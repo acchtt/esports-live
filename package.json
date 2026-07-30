@@ -10,7 +10,7 @@
   "scripts": {
     "dev:web": "vite apps/web",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test packages/**/*.test.ts",
+    "test": "node --import tsx --test packages/core/src/*.test.ts packages/adapter-lol/src/*.test.ts apps/api/src/*.test.ts",
     "check": "npm run typecheck && npm test"
   },
   "devDependencies": {

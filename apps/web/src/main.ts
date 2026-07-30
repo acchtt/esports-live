@@ -31,13 +31,15 @@ const esports: readonly EsportCard[] = [
   }
 ];
 
-const statusHeading = document.querySelector<HTMLElement>('#platform-status');
-const statusBadge = document.querySelector<HTMLElement>('#status-badge');
-const grid = document.querySelector<HTMLElement>('#esport-grid');
-
-if (!statusHeading || !statusBadge || !grid) {
-  throw new Error('Application shell is incomplete.');
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing required element: ${selector}`);
+  return element;
 }
+
+const statusHeading = requiredElement<HTMLElement>('#platform-status');
+const statusBadge = requiredElement<HTMLElement>('#status-badge');
+const grid = requiredElement<HTMLElement>('#esport-grid');
 
 function renderCards(enabled: readonly string[]): void {
   grid.replaceChildren(...esports.map(esport => {

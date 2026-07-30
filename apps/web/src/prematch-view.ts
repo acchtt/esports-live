@@ -1,11 +1,13 @@
-const selectedCompetition = document.querySelector<HTMLElement>('#selected-competition');
-const selectedSeries = document.querySelector<HTMLElement>('#selected-series');
-const selectedMeta = document.querySelector<HTMLElement>('#selected-meta');
-const gameContent = document.querySelector<HTMLElement>('#game-content');
-
-if (!selectedCompetition || !selectedSeries || !selectedMeta || !gameContent) {
-  throw new Error('Pre-match view requires the analysis workspace elements.');
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing required element: ${selector}`);
+  return element;
 }
+
+const selectedCompetition = requiredElement<HTMLElement>('#selected-competition');
+const selectedSeries = requiredElement<HTMLElement>('#selected-series');
+const selectedMeta = requiredElement<HTMLElement>('#selected-meta');
+const gameContent = requiredElement<HTMLElement>('#game-content');
 
 const style = document.createElement('style');
 style.textContent = `

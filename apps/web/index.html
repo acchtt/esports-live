@@ -3,35 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Provider-neutral live esports data and analysis." />
+    <meta name="description" content="Provider-neutral live esports schedules and verified telemetry." />
     <title>Esports Live</title>
   </head>
   <body>
-    <main class="shell">
-      <header class="hero">
-        <p class="eyebrow">LIVE ESPORTS PLATFORM</p>
-        <h1>Esports Live</h1>
-        <p class="lede">One normalized platform for schedules, game state, and verified telemetry across esports.</p>
-      </header>
-
-      <section class="status-card" aria-labelledby="platform-status">
-        <div>
-          <p class="eyebrow">PLATFORM</p>
-          <h2 id="platform-status">Connecting to API</h2>
-        </div>
-        <span id="status-badge" class="badge">CHECKING</span>
-      </section>
-
-      <section>
-        <div class="section-heading">
+    <div class="app-frame">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">EL</span>
           <div>
-            <p class="eyebrow">SUPPORTED GAMES</p>
-            <h2>Adapter status</h2>
+            <strong>Esports Live</strong>
+            <small>Normalized live intelligence</small>
           </div>
         </div>
-        <div id="esport-grid" class="esport-grid" aria-live="polite"></div>
-      </section>
-    </main>
+        <div class="connection" aria-live="polite">
+          <span id="status-dot" class="status-dot"></span>
+          <div>
+            <strong id="platform-status">Connecting</strong>
+            <small id="connection-detail">Checking API and adapters</small>
+          </div>
+          <span id="status-badge" class="badge">CHECKING</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="panel schedule-panel" aria-labelledby="schedule-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">MATCHES</p>
+              <h1 id="schedule-heading">League of Legends</h1>
+            </div>
+            <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
+          </div>
+
+          <div class="sport-tabs" aria-label="Esports">
+            <button class="sport-tab active" type="button">LoL <span>LIVE</span></button>
+            <button class="sport-tab" type="button" disabled>CS2 <span>PLANNED</span></button>
+            <button class="sport-tab" type="button" disabled>Dota 2 <span>PLANNED</span></button>
+          </div>
+
+          <div id="schedule-list" class="schedule-list" aria-live="polite">
+            <div class="empty-state">Loading schedule…</div>
+          </div>
+        </aside>
+
+        <section class="panel analysis-panel" aria-labelledby="selected-series">
+          <div class="analysis-header">
+            <div>
+              <p id="selected-competition" class="eyebrow">SELECT A MATCH</p>
+              <h2 id="selected-series">Live analysis workspace</h2>
+              <p id="selected-meta" class="selected-meta">Choose a match from the schedule.</p>
+            </div>
+            <div id="game-selector" class="game-selector" aria-label="Series games"></div>
+          </div>
+
+          <section id="quality-banner" class="quality-banner hidden" aria-live="polite"></section>
+
+          <div id="game-content" class="game-content">
+            <div class="analysis-empty">
+              <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
+              <h3>No match selected</h3>
+              <p>Live game state, objectives, player telemetry, and source quality will appear here.</p>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel platform-panel" aria-labelledby="platform-heading">
+          <div class="panel-heading compact">
+            <div>
+              <p class="eyebrow">PLATFORM</p>
+              <h2 id="platform-heading">Adapter status</h2>
+            </div>
+          </div>
+          <div id="adapter-list" class="adapter-list"></div>
+
+          <section class="policy-card">
+            <p class="eyebrow">QUALITY POLICY</p>
+            <dl>
+              <div><dt>0–30s</dt><dd>Fresh</dd></div>
+              <div><dt>31–90s</dt><dd>Context only</dd></div>
+              <div><dt>&gt;90s</dt><dd>Stale</dd></div>
+            </dl>
+            <p>Only fresh, complete, advancing telemetry is marked safe for live analysis.</p>
+          </section>
+        </aside>
+      </main>
+
+      <footer>
+        <span>Esports Live · clean-room community project</span>
+        <span>Provider status and telemetry quality are reported separately.</span>
+      </footer>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

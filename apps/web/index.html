@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Provider-neutral live esports data and analysis." />
+    <title>Esports Live</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">LIVE ESPORTS PLATFORM</p>
+        <h1>Esports Live</h1>
+        <p class="lede">One normalized platform for schedules, game state, and verified telemetry across esports.</p>
+      </header>
+
+      <section class="status-card" aria-labelledby="platform-status">
+        <div>
+          <p class="eyebrow">PLATFORM</p>
+          <h2 id="platform-status">Connecting to API</h2>
+        </div>
+        <span id="status-badge" class="badge">CHECKING</span>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SUPPORTED GAMES</p>
+            <h2>Adapter status</h2>
+          </div>
+        </div>
+        <div id="esport-grid" class="esport-grid" aria-live="polite"></div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,185 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { LolAdapter } from './adapter.ts';
+import { createRiotLolProvider, riotWindowProbeTimes } from './riot-provider.ts';
+
+const NOW = '2026-07-31T08:10:00.000Z';
+const SOURCE = '2026-07-31T08:09:50.000Z';
+
+function json(value: unknown, status = 200): Response {
+  return new Response(status === 204 ? null : JSON.stringify(value), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+function eventPayload() {
+  return {
+    data: {
+      event: {
+        id: 'match-1',
+        state: 'inProgress',
+        startTime: '2026-07-31T08:00:00.000Z',
+        league: { id: 'lck', name: 'LCK', region: 'KR' },
+        match: {
+          id: 'match-1',
+          strategy: { count: 3 },
+          teams: [
+            { id: 'team-a', name: 'Team A', code: 'A' },
+            { id: 'team-b', name: 'Team B', code: 'B' }
+          ],
+          games: [{
+            id: 'game-1',
+            number: 1,
+            state: 'inProgress',
+            teams: [
+              { id: 'team-a', side: 'blue' },
+              { id: 'team-b', side: 'red' }
+            ],
+            vods: [{ firstFrameTime: '2026-07-31T08:00:00.000Z', startMillis: 0 }]
+          }]
+        }
+      }
+    }
+  };
+}
+
+function participant(id: number) {
+  return {
+    participantId: id,
+    level: 7,
+    kills: id === 1 ? 2 : 0,
+    deaths: 0,
+    assists: 1,
+    creepScore: 70,
+    totalGold: 6000
+  };
+}
+
+function windowPayload() {
+  const metadata = (start: number) => Array.from({ length: 5 }, (_, index) => ({
+    participantId: start + index,
+    summonerName: `Player ${start + index}`,
+    championId: `Champion${start + index}`,
+    role: ['top', 'jungle', 'mid', 'bottom', 'support'][index]
+  }));
+  return {
+    esportsMatchId: 'match-1',
+    gameMetadata: {
+      esportsMatchId: 'match-1',
+      patchVersion: '26.14',
+      blueTeamMetadata: { esportsTeamId: 'team-a', participantMetadata: metadata(1) },
+      redTeamMetadata: { esportsTeamId: 'team-b', participantMetadata: metadata(6) }
+    },
+    frames: [{
+      rfc460Timestamp: SOURCE,
+      blueTeam: {
+        totalGold: 30000,
+        totalKills: 2,
+        towers: 2,
+        inhibitors: 0,
+        dragons: ['infernal'],
+        barons: 0,
+        heralds: 1,
+        participants: Array.from({ length: 5 }, (_, index) => participant(index + 1))
+      },
+      redTeam: {
+        totalGold: 28500,
+        totalKills: 0,
+        towers: 1,
+        inhibitors: 0,
+        dragons: [],
+        barons: 0,
+        heralds: 0,
+        participants: Array.from({ length: 5 }, (_, index) => participant(index + 6))
+      }
+    }]
+  };
+}
+
+function detailsPayload() {
+  return {
+    frames: [{
+      rfc460Timestamp: SOURCE,
+      participants: Array.from({ length: 10 }, (_, index) => ({
+        ...participant(index + 1),
+        items: [{ itemID: 1001 }, { itemID: 2003 }]
+      }))
+    }]
+  };
+}
+
+function fetcher(options: { includeDetails?: boolean } = {}) {
+  return async (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/getSchedule')) {
+      return json({ data: { schedule: { events: [eventPayload().data.event] } } });
+    }
+    if (url.pathname.endsWith('/getEventDetails')) return json(eventPayload());
+    if (url.pathname.includes('/window/game-1')) return json(windowPayload());
+    if (url.pathname.includes('/details/game-1')) {
+      return options.includeDetails === false ? json(null, 204) : json(detailsPayload());
+    }
+    return json({ error: 'unexpected_url', url: url.toString() }, 500);
+  };
+}
+
+test('Riot live-window probes are bounded and include delayed anchors', () => {
+  const probes = riotWindowProbeTimes(Date.parse(NOW));
+  assert.deepEqual(probes, [
+    null,
+    '2026-07-31T08:09:40.000Z',
+    '2026-07-31T08:09:00.000Z',
+    '2026-07-31T08:08:00.000Z',
+    '2026-07-31T08:06:00.000Z',
+    '2026-07-31T08:04:00.000Z'
+  ]);
+});
+
+test('Riot provider normalizes schedule entries', async () => {
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: fetcher(),
+    now: () => new Date(NOW)
+  });
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule.length, 1);
+  assert.equal(schedule[0]?.series.id, 'match-1');
+  assert.equal(schedule[0]?.series.competition.id, 'lck');
+  assert.equal(schedule[0]?.series.games[0]?.id, 'game-1');
+});
+
+test('Riot provider emits a complete normalized gameplay snapshot', async () => {
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: fetcher(),
+    now: () => new Date(NOW)
+  });
+  const adapter = new LolAdapter(provider);
+  const snapshot = await adapter.getLiveSnapshot('game-1');
+
+  assert.equal(snapshot.series.state, 'live');
+  assert.equal(snapshot.game.state, 'live');
+  assert.equal(snapshot.stats?.gameClockSeconds, 590);
+  assert.equal(snapshot.stats?.blue.gold, 30000);
+  assert.deepEqual(snapshot.stats?.blue.players[0]?.items, ['1001', '2003']);
+  assert.equal(snapshot.quality.freshness, 'fresh');
+  assert.equal(snapshot.quality.complete, true);
+  assert.equal(snapshot.quality.safeForLiveAnalysis, true);
+});
+
+test('missing Riot detail frames remain visible but unsafe', async () => {
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: fetcher({ includeDetails: false }),
+    now: () => new Date(NOW)
+  });
+  const adapter = new LolAdapter(provider);
+  const snapshot = await adapter.getLiveSnapshot('game-1');
+
+  assert.equal(snapshot.stats?.blue.gold, 30000);
+  assert.equal(snapshot.stats?.blue.players[0]?.items, null);
+  assert.equal(snapshot.quality.complete, false);
+  assert.equal(snapshot.quality.safeForLiveAnalysis, false);
+  assert.ok(snapshot.quality.reasons.some(reason => reason.field === 'blue.players.0.items'));
+});

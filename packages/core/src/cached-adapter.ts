@@ -1,5 +1,5 @@
 import type { EsportAdapter, ScheduleQuery } from './adapter.ts';
-import type { LiveSnapshot, ScheduleEvent } from './domain.ts';
+import type { EsportId, LiveSnapshot, ScheduleEvent } from './domain.ts';
 
 export interface AdapterCachePolicy {
   scheduleTtlMs: number;
@@ -26,8 +26,8 @@ function queryKey(query: ScheduleQuery): string {
 }
 
 export class CachedAdapter<TStats = unknown> implements EsportAdapter<TStats> {
-  readonly esport;
-  readonly providerId;
+  readonly esport: EsportId;
+  readonly providerId: string;
   readonly #adapter: EsportAdapter<TStats>;
   readonly #policy: AdapterCachePolicy;
   readonly #now: () => number;

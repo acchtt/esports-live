@@ -1,0 +1,12 @@
+{
+  "name": "@esports-live/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@esports-live/core": "0.1.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -70,7 +70,7 @@ export class LolAdapter implements EsportAdapter<LolStats> {
       observedAt: raw.observedAt,
       complete,
       advancing: raw.advancing,
-      reasons: raw.reasons
+      ...(raw.reasons ? { reasons: raw.reasons } : {})
     });
 
     return {

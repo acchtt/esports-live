@@ -140,7 +140,8 @@ function renderPrematch(): void {
   const [left = 'Team 1', right = 'Team 2'] = title.split(/\s+vs\s+/i, 2);
   const [start = 'Scheduled', format = 'Series format pending'] = meta.split(' · ', 2);
   const signature = `${title}|${meta}|${competition}`;
-  if (gameContent.dataset.prematchSignature === signature) return;
+  const overviewVisible = Boolean(gameContent.querySelector('[data-prematch-overview]'));
+  if (overviewVisible && gameContent.dataset.prematchSignature === signature) return;
 
   gameContent.dataset.prematchSignature = signature;
   gameContent.innerHTML = `

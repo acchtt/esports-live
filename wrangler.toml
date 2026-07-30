@@ -1,6 +1,6 @@
 name = "esports-live-api"
 main = "apps/api/src/worker.ts"
-compatibility_date = "2026-07-31"
+compatibility_date = "2026-07-30"
 workers_dev = true
 
 [observability]

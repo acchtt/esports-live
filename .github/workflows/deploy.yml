@@ -59,6 +59,19 @@ jobs:
         with:
           node-version: 24
       - run: npm install
+      - name: Ensure Pages project exists
+        shell: bash
+        run: |
+          projects_json="$(npx wrangler pages project list --json)"
+          if PROJECTS_JSON="$projects_json" node -e '
+            const parsed = JSON.parse(process.env.PROJECTS_JSON || "[]");
+            const projects = Array.isArray(parsed) ? parsed : (parsed.result || []);
+            process.exit(projects.some(project => project.name === "esports-live") ? 0 : 1);
+          '; then
+            echo "Pages project esports-live already exists."
+          else
+            npx wrangler pages project create esports-live --production-branch main
+          fi
       - name: Build web application
         run: npm run build:web
         env:

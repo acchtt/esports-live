@@ -445,3 +445,228 @@ footer { display: flex; justify-content: space-between; gap: 20px; width: min(15
   .live-player-row > span:nth-of-type(3),
   .live-player-row > span:nth-of-type(4) { display: none; }
 }
+
+
+/* synchronized-live-telemetry-redesign */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.scoreboard {
+  grid-template-columns: minmax(0, 1fr) minmax(190px, auto) minmax(0, 1fr);
+  gap: 18px;
+  padding: 17px 20px;
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.16), rgba(255, 255, 255, 0.018) 39%, rgba(255, 255, 255, 0.018) 61%, rgba(244, 63, 94, 0.16)),
+    #0a1120;
+}
+
+.scoreboard .score-team.blue > span,
+.scoreboard .score-team.blue > strong {
+  color: #b9ebff;
+}
+
+.scoreboard .score-team.red > span,
+.scoreboard .score-team.red > strong {
+  color: #ffc2ce;
+}
+
+.scoreboard .clock {
+  min-width: 190px;
+  gap: 4px;
+}
+
+.scoreboard .clock small {
+  color: #9aa9bf;
+  font-size: 0.52rem;
+}
+
+.scoreboard .clock > strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreboard .clock .patch-label {
+  color: #74859d;
+  font-size: 0.57rem;
+}
+
+.scoreboard .clock .gold-lead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  margin-top: 2px;
+  padding: 0 11px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  font-size: 0.67rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.scoreboard .clock .gold-lead.blue {
+  border-color: rgba(56, 189, 248, 0.42);
+  color: #d9f5ff;
+  background: rgba(14, 165, 233, 0.18);
+  box-shadow: 0 0 24px rgba(14, 165, 233, 0.14);
+}
+
+.scoreboard .clock .gold-lead.red {
+  border-color: rgba(251, 113, 133, 0.42);
+  color: #ffe1e7;
+  background: rgba(244, 63, 94, 0.18);
+  box-shadow: 0 0 24px rgba(244, 63, 94, 0.14);
+}
+
+.scoreboard .clock .gold-lead.even,
+.scoreboard .clock .gold-lead.unknown {
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.team-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.team-card.blue {
+  border-color: rgba(56, 189, 248, 0.4);
+  background:
+    radial-gradient(circle at -8% 0%, rgba(14, 165, 233, 0.34), transparent 50%),
+    linear-gradient(120deg, rgba(7, 57, 82, 0.58), rgba(9, 16, 31, 0.94) 58%);
+  box-shadow:
+    inset 5px 0 0 rgba(56, 189, 248, 0.92),
+    0 0 34px rgba(14, 165, 233, 0.12);
+}
+
+.team-card.red {
+  border-color: rgba(251, 113, 133, 0.4);
+  background:
+    radial-gradient(circle at 108% 0%, rgba(244, 63, 94, 0.34), transparent 50%),
+    linear-gradient(240deg, rgba(88, 21, 42, 0.58), rgba(9, 16, 31, 0.94) 58%);
+  box-shadow:
+    inset -5px 0 0 rgba(251, 113, 133, 0.92),
+    0 0 34px rgba(244, 63, 94, 0.12);
+}
+
+.team-card.blue .team-heading small,
+.team-card.blue .team-primary span {
+  color: #8bdcff;
+}
+
+.team-card.red .team-heading small,
+.team-card.red .team-primary span {
+  color: #ff9fb2;
+}
+
+.live-team-primary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.live-team-primary > div {
+  min-height: 60px;
+  padding: 10px 12px;
+}
+
+.live-team-primary strong {
+  font-size: 1.16rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-difference.positive strong {
+  color: #86efac;
+}
+
+.gold-difference.negative strong {
+  color: #fda4af;
+}
+
+.gold-difference.even strong,
+.gold-difference.unknown strong {
+  color: #cbd5e1;
+}
+
+.objective-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.objective-grid > .objective-stat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 43px;
+  padding: 7px 6px;
+  text-align: left;
+}
+
+.objective-icon {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  font-size: initial;
+  line-height: 1;
+}
+
+.objective-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.team-card.blue .objective-icon {
+  color: #62d5ff;
+  filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.34));
+}
+
+.team-card.red .objective-icon {
+  color: #ff8399;
+  filter: drop-shadow(0 0 7px rgba(251, 113, 133, 0.34));
+}
+
+.objective-grid > .objective-stat strong {
+  margin-top: 0;
+  color: #f1f5f9;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 620px) {
+  .scoreboard {
+    grid-template-columns: minmax(0, 1fr) minmax(122px, auto) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .scoreboard .clock {
+    min-width: 122px;
+  }
+
+  .scoreboard .clock .gold-lead {
+    max-width: 160px;
+    min-height: 24px;
+    padding: 0 8px;
+    overflow: hidden;
+    font-size: 0.58rem;
+    text-overflow: ellipsis;
+  }
+
+  .objective-grid {
+    grid-template-columns: repeat(5, minmax(48px, 1fr));
+    overflow-x: auto;
+  }
+}

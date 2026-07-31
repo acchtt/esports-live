@@ -21,6 +21,7 @@ export interface TeamRef {
   id: string;
   name: string;
   code?: string;
+  slug?: string;
   imageUrl?: string;
 }
 
@@ -29,6 +30,21 @@ export interface PlayerRef {
   handle: string;
   teamId?: string;
   role?: string;
+  displayName?: string;
+  imageUrl?: string;
+}
+
+export interface TeamRosterRef {
+  team: TeamRef;
+  players: readonly PlayerRef[];
+}
+
+export interface StandingRef {
+  rank: number | null;
+  team: TeamRef;
+  wins: number | null;
+  losses: number | null;
+  group?: string;
 }
 
 export interface SeriesGameRef {
@@ -58,6 +74,18 @@ export interface QualityReason {
   code: string;
   message: string;
   field?: string;
+}
+
+export interface SeriesContext {
+  schemaVersion: '1.0';
+  esport: EsportId;
+  seriesId: string;
+  provider: ProviderRef;
+  observedAt: string;
+  rosters: readonly TeamRosterRef[];
+  standings: readonly StandingRef[];
+  complete: boolean;
+  reasons: readonly QualityReason[];
 }
 
 export interface TelemetryQuality {

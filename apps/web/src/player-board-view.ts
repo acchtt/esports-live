@@ -518,7 +518,7 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
   renderTeam(snapshot.stats.blue, patch);
   renderTeam(snapshot.stats.red, patch);
   renderRoleBoard(snapshot.stats.blue, snapshot.stats.red, patch);
-  const patchElement = document.querySelector<HTMLElement>('.scoreboard .patch-label');
+  const patchElement = document.querySelector<HTMLElement>('.role-match-clock .patch-label');
   if (patchElement) patchElement.textContent = patchLabel(snapshot.stats.patch);
   bindImageFallbacks();
 }

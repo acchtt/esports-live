@@ -334,22 +334,45 @@ function roleMatchupRows(blue: LolTeamState, red: LolTeamState): string {
   }).join('');
 }
 
-function teamSummaryMarkup(team: LolTeamState, imageUrl?: string): string {
+function matchTeamHeaderMarkup(team: LolTeamState, imageUrl?: string): string {
   return `
-    <div class="role-team-summary ${team.side}">
-      ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="" />` : '<span class="team-placeholder"></span>'}
-      <div class="role-team-name"><small>${team.side.toUpperCase()} SIDE</small><strong>${escapeHtml(team.name)}</strong></div>
-      <div class="role-team-gold"><small>TOTAL GOLD</small><strong>${formatNumber(team.gold)}</strong></div>
+    <div class="role-match-team ${team.side}">
+      ${imageUrl
+        ? `<img class="role-match-team-logo" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(team.name)} logo" />`
+        : '<span class="role-match-team-logo team-placeholder" aria-hidden="true"></span>'}
+      <div class="role-match-team-copy">
+        <small>${team.side.toUpperCase()} SIDE</small>
+        <strong>${escapeHtml(team.name)}</strong>
+      </div>
+      <div class="role-match-team-metrics">
+        <span><small>KILLS</small><strong>${formatNumber(team.kills)}</strong></span>
+        <span><small>TOTAL GOLD</small><strong>${formatNumber(team.gold)}</strong></span>
+      </div>
     </div>`;
 }
 
-function roleScoreboardMarkup(blue: LolTeamState, red: LolTeamState, blueImageUrl?: string, redImageUrl?: string): string {
+function roleScoreboardMarkup(
+  blue: LolTeamState,
+  red: LolTeamState,
+  gameNumber: number,
+  gameClockSeconds: number | null,
+  patch: string | null,
+  goldLeadClass: string,
+  goldLeader: string,
+  blueImageUrl?: string,
+  redImageUrl?: string
+): string {
   return `
     <section class="role-scoreboard-board">
-      <div class="role-team-summary-grid">
-        ${teamSummaryMarkup(blue, blueImageUrl)}
-        <div class="role-summary-label"><strong>ROLE MATCHUPS</strong><span>Gold difference by position</span></div>
-        ${teamSummaryMarkup(red, redImageUrl)}
+      <div class="role-match-header">
+        ${matchTeamHeaderMarkup(blue, blueImageUrl)}
+        <div class="role-match-clock">
+          <small>GAME ${gameNumber} · TELEMETRY TIME</small>
+          <strong id="live-game-clock" title="Game time of this telemetry snapshot">${formatClock(gameClockSeconds)}</strong>
+          <span class="patch-label">${escapeHtml(publicPatchLabel(patch))}</span>
+          <em class="gold-lead ${goldLeadClass}">${escapeHtml(goldLeader)}</em>
+        </div>
+        ${matchTeamHeaderMarkup(red, redImageUrl)}
       </div>
       <div class="role-objective-comparison">
         <div class="role-objectives blue">${objectiveMarkup(blue)}</div>
@@ -395,18 +418,17 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
       ? 'Gold even'
       : `Gold lead · ${goldDifference > 0 ? stats.blue.name : stats.red.name} ${formatSigned(Math.abs(goldDifference))}`;
 
-  gameContent.innerHTML = `
-    <div class="scoreboard">
-      <div class="score-team blue"><span>${escapeHtml(stats.blue.name)}</span><strong>${formatNumber(stats.blue.kills)}</strong></div>
-      <div class="clock">
-        <small>GAME ${snapshot.game.number} · TELEMETRY TIME</small>
-        <strong id="live-game-clock" title="Game time of this telemetry snapshot">${formatClock(stats.gameClockSeconds)}</strong>
-        <span class="patch-label">${escapeHtml(publicPatchLabel(stats.patch ?? null))}</span>
-        <em class="gold-lead ${goldLeadClass}">${escapeHtml(goldLeader)}</em>
-      </div>
-      <div class="score-team red right"><strong>${formatNumber(stats.red.kills)}</strong><span>${escapeHtml(stats.red.name)}</span></div>
-    </div>
-    ${roleScoreboardMarkup(stats.blue, stats.red, blueRef?.imageUrl, redRef?.imageUrl)}`;
+  gameContent.innerHTML = roleScoreboardMarkup(
+    stats.blue,
+    stats.red,
+    snapshot.game.number,
+    stats.gameClockSeconds,
+    stats.patch ?? null,
+    goldLeadClass,
+    goldLeader,
+    blueRef?.imageUrl,
+    redRef?.imageUrl
+  );
   startLiveClock(snapshot);
   window.dispatchEvent(new CustomEvent<LiveSnapshot<LolStats>>('esports-live:snapshot', { detail: snapshot }));
 }

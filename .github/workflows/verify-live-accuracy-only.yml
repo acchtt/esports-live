@@ -1,0 +1,204 @@
+name: Verify Live Accuracy Only
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/verify-live-accuracy-only.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production release
+        env:
+          API_BASE: https://esports-live-api.acchtt.workers.dev
+          WEB_BASE: https://esports-live.pages.dev
+        run: |
+          node - <<'NODE'
+          const apiBase = process.env.API_BASE;
+          const webBase = process.env.WEB_BASE;
+          const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+          async function response(url) {
+            try {
+              const result = await fetch(url, {
+                headers: { accept: 'application/json,text/html,*/*', 'cache-control': 'no-cache' }
+              });
+              const text = await result.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: result.ok, status: result.status, text, body };
+            } catch (error) {
+              return { ok: false, status: 0, text: '', body: { message: String(error) } };
+            }
+          }
+
+          function coverage(snapshot) {
+            const stats = snapshot?.stats ?? null;
+            const players = [
+              ...(Array.isArray(stats?.blue?.players) ? stats.blue.players : []),
+              ...(Array.isArray(stats?.red?.players) ? stats.red.players : [])
+            ];
+            return {
+              gameId: snapshot?.game?.id ?? null,
+              state: snapshot?.game?.state ?? null,
+              sourceTimestamp: snapshot?.quality?.sourceTimestamp ?? null,
+              freshness: snapshot?.quality?.freshness ?? null,
+              complete: snapshot?.quality?.complete ?? null,
+              safeForLiveAnalysis: snapshot?.quality?.safeForLiveAnalysis ?? null,
+              clock: stats?.gameClockSeconds ?? null,
+              blue: stats ? {
+                name: stats.blue?.name ?? null,
+                gold: stats.blue?.gold ?? null,
+                kills: stats.blue?.kills ?? null,
+                towers: stats.blue?.objectives?.towers ?? null,
+                dragons: Array.isArray(stats.blue?.objectives?.dragons) ? stats.blue.objectives.dragons.length : null,
+                barons: stats.blue?.objectives?.barons ?? null
+              } : null,
+              red: stats ? {
+                name: stats.red?.name ?? null,
+                gold: stats.red?.gold ?? null,
+                kills: stats.red?.kills ?? null,
+                towers: stats.red?.objectives?.towers ?? null,
+                dragons: Array.isArray(stats.red?.objectives?.dragons) ? stats.red.objectives.dragons.length : null,
+                barons: stats.red?.objectives?.barons ?? null
+              } : null,
+              players: {
+                count: players.length,
+                named: players.filter(player => player?.handle).length,
+                champions: players.filter(player => player?.championId).length,
+                kda: players.filter(player => [player?.kills, player?.deaths, player?.assists].every(Number.isFinite)).length,
+                cs: players.filter(player => Number.isFinite(player?.creepScore)).length,
+                gold: players.filter(player => Number.isFinite(player?.totalGold)).length,
+                items: players.filter(player => Array.isArray(player?.items) && player.items.length > 0).length
+              },
+              reasonCodes: Array.isArray(snapshot?.quality?.reasons)
+                ? snapshot.quality.reasons.map(reason => reason.code)
+                : []
+            };
+          }
+
+          let finalReport = null;
+          for (let attempt = 1; attempt <= 12; attempt += 1) {
+            const bust = Date.now();
+            const [health, schedule, web] = await Promise.all([
+              response(`${apiBase}/health?verify=${bust}`),
+              response(`${apiBase}/v1/lol/schedule?limit=100&verify=${bust}`),
+              response(`${webBase}?verify=${bust}`)
+            ]);
+
+            const scriptSources = [...web.text.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+              .map(match => new URL(match[1], webBase).toString());
+            const scriptBodies = await Promise.all(scriptSources.map(async source => {
+              const result = await response(`${source}${source.includes('?') ? '&' : '?'}verify=${bust}`);
+              return result.text;
+            }));
+            const bundle = scriptBodies.join('\n');
+            const bundleReady = bundle.includes('Final game telemetry')
+              && bundle.includes('Riot live-feed archive')
+              && bundle.includes('completed-final-team');
+
+            const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+            const candidates = events
+              .filter(event => event?.series?.state === 'completed')
+              .sort((a, b) => Date.parse(b.series.scheduledStart) - Date.parse(a.series.scheduledStart))
+              .slice(0, 8);
+            const completedReports = [];
+
+            for (const event of candidates) {
+              const context = await response(
+                `${apiBase}/v1/lol/series/${encodeURIComponent(event.series.id)}/context?verify=${bust}`
+              );
+              const games = Array.isArray(context.body?.history?.games)
+                ? context.body.history.games.filter(game => game?.state === 'completed')
+                : [];
+              const snapshots = [];
+              for (const game of games.slice(0, 3)) {
+                const result = await response(
+                  `${apiBase}/v1/lol/games/${encodeURIComponent(game.id)}/live?verify=${bust}`
+                );
+                snapshots.push({ status: result.status, ...(result.ok ? coverage(result.body) : {}) });
+              }
+              completedReports.push({
+                seriesId: event.series.id,
+                competition: event.series.competition?.name ?? null,
+                teams: event.series.teams?.map(team => team.name) ?? [],
+                score: context.body?.history?.score?.map(row => row.wins) ?? [],
+                snapshots
+              });
+            }
+
+            const rich = completedReports.flatMap(series => series.snapshots.map(snapshot => ({ series, snapshot })))
+              .find(({ snapshot }) => (
+                snapshot.blue
+                && snapshot.red
+                && Number.isFinite(snapshot.blue.gold)
+                && Number.isFinite(snapshot.red.gold)
+                && snapshot.players?.count === 10
+                && snapshot.players.named >= 10
+                && snapshot.players.champions >= 10
+                && snapshot.players.kda >= 10
+                && snapshot.players.cs >= 10
+                && snapshot.players.gold >= 10
+                && snapshot.players.items >= 8
+              ));
+
+            const active = events.find(event => event?.series?.games?.some(game => game.state === 'live'))
+              ?? events.find(event => event?.series?.state === 'live');
+            let live = null;
+            if (active) {
+              const game = active.series.games.find(game => game.state === 'live')
+                ?? active.series.games.find(game => game.state === 'draft')
+                ?? active.series.games.find(game => game.state !== 'completed');
+              if (game) {
+                const result = await response(`${apiBase}/v1/lol/games/${encodeURIComponent(game.id)}/live?verify=${bust}`);
+                live = {
+                  seriesId: active.series.id,
+                  competition: active.series.competition?.name ?? null,
+                  teams: active.series.teams?.map(team => team.name) ?? [],
+                  status: result.status,
+                  snapshot: result.ok ? coverage(result.body) : null
+                };
+              }
+            }
+
+            finalReport = {
+              checkedAt: new Date().toISOString(),
+              attempt,
+              healthStatus: health.status,
+              adapters: health.body?.adapters ?? [],
+              scheduleStatus: schedule.status,
+              scheduleCount: events.length,
+              webStatus: web.status,
+              bundleReady,
+              completedSeriesChecked: completedReports.length,
+              richCompleted: rich ? {
+                seriesId: rich.series.seriesId,
+                competition: rich.series.competition,
+                teams: rich.series.teams,
+                score: rich.series.score,
+                snapshot: rich.snapshot
+              } : null,
+              completedReports,
+              live
+            };
+            console.log(`LIVE_ACCURACY_VERIFY_REPORT=${JSON.stringify(finalReport)}`);
+
+            if (
+              health.ok
+              && health.body?.adapters?.includes('lol')
+              && schedule.ok
+              && web.ok
+              && bundleReady
+              && rich
+            ) process.exit(0);
+
+            await wait(10_000);
+          }
+
+          console.error(`FINAL_LIVE_ACCURACY_VERIFY_REPORT=${JSON.stringify(finalReport)}`);
+          process.exit(1);
+          NODE

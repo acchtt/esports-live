@@ -16,6 +16,7 @@ import { createRiotLolProvider, type RiotLolProviderOptions } from './riot-provi
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const REQUEST_TIMEOUT_MS = 8_000;
 const EVENT_TIME_TOLERANCE_MS = 12 * 60 * 60 * 1_000;
+const MAX_RECENT_SERIES = 500;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -291,6 +292,12 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
   const now = options.now ?? (() => new Date());
   const primary = createRiotLolContextProvider({ ...options, fetcher });
   const base = createRiotLolProvider({ ...options, fetcher });
+  const recentSeries = new Map<string, LolProviderSeries>();
+
+  const remember = (series: readonly LolProviderSeries[]): void => {
+    if (recentSeries.size + series.length > MAX_RECENT_SERIES) recentSeries.clear();
+    for (const item of series) recentSeries.set(item.id, item);
+  };
 
   const persisted = async (
     path: string,
@@ -309,22 +316,33 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
     id: primary.id,
     name: primary.name,
     ...(primary.sourceUrl ? { sourceUrl: primary.sourceUrl } : {}),
-    getSchedule: () => primary.getSchedule(),
+
+    async getSchedule() {
+      const entries = await primary.getSchedule();
+      remember(entries.map(entry => entry.series));
+      return entries;
+    },
+
     getSnapshot: (gameId: string, after?: string) => primary.getSnapshot(gameId, after),
 
     async getSeriesContext(seriesId: string): Promise<LolProviderSeriesContext> {
       const reasons: QualityReason[] = [];
-      const [normalizedSchedule, rawSchedule] = await Promise.all([
-        base.getSchedule(),
-        persisted('getSchedule', {}).catch(error => {
-          reasons.push({
-            code: 'schedule_context_unavailable',
-            message: error instanceof Error ? error.message : 'Riot schedule context is unavailable.'
-          });
-          return null;
-        })
-      ]);
-      const normalized = normalizedSchedule.find(entry => entry.series.id === seriesId)?.series;
+      const rawSchedulePromise = persisted('getSchedule', {}).catch(error => {
+        reasons.push({
+          code: 'schedule_context_unavailable',
+          message: error instanceof Error ? error.message : 'Riot schedule context is unavailable.'
+        });
+        return null;
+      });
+
+      let normalized = recentSeries.get(seriesId);
+      if (!normalized) {
+        const normalizedSchedule = await base.getSchedule();
+        remember(normalizedSchedule.map(entry => entry.series));
+        normalized = recentSeries.get(seriesId);
+      }
+      const rawSchedule = await rawSchedulePromise;
+
       if (!normalized) {
         return {
           seriesId,

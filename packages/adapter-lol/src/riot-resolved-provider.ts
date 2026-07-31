@@ -465,6 +465,7 @@ function verifiedPlayersFromWindow(
   });
   if (!selected) return null;
 
+  const byId = new Map(pool.map(player => [player.id, player] as const));
   const byHandle = new Map<string, PlayerRef[]>();
   for (const player of pool) {
     const key = normalizedText(player.handle);
@@ -473,17 +474,21 @@ function verifiedPlayersFromWindow(
 
   const verified = array(selected.participantMetadata).flatMap(value => {
     const participant = object(value);
-    const handle = firstString(participant, ['summonerName', 'name']);
+    const rawHandle = firstString(participant, ['summonerName', 'name']);
+    const esportsPlayerId = firstString(participant, ['esportsPlayerId', 'playerId']);
     const role = canonicalRole(firstString(participant, ['role', 'roleSlug']));
-    if (!handle || !role) return [];
-    const matches = byHandle.get(normalizedText(handle)) ?? [];
-    const catalogMatch = matches.find(player => canonicalRole(player.role ?? null) === role)
-      ?? matches[0]
+    if (!rawHandle || !role) return [];
+    const directMatch = esportsPlayerId ? byId.get(esportsPlayerId) : undefined;
+    const handleMatches = byHandle.get(normalizedText(rawHandle)) ?? [];
+    const catalogMatch = directMatch
+      ?? handleMatches.find(player => canonicalRole(player.role ?? null) === role)
+      ?? handleMatches[0]
       ?? null;
+    const handle = catalogMatch?.handle ?? rawHandle;
     const syntheticHandle = normalizedText(handle).replaceAll(' ', '-');
     return [{
       ...(catalogMatch ?? {
-        id: `verified:${normalizedTeam.id}:${syntheticHandle}`,
+        id: esportsPlayerId ?? `verified:${normalizedTeam.id}:${syntheticHandle}`,
         handle,
         teamId: normalizedTeam.id
       }),
@@ -718,7 +723,14 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
 
     const request = (async (): Promise<VerifiedLineupResult> => {
       const selectedStart = Date.parse(selectedSeries.scheduledStart);
-      const candidateGames = [...recentSeries.values()]
+      const selectedGames = selectedSeries.games
+        .map(game => ({ game, series: selectedSeries }))
+        .sort((left, right) => (
+          Number(right.game.state === 'completed') - Number(left.game.state === 'completed')
+          || right.game.number - left.game.number
+        ));
+      const historicalGames = [...recentSeries.values()]
+        .filter(series => series.id !== selectedSeries.id)
         .filter(series => (
           !Number.isFinite(selectedStart)
           || !Number.isFinite(Date.parse(series.scheduledStart))
@@ -731,6 +743,7 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
           || Date.parse(right.series.scheduledStart) - Date.parse(left.series.scheduledStart)
           || right.game.number - left.game.number
         ));
+      const candidateGames = [...selectedGames, ...historicalGames];
 
       const seen = new Set<string>();
       for (const { game } of candidateGames) {

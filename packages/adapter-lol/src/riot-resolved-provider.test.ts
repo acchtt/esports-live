@@ -470,18 +470,19 @@ test('resolves mixed organization pools from a verified five-player game lineup'
     if (url.pathname.includes('/window/future-game')) return json({ error: 'not_started' }, 404);
     if (url.pathname.includes('/window/verified-game')) {
       verifiedWindowCalls += 1;
-      const metadata = (teamId: string, handles: readonly string[]) => ({
+      const metadata = (teamId: string, prefix: string, handles: readonly string[]) => ({
         esportsTeamId: teamId,
-        participantMetadata: handles.map((summonerName, index) => ({
+        participantMetadata: handles.map((handle, index) => ({
           participantId: index + 1,
-          summonerName,
+          esportsPlayerId: `${teamId}-${handle}`,
+          summonerName: `${prefix} ${handle}`,
           role: roles[index]
         }))
       });
       return json({
         gameMetadata: {
-          blueTeamMetadata: metadata('t1-academy-id', academyHandles),
-          redTeamMetadata: metadata('dk-challengers-id', dkHandles)
+          blueTeamMetadata: metadata('t1-academy-id', 'T1A', academyHandles),
+          redTeamMetadata: metadata('dk-challengers-id', 'DK', dkHandles)
         },
         frames: []
       });

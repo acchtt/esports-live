@@ -1,0 +1,60 @@
+name: Run Merged Team Board Once
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply-redesign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/merged-team-board-official-objectives
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Apply redesign
+        run: python scripts/apply-merged-team-board.py
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck and test
+        run: npm run check
+
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+
+      - name: Verify generated assets
+        shell: bash
+        run: |
+          test -s apps/web/dist/objectives/tower-blue.png
+          test -s apps/web/dist/objectives/tower-red.png
+          test -s apps/web/dist/objectives/dragon.png
+          test -s apps/web/dist/objectives/baron.png
+          test -s apps/web/dist/objectives/herald.png
+          test -s apps/web/dist/objectives/inhibitor-blue.png
+          test -s apps/web/dist/objectives/inhibitor-red.png
+          grep -R "team-overview" apps/web/dist/assets/*.js
+          grep -R "merged-team-board-official-objectives" apps/web/dist/assets/*.css
+
+      - name: Commit redesign
+        shell: bash
+        run: |
+          rm .github/workflows/apply-merged-team-board-once.yml
+          rm .github/workflows/run-merged-team-board-once.yml
+          rm scripts/apply-merged-team-board.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Merge live team board and use Riot objective assets"
+          git push origin HEAD:fix/merged-team-board-official-objectives

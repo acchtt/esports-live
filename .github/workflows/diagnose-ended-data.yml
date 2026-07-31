@@ -1,0 +1,83 @@
+name: Diagnose Ended Match Data
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/diagnose-ended-data.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe completed game telemetry
+        env:
+          API_BASE: https://esports-live-api.acchtt.workers.dev
+        run: |
+          node - <<'NODE'
+          const base = process.env.API_BASE;
+          async function get(path) {
+            const response = await fetch(`${base}${path}`, { headers: { accept: 'application/json', 'cache-control': 'no-cache' } });
+            const text = await response.text();
+            let body = null;
+            try { body = JSON.parse(text); } catch {}
+            return { status: response.status, ok: response.ok, body };
+          }
+
+          const schedule = await get(`/v1/lol/schedule?limit=80&diagnose=${Date.now()}`);
+          const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+          const completed = events
+            .filter(event => event?.series?.state === 'completed')
+            .sort((a, b) => Date.parse(b.series.scheduledStart) - Date.parse(a.series.scheduledStart))
+            .slice(0, 3);
+
+          const report = [];
+          for (const event of completed) {
+            const series = event.series;
+            const context = await get(`/v1/lol/series/${encodeURIComponent(series.id)}/context?diagnose=${Date.now()}`);
+            const games = Array.isArray(context.body?.history?.games) ? context.body.history.games : [];
+            const gameReports = [];
+            for (const game of games.filter(game => game?.state === 'completed').slice(0, 3)) {
+              const live = await get(`/v1/lol/games/${encodeURIComponent(game.id)}/live?diagnose=${Date.now()}`);
+              const stats = live.body?.stats ?? null;
+              gameReports.push({
+                gameId: game.id,
+                contextWinner: game.winner?.name ?? null,
+                contextDuration: game.durationSeconds ?? null,
+                liveStatus: live.status,
+                liveGameState: live.body?.game?.state ?? null,
+                sourceTimestamp: live.body?.sourceTimestamp ?? null,
+                complete: live.body?.complete ?? null,
+                freshness: live.body?.quality?.freshness ?? null,
+                gameClockSeconds: stats?.gameClockSeconds ?? null,
+                blue: stats ? {
+                  name: stats.blue?.name ?? null,
+                  gold: stats.blue?.gold ?? null,
+                  kills: stats.blue?.kills ?? null,
+                  towers: stats.blue?.objectives?.towers ?? null,
+                  players: Array.isArray(stats.blue?.players) ? stats.blue.players.length : null
+                } : null,
+                red: stats ? {
+                  name: stats.red?.name ?? null,
+                  gold: stats.red?.gold ?? null,
+                  kills: stats.red?.kills ?? null,
+                  towers: stats.red?.objectives?.towers ?? null,
+                  players: Array.isArray(stats.red?.players) ? stats.red.players.length : null
+                } : null,
+                reasonCodes: Array.isArray(live.body?.quality?.reasons)
+                  ? live.body.quality.reasons.map(reason => reason.code)
+                  : Array.isArray(live.body?.reasons) ? live.body.reasons.map(reason => reason.code) : []
+              });
+            }
+            report.push({
+              seriesId: series.id,
+              competition: series.competition?.name ?? null,
+              teams: series.teams?.map(team => team.name) ?? [],
+              score: context.body?.history?.score?.map(row => row.wins) ?? [],
+              games: gameReports
+            });
+          }
+          console.log(`ENDED_DATA_DIAGNOSTIC=${JSON.stringify({ scheduleStatus: schedule.status, completedSeries: report })}`);
+          NODE

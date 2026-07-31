@@ -1,3 +1,5 @@
+export {};
+
 const DDRAGON_VERSIONS = 'https://ddragon.leagueoflegends.com/api/versions.json';
 const DDRAGON_CDN = 'https://ddragon.leagueoflegends.com/cdn';
 const ITEM_SLOTS = 7;

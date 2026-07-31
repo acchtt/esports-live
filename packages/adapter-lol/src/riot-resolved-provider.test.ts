@@ -421,16 +421,15 @@ test('resolves mixed organization pools from a verified five-player game lineup'
         { id: 't1-academy-id', name: 'T1 Esports Academy', code: 'T1A' },
         { id: 'dk-challengers-id', name: 'DK Challengers', code: 'DK' }
       ],
-      games: [{ id: 'future-game', number: 1, state: 'unstarted' }]
+      games: []
     }
   };
-  const previousEvent = {
+  const detailsEvent = {
     ...currentEvent,
     state: 'completed',
     startTime: '2026-07-30T08:00:00.000Z',
     match: {
       ...currentEvent.match,
-      id: 'academy-previous',
       games: [{ id: 'verified-game', number: 1, state: 'completed' }]
     }
   };
@@ -454,11 +453,11 @@ test('resolves mixed organization pools from a verified five-player game lineup'
   const fetcher = async (input: RequestInfo | URL): Promise<Response> => {
     const url = new URL(String(input));
     if (url.pathname.endsWith('/getSchedule')) {
-      return json({ data: { schedule: { events: [currentEvent, previousEvent] } } });
+      return json({ data: { schedule: { events: [currentEvent] } } });
     }
     if (url.pathname.endsWith('/getLive')) return json({ data: { schedule: { events: [] } } });
     if (url.pathname.endsWith('/getEventDetails')) {
-      return json({ data: { event: currentEvent } });
+      return json({ data: { event: detailsEvent } });
     }
     if (url.pathname.endsWith('/getTeams')) {
       return json({ data: { teams: [

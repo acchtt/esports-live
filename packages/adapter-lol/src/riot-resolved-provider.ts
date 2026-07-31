@@ -178,6 +178,12 @@ function eventTeamDescriptors(event: Json): readonly TeamDescriptor[] {
   });
 }
 
+function eventGameIds(event: Json): readonly string[] {
+  return array(object(event.match).games)
+    .map(value => firstString(object(value), ['id', 'gameId']))
+    .filter((value): value is string => value !== null);
+}
+
 function seriesTeamDescriptors(series: LolProviderSeries): readonly TeamDescriptor[] {
   return series.teams.map(team => ({
     id: team.id,
@@ -707,7 +713,8 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
     descriptor: TeamDescriptor,
     normalizedTeam: TeamRef,
     pool: readonly PlayerRef[],
-    selectedSeries: LolProviderSeries
+    selectedSeries: LolProviderSeries,
+    selectedGameIds: readonly string[]
   ): Promise<VerifiedLineupResult> => {
     const key = [
       normalizedTeam.id,
@@ -723,8 +730,19 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
 
     const request = (async (): Promise<VerifiedLineupResult> => {
       const selectedStart = Date.parse(selectedSeries.scheduledStart);
-      const selectedGames = selectedSeries.games
-        .map(game => ({ game, series: selectedSeries }))
+      const selectedIds = [...new Set([
+        ...selectedGameIds,
+        ...selectedSeries.games.map(game => game.id)
+      ])];
+      const selectedGames = selectedIds
+        .map((id, index) => ({
+          game: selectedSeries.games.find(game => game.id === id) ?? {
+            id,
+            number: index + 1,
+            state: 'unknown' as const
+          },
+          series: selectedSeries
+        }))
         .sort((left, right) => (
           Number(right.game.state === 'completed') - Number(left.game.state === 'completed')
           || right.game.number - left.game.number
@@ -828,6 +846,11 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
         eventTeamDescriptors(rawEvent),
         eventTeamDescriptors(detailsEvent)
       );
+      const lineupGameIds = [...new Set([
+        ...eventGameIds(detailsEvent),
+        ...eventGameIds(rawEvent),
+        ...normalized.games.map(game => game.id)
+      ])];
       const detailsLeague = object(detailsEvent.league);
       const scheduleLeague = object(rawEvent.league);
       const leagueTokens = new Set([
@@ -867,7 +890,13 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
           const pool = catalogPlayers(match.team, normalizedTeam.id);
           let players = exactFivePlayerLineup(pool) ?? [];
           if (players.length !== 5) {
-            const verified = await loadVerifiedLineup(descriptor, normalizedTeam, pool, normalized);
+            const verified = await loadVerifiedLineup(
+              descriptor,
+              normalizedTeam,
+              pool,
+              normalized,
+              lineupGameIds
+            );
             players = verified.players;
             if (players.length === 5) {
               reasons.push({

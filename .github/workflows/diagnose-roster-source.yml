@@ -1,0 +1,99 @@
+name: Diagnose Roster Source
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/diagnose-roster-source.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect raw Riot team and event records
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const source = await fetch('https://raw.githubusercontent.com/Aureom/live-lol-esports/main/src/utils/LoLEsportsAPI.ts').then(response => response.text());
+          const apiKey = source.match(/API_KEY\s*=\s*["']([^"']+)["']/)?.[1];
+          if (!apiKey) throw new Error('Unable to resolve public Riot web API key.');
+          console.log(`::add-mask::${apiKey}`);
+
+          const base = 'https://esports-api.lolesports.com/persisted/gw';
+          async function persisted(path, params = {}) {
+            const url = new URL(`${base}/${path}`);
+            url.searchParams.set('hl', 'en-US');
+            for (const [key, value] of Object.entries(params)) {
+              for (const item of Array.isArray(value) ? value : [value]) url.searchParams.append(key, String(item));
+            }
+            const response = await fetch(url, { headers: { accept: 'application/json', 'x-api-key': apiKey } });
+            const text = await response.text();
+            if (!response.ok) throw new Error(`${path} HTTP ${response.status}: ${text.slice(0, 200)}`);
+            return JSON.parse(text);
+          }
+
+          const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+          const array = value => Array.isArray(value) ? value : [];
+          const teamsPayload = await persisted('getTeams', {});
+          const teams = array(object(teamsPayload.data).teams ?? teamsPayload.teams);
+          const selectedSlugs = new Set(['geng', 't1', 't1-challengers', 'hle-challengers', 'fearx-youth', 'team-vitality', 'dwg-kia-challengers']);
+          const selectedTeams = teams.filter(team => selectedSlugs.has(String(team.slug ?? '')));
+
+          const sanitizePlayer = player => ({
+            keys: Object.keys(object(player)).sort(),
+            id: player?.id ?? player?.playerId ?? null,
+            handle: player?.summonerName ?? player?.name ?? player?.slug ?? null,
+            role: player?.role ?? player?.roleSlug ?? null,
+            status: player?.status ?? null,
+            active: player?.active ?? player?.isActive ?? null,
+            teamId: player?.teamId ?? player?.team?.id ?? player?.homeTeam?.id ?? null,
+            teamSlug: player?.team?.slug ?? player?.homeTeam?.slug ?? null,
+            contract: player?.contract ?? null,
+            flags: Object.fromEntries(Object.entries(object(player)).filter(([key, value]) => (
+              /active|status|team|roster|starter|sub|academy|youth|challeng|league/i.test(key)
+              && (value === null || ['string', 'number', 'boolean'].includes(typeof value))
+            )))
+          });
+
+          const teamReport = selectedTeams.map(team => ({
+            keys: Object.keys(object(team)).sort(),
+            id: team.id ?? null,
+            slug: team.slug ?? null,
+            name: team.name ?? null,
+            code: team.code ?? null,
+            status: team.status ?? null,
+            homeLeague: team.homeLeague ?? null,
+            players: array(team.players).map(sanitizePlayer)
+          }));
+
+          const eventIds = ['116889604984157237', '115548147900553457', '116889604984222869'];
+          const eventReports = [];
+          for (const id of eventIds) {
+            const payload = await persisted('getEventDetails', { id });
+            const event = object(object(payload.data).event ?? payload.event ?? payload.data);
+            const match = object(event.match);
+            eventReports.push({
+              requestedId: id,
+              eventKeys: Object.keys(event).sort(),
+              matchKeys: Object.keys(match).sort(),
+              teams: array(match.teams).map(team => ({
+                keys: Object.keys(object(team)).sort(),
+                id: team?.id ?? team?.teamId ?? null,
+                slug: team?.slug ?? null,
+                name: team?.name ?? null,
+                code: team?.code ?? null,
+                players: array(team?.players ?? team?.roster ?? team?.participants).map(sanitizePlayer)
+              })),
+              games: array(match.games).map(game => ({
+                id: game?.id ?? null,
+                state: game?.state ?? null,
+                teamKeys: array(game?.teams).map(team => Object.keys(object(team)).sort()),
+                teams: game?.teams ?? null
+              }))
+            });
+          }
+
+          console.log(`RAW_ROSTER_SOURCE=${JSON.stringify({ teamReport, eventReports })}`);
+          NODE

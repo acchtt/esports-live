@@ -1,0 +1,109 @@
+name: Verify Riot Context PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/verify-riot-context-pr.yml
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+jobs:
+  deploy-and-probe:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run check
+      - name: Deploy API Worker
+        run: npm run deploy:api
+      - name: Probe production context
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const base = process.env.API_BASE_URL;
+
+          async function getJson(url) {
+            try {
+              const response = await fetch(url, { headers: { accept: 'application/json' } });
+              const text = await response.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: response.ok, status: response.status, body };
+            } catch (error) {
+              return { ok: false, status: 0, body: { message: String(error) } };
+            }
+          }
+
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            const health = await getJson(`${base}/health`);
+            if (health.ok && health.body?.adapters?.includes('lol')) break;
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+
+          const health = await getJson(`${base}/health`);
+          const schedule = await getJson(`${base}/v1/lol/schedule?limit=20`);
+          const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+          const attempts = [];
+          let best = null;
+
+          for (const event of events.slice(0, 12)) {
+            const series = event?.series;
+            if (!series?.id) continue;
+            const result = await getJson(`${base}/v1/lol/series/${encodeURIComponent(series.id)}/context`);
+            const context = result.body ?? {};
+            const rosterCount = Array.isArray(context.rosters) ? context.rosters.length : 0;
+            const playerCounts = Array.isArray(context.rosters)
+              ? context.rosters.map(roster => Array.isArray(roster.players) ? roster.players.length : 0)
+              : [];
+            const standingsCount = Array.isArray(context.standings) ? context.standings.length : 0;
+            const reasonCodes = Array.isArray(context.reasons)
+              ? context.reasons.map(reason => reason.code)
+              : [];
+            const item = {
+              seriesId: series.id,
+              competition: series.competition?.name ?? null,
+              competitionId: series.competition?.id ?? null,
+              teams: Array.isArray(series.teams) ? series.teams.map(team => ({ id: team.id, name: team.name, code: team.code ?? null })) : [],
+              status: result.status,
+              message: context.message ?? null,
+              complete: context.complete ?? false,
+              rosterCount,
+              playerCounts,
+              standingsCount,
+              reasonCodes
+            };
+            attempts.push(item);
+            const score = playerCounts.reduce((sum, count) => sum + count, 0) * 10
+              + rosterCount * 5
+              + standingsCount;
+            if (!best || score > best.score) best = { ...item, score };
+            if (rosterCount >= 2 && standingsCount > 0) break;
+          }
+
+          const report = {
+            checkedAt: new Date().toISOString(),
+            healthStatus: health.status,
+            adapters: health.body?.adapters ?? [],
+            scheduleStatus: schedule.status,
+            scheduleTotal: schedule.body?.page?.total ?? null,
+            firstPageCount: events.length,
+            nextCursorPresent: Boolean(schedule.body?.page?.nextCursor),
+            meaningful: Boolean(best && (best.rosterCount > 0 || best.standingsCount > 0)),
+            best,
+            attempts
+          };
+          console.log(`VERIFICATION_REPORT=${JSON.stringify(report)}`);
+          if (!health.ok || !schedule.ok) process.exit(1);
+          NODE

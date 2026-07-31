@@ -1,4 +1,4 @@
-import { LolAdapter, createRiotLolContextProvider } from '@esports-live/adapter-lol';
+import { LolAdapter, createRiotLolResolvedProvider } from '@esports-live/adapter-lol';
 import { AdapterRegistry, CachedAdapter } from '@esports-live/core';
 import { createApiHandler } from './router.ts';
 
@@ -17,7 +17,7 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
 
   const registry = new AdapterRegistry();
   if (apiKey) {
-    const riot = new LolAdapter(createRiotLolContextProvider({ apiKey }));
+    const riot = new LolAdapter(createRiotLolResolvedProvider({ apiKey }));
     registry.register(new CachedAdapter(riot));
   }
 

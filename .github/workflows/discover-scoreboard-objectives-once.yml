@@ -1,0 +1,42 @@
+name: Discover Scoreboard Objective Assets Once
+
+on:
+  push:
+    paths:
+      - .github/workflows/discover-scoreboard-objectives-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/broadcast-objective-icons-no-side-gold
+          fetch-depth: 0
+
+      - name: Download Riot scoreboard sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apps/web/public/objectives-scoreboard-source
+          base="https://raw.communitydragon.org/latest/game/assets/ux/scoreboard"
+          spectator="https://raw.communitydragon.org/latest/game/assets/ux/spectator"
+          curl -fL --retry 4 --retry-delay 3 "$base/_dragon.png" -o apps/web/public/objectives-scoreboard-source/dragon.png
+          curl -fL --retry 4 --retry-delay 3 "$base/_baronnashor.png" -o apps/web/public/objectives-scoreboard-source/baron.png
+          curl -fL --retry 4 --retry-delay 3 "$base/_riftherald.png" -o apps/web/public/objectives-scoreboard-source/herald.png
+          curl -fL --retry 4 --retry-delay 3 "$base/scoreboardatlas.png" -o apps/web/public/objectives-scoreboard-source/scoreboardatlas.png
+          curl -fL --retry 4 --retry-delay 3 "$spectator/esportsneutraltimersatlas.png" -o apps/web/public/objectives-scoreboard-source/esportsneutraltimersatlas.png
+          file apps/web/public/objectives-scoreboard-source/*.png
+
+      - name: Commit discovery assets
+        shell: bash
+        run: |
+          rm .github/workflows/discover-scoreboard-objectives-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add Riot scoreboard objective source assets"
+          git push origin HEAD:fix/broadcast-objective-icons-no-side-gold

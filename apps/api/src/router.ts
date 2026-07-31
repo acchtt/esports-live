@@ -7,6 +7,21 @@ const CORS_HEADERS: Record<string, string> = {
   Vary: 'Origin'
 };
 
+const DEFAULT_PAGE_LIMIT = 25;
+const MAX_PAGE_LIMIT = 100;
+
+class ApiRequestError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function json(payload: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(payload, null, 2), {
     status,
@@ -19,21 +34,72 @@ function json(payload: unknown, status = 200, headers: Record<string, string> = 
   });
 }
 
+function commaValues(values: readonly string[]): string[] {
+  return values
+    .flatMap(value => value.split(','))
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
 function scheduleQuery(url: URL): ScheduleQuery {
   const from = url.searchParams.get('from');
   const to = url.searchParams.get('to');
-  const competitionId = url.searchParams.get('competitionId');
-  const states = url.searchParams.get('states')
-    ?.split(',')
-    .map(value => value.trim())
-    .filter(Boolean);
+  const competitions = commaValues([
+    ...url.searchParams.getAll('competitionId'),
+    ...url.searchParams.getAll('competitionIds')
+  ]);
+  const states = commaValues(url.searchParams.getAll('states'));
 
   return {
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
-    ...(competitionId ? { competitionId } : {}),
-    ...(states?.length ? { states } : {})
+    ...(competitions.length === 1 ? { competitionId: competitions[0] } : {}),
+    ...(competitions.length > 1 ? { competitionIds: competitions } : {}),
+    ...(states.length ? { states } : {})
   };
+}
+
+function encodeCursor(offset: number): string {
+  return btoa(`v1:${offset}`)
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '');
+}
+
+function decodeCursor(value: string): number {
+  try {
+    const normalized = value.replaceAll('-', '+').replaceAll('_', '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const decoded = atob(padded);
+    const match = /^v1:(\d+)$/.exec(decoded);
+    if (!match) throw new Error('Invalid cursor format.');
+    const offset = Number(match[1]);
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('Invalid cursor offset.');
+    return offset;
+  } catch {
+    throw new ApiRequestError(400, 'invalid_cursor', 'The schedule cursor is invalid.');
+  }
+}
+
+function pagination(url: URL): { enabled: boolean; offset: number; limit: number } {
+  const cursor = url.searchParams.get('cursor');
+  const rawLimit = url.searchParams.get('limit');
+  const enabled = cursor !== null || rawLimit !== null;
+  const offset = cursor ? decodeCursor(cursor) : 0;
+  if (rawLimit === null) return { enabled, offset, limit: DEFAULT_PAGE_LIMIT };
+
+  if (!/^\d+$/.test(rawLimit)) {
+    throw new ApiRequestError(400, 'invalid_limit', 'Schedule limit must be a positive integer.');
+  }
+  const limit = Number(rawLimit);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_PAGE_LIMIT) {
+    throw new ApiRequestError(
+      400,
+      'invalid_limit',
+      `Schedule limit must be between 1 and ${MAX_PAGE_LIMIT}.`
+    );
+  }
+  return { enabled, offset, limit };
 }
 
 export function createApiHandler(registry: AdapterRegistry) {
@@ -65,7 +131,41 @@ export function createApiHandler(registry: AdapterRegistry) {
       if (segments.length === 3 && segments[0] === 'v1' && segments[2] === 'schedule') {
         const adapter = registry.get(segments[1] as EsportId);
         const events = await adapter.getSchedule(scheduleQuery(url));
-        return json({ esport: adapter.esport, events });
+        const pageRequest = pagination(url);
+        const total = events.length;
+        const pageEvents = pageRequest.enabled
+          ? events.slice(pageRequest.offset, pageRequest.offset + pageRequest.limit)
+          : events;
+        const nextOffset = pageRequest.offset + pageRequest.limit;
+        const previousOffset = Math.max(0, pageRequest.offset - pageRequest.limit);
+        return json({
+          esport: adapter.esport,
+          events: pageEvents,
+          page: {
+            total,
+            offset: pageRequest.enabled ? pageRequest.offset : 0,
+            limit: pageRequest.enabled ? pageRequest.limit : total,
+            nextCursor: pageRequest.enabled && nextOffset < total ? encodeCursor(nextOffset) : null,
+            previousCursor: pageRequest.enabled && pageRequest.offset > 0
+              ? encodeCursor(previousOffset)
+              : null
+          }
+        });
+      }
+
+      if (
+        segments.length === 5
+        && segments[0] === 'v1'
+        && segments[2] === 'series'
+        && segments[4] === 'context'
+      ) {
+        const adapter = registry.get(segments[1] as EsportId);
+        const seriesId = decodeURIComponent(segments[3] ?? '');
+        if (!seriesId) throw new ApiRequestError(400, 'series_id_required', 'Series ID is required.');
+        if (!adapter.getSeriesContext) {
+          throw new ApiRequestError(404, 'context_not_supported', 'Series context is not supported for this esport.');
+        }
+        return json(await adapter.getSeriesContext(seriesId));
       }
 
       if (
@@ -76,7 +176,7 @@ export function createApiHandler(registry: AdapterRegistry) {
       ) {
         const adapter = registry.get(segments[1] as EsportId);
         const gameId = decodeURIComponent(segments[3] ?? '');
-        if (!gameId) return json({ error: 'game_id_required' }, 400);
+        if (!gameId) throw new ApiRequestError(400, 'game_id_required', 'Game ID is required.');
         const after = url.searchParams.get('after') ?? undefined;
         const snapshot = await adapter.getLiveSnapshot(gameId, after);
         return json(snapshot, 200, {
@@ -90,6 +190,9 @@ export function createApiHandler(registry: AdapterRegistry) {
 
       return json({ error: 'not_found' }, 404);
     } catch (error) {
+      if (error instanceof ApiRequestError) {
+        return json({ error: error.code, message: error.message }, error.status);
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       const status = message.startsWith('No adapter registered') ? 404 : 502;
       return json({ error: status === 404 ? 'esport_not_supported' : 'upstream_failure', message }, status);

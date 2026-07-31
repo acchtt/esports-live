@@ -69,6 +69,7 @@ export class LolAdapter implements EsportAdapter<LolStats> {
           observedAt: context.observedAt,
           rosters: context.rosters,
           standings: context.standings,
+          ...(context.history ? { history: context.history } : {}),
           complete: context.complete,
           reasons: context.reasons ?? []
         };

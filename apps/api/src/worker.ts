@@ -1,6 +1,7 @@
 import { LolAdapter, createRiotLolResolvedProvider } from '@esports-live/adapter-lol';
 import { AdapterRegistry, CachedAdapter } from '@esports-live/core';
 import { createApiHandler } from './router.ts';
+import { riotTeamDiagnostic } from './riot-diagnostic.ts';
 
 export interface WorkerEnv {
   LOL_ESPORTS_API_KEY?: string;
@@ -21,8 +22,15 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
     registry.register(new CachedAdapter(riot));
   }
 
+  const apiHandler = createApiHandler(registry);
   cachedApiKey = apiKey;
-  cachedHandler = createApiHandler(registry);
+  cachedHandler = async (request: Request): Promise<Response> => {
+    const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === '/_diagnostics/riot-team-lookup-20260731') {
+      return riotTeamDiagnostic(apiKey);
+    }
+    return apiHandler(request);
+  };
   return cachedHandler;
 }
 

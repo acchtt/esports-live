@@ -4,6 +4,10 @@ import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapt
 const DATA_DRAGON_BASE = 'https://ddragon.leagueoflegends.com/cdn';
 const INVENTORY_SLOTS = 7;
 
+type CanonicalRole = 'top' | 'jungle' | 'mid' | 'bottom' | 'support';
+
+const ROLE_ORDER: readonly CanonicalRole[] = ['top', 'jungle', 'mid', 'bottom', 'support'];
+
 const style = document.createElement('style');
 style.textContent = `
   .team-card {
@@ -52,6 +56,7 @@ style.textContent = `
   }
 
   .telemetry-champion img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -177,9 +182,78 @@ style.textContent = `
   }
 
   .telemetry-item-slot img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  /* The role matchup board is rendered by main.ts. Add media without replacing its stats. */
+  .role-player {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "portrait heading stats"
+      "portrait items items";
+    column-gap: 10px;
+    row-gap: 6px;
+  }
+
+  .role-player.red {
+    grid-template-columns: auto minmax(0, 1fr) 38px;
+    grid-template-areas:
+      "stats heading portrait"
+      "items items portrait";
+  }
+
+  .role-player .role-player-heading {
+    grid-area: heading;
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .role-player .role-player-stats {
+    grid-area: stats;
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .role-player-portrait {
+    grid-area: portrait;
+    display: grid;
+    place-items: center;
+    align-self: center;
+  }
+
+  .role-player-portrait .telemetry-champion {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+  }
+
+  .role-player-items {
+    grid-area: items;
+    min-width: 0;
+  }
+
+  .role-player-items .telemetry-inventory {
+    justify-content: flex-start;
+    min-height: 20px;
+    padding-left: 0;
+  }
+
+  .role-player.red .role-player-items .telemetry-inventory {
+    justify-content: flex-end;
+  }
+
+  .role-player-items .telemetry-item-slot {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+    border-radius: 4px;
+  }
+
+  .role-player-items .telemetry-inventory-label {
+    font-size: .4rem;
   }
 
   @container (max-width: 320px) {
@@ -198,6 +272,57 @@ style.textContent = `
 
     .telemetry-inventory {
       padding-left: 0;
+    }
+  }
+
+  @media (max-width: 1320px) {
+    .role-player,
+    .role-player.red {
+      grid-template-columns: 34px minmax(0, 1fr);
+      grid-template-areas:
+        "portrait heading"
+        "stats stats"
+        "items items";
+      gap: 6px 8px;
+    }
+
+    .role-player.red {
+      grid-template-columns: minmax(0, 1fr) 34px;
+      grid-template-areas:
+        "heading portrait"
+        "stats stats"
+        "items items";
+    }
+
+    .role-player-portrait .telemetry-champion {
+      width: 34px;
+      height: 34px;
+    }
+
+    .role-player.red .role-player-stats {
+      justify-content: end;
+      text-align: right;
+    }
+
+    .role-player-items .telemetry-inventory-label {
+      display: none;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .role-player-items {
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .role-player-items .telemetry-inventory {
+      gap: 3px;
+    }
+
+    .role-player-items .telemetry-item-slot {
+      width: 18px;
+      height: 18px;
+      flex-basis: 18px;
     }
   }
 
@@ -255,26 +380,27 @@ function initials(value: string | null): string {
   return words.slice(0, 2).map(word => word[0]?.toUpperCase() ?? '').join('') || '?';
 }
 
-function championMarkup(player: LolPlayerState, patch: string | null): string {
-  const key = championKey(player.championId);
+function championMarkup(player: LolPlayerState | null, patch: string | null): string {
+  const championId = player?.championId ?? null;
+  const key = championKey(championId);
   const url = patch && key
     ? `${DATA_DRAGON_BASE}/${encodeURIComponent(patch)}/img/champion/${encodeURIComponent(key)}.png`
     : null;
   return `
     <div class="telemetry-champion">
-      ${url ? `<img class="telemetry-image" src="${escapeHtml(url)}" alt="${escapeHtml(player.championId ?? '')}" />` : ''}
-      <span class="telemetry-champion-fallback">${escapeHtml(initials(player.championId))}</span>
+      ${url ? `<img class="telemetry-image" src="${escapeHtml(url)}" alt="${escapeHtml(championId ?? '')}" />` : ''}
+      <span class="telemetry-champion-fallback">${escapeHtml(initials(championId))}</span>
     </div>`;
 }
 
-function normalizedItemIds(player: LolPlayerState): string[] {
-  return (player.items ?? [])
+function normalizedItemIds(player: LolPlayerState | null): string[] {
+  return (player?.items ?? [])
     .map(item => String(item))
     .filter(item => /^\d+$/.test(item) && Number(item) > 0)
     .slice(0, INVENTORY_SLOTS);
 }
 
-function inventoryMarkup(player: LolPlayerState, patch: string | null): string {
+function inventoryMarkup(player: LolPlayerState | null, patch: string | null): string {
   const items = normalizedItemIds(player);
   const slots = Array.from({ length: INVENTORY_SLOTS }, (_, index) => {
     const itemId = items[index];
@@ -310,6 +436,28 @@ function playerMarkup(player: LolPlayerState, patch: string | null): string {
     </article>`;
 }
 
+function canonicalRole(value: string | null): CanonicalRole | null {
+  const normalized = value?.trim().toLowerCase().replaceAll('_', ' ').replaceAll('-', ' ') ?? '';
+  if (!normalized) return null;
+  if (normalized.includes('top')) return 'top';
+  if (normalized.includes('jung')) return 'jungle';
+  if (normalized.includes('mid')) return 'mid';
+  if (normalized.includes('bot') || normalized.includes('adc') || normalized.includes('carry')) return 'bottom';
+  if (normalized.includes('sup') || normalized.includes('utility')) return 'support';
+  return null;
+}
+
+function orderedPlayers(team: LolTeamState): readonly (LolPlayerState | null)[] {
+  const assigned = new Map<CanonicalRole, LolPlayerState>();
+  const unassigned: LolPlayerState[] = [];
+  for (const player of team.players) {
+    const role = canonicalRole(player.role);
+    if (role && !assigned.has(role)) assigned.set(role, player);
+    else unassigned.push(player);
+  }
+  return ROLE_ORDER.map(role => assigned.get(role) ?? unassigned.shift() ?? null);
+}
+
 function renderTeam(team: LolTeamState, patch: string | null): void {
   const card = document.querySelector<HTMLElement>(`.team-card.${team.side}`);
   const list = card?.querySelector<HTMLElement>('.player-list');
@@ -320,12 +468,47 @@ function renderTeam(team: LolTeamState, patch: string | null): void {
     : '<div class="players-empty">Player telemetry unavailable</div>';
 }
 
+function enhanceRolePlayer(container: HTMLElement | null, player: LolPlayerState | null, patch: string | null): void {
+  if (!container) return;
+
+  let portrait = container.querySelector<HTMLElement>(':scope > .role-player-portrait');
+  if (!portrait) {
+    portrait = document.createElement('div');
+    portrait.className = 'role-player-portrait';
+    container.append(portrait);
+  }
+  portrait.innerHTML = championMarkup(player, patch);
+
+  let items = container.querySelector<HTMLElement>(':scope > .role-player-items');
+  if (!items) {
+    items = document.createElement('div');
+    items.className = 'role-player-items';
+    container.append(items);
+  }
+  items.innerHTML = inventoryMarkup(player, patch);
+}
+
+function renderRoleBoard(blue: LolTeamState, red: LolTeamState, patch: string | null): void {
+  const rows = [...document.querySelectorAll<HTMLElement>('.role-matchup-row')];
+  if (!rows.length) return;
+
+  const bluePlayers = orderedPlayers(blue);
+  const redPlayers = orderedPlayers(red);
+  rows.forEach((row, index) => {
+    enhanceRolePlayer(row.querySelector<HTMLElement>('.role-player.blue'), bluePlayers[index] ?? null, patch);
+    enhanceRolePlayer(row.querySelector<HTMLElement>('.role-player.red'), redPlayers[index] ?? null, patch);
+  });
+}
+
 function bindImageFallbacks(): void {
-  document.querySelectorAll<HTMLImageElement>('.telemetry-image').forEach(image => {
-    image.addEventListener('error', () => {
+  document.querySelectorAll<HTMLImageElement>('.telemetry-image:not([data-fallback-bound])').forEach(image => {
+    image.dataset.fallbackBound = 'true';
+    const showFallback = (): void => {
       image.hidden = true;
       image.parentElement?.classList.add('image-missing');
-    }, { once: true });
+    };
+    if (image.complete && image.naturalWidth === 0) showFallback();
+    else image.addEventListener('error', showFallback, { once: true });
   });
 }
 
@@ -334,6 +517,7 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
   const patch = dataDragonPatch(snapshot.stats.patch);
   renderTeam(snapshot.stats.blue, patch);
   renderTeam(snapshot.stats.red, patch);
+  renderRoleBoard(snapshot.stats.blue, snapshot.stats.red, patch);
   const patchElement = document.querySelector<HTMLElement>('.scoreboard .patch-label');
   if (patchElement) patchElement.textContent = patchLabel(snapshot.stats.patch);
   bindImageFallbacks();

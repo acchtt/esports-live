@@ -1,0 +1,129 @@
+name: Deploy Broadcast Objective UI Once
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/deploy-broadcast-objectives-once.yml
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 084a95ead235a2e3574190e63de60890ea67bbe4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npx wrangler pages deploy apps/web/dist --project-name esports-live --branch main --commit-hash 084a95ead235a2e3574190e63de60890ea67bbe4 --commit-message "Use broadcast objective icons and simplify player boards"; then exit 0; fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+      - name: Verify production bundle and broadcast assets
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+
+          const web = 'https://esports-live.pages.dev';
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const localHtml = fs.readFileSync('apps/web/dist/index.html', 'utf8');
+          const expectedAsset = localHtml.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          const expectedCss = localHtml.match(/<link[^>]+href="([^"]+\.css)"/)?.[1];
+          if (!expectedAsset || !expectedCss) throw new Error('Built JavaScript or CSS asset missing.');
+
+          async function fetchResponse(url) {
+            const response = await fetch(url, { headers: { 'cache-control': 'no-cache' } });
+            if (!response.ok) throw new Error(`${url} -> ${response.status}`);
+            return response;
+          }
+
+          let html = '';
+          let bundle = '';
+          let css = '';
+          let jsContentType = '';
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const page = await fetchResponse(`${web}/?release=${Date.now()}`).catch(() => null);
+            html = page ? await page.text() : '';
+            if (!html.includes(expectedAsset) || !html.includes(expectedCss)) {
+              await sleep(4000);
+              continue;
+            }
+            const jsResponse = await fetchResponse(`${new URL(expectedAsset, web)}?release=${Date.now()}`).catch(() => null);
+            const cssResponse = await fetchResponse(`${new URL(expectedCss, web)}?release=${Date.now()}`).catch(() => null);
+            jsContentType = jsResponse?.headers.get('content-type') ?? '';
+            bundle = jsResponse ? await jsResponse.text() : '';
+            css = cssResponse ? await cssResponse.text() : '';
+            const ready = /javascript|ecmascript/i.test(jsContentType)
+              && bundle.includes('/objectives/tower.png')
+              && bundle.includes('/objectives/inhibitor.png')
+              && bundle.includes('/objectives/herald.png')
+              && bundle.includes('Gold lead ·')
+              && !bundle.includes('gold-difference')
+              && bundle.includes('background: transparent')
+              && bundle.includes('border: 0');
+            if (ready) break;
+            await sleep(4000);
+          }
+
+          if (!html.includes(expectedAsset) || !html.includes(expectedCss)) {
+            throw new Error(`Expected production assets are not active: ${expectedAsset}, ${expectedCss}`);
+          }
+          if (!/javascript|ecmascript/i.test(jsContentType)) {
+            throw new Error(`JavaScript asset returned unexpected content type: ${jsContentType}`);
+          }
+
+          const objectiveAssets = ['tower.png', 'dragon.png', 'baron.png', 'herald.png', 'inhibitor.png'];
+          const objectiveChecks = {};
+          for (const asset of objectiveAssets) {
+            const response = await fetchResponse(`${web}/objectives/${asset}?release=${Date.now()}`);
+            const type = response.headers.get('content-type') ?? '';
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            const isPng = bytes.length > 256
+              && bytes[0] === 0x89
+              && bytes[1] === 0x50
+              && bytes[2] === 0x4e
+              && bytes[3] === 0x47;
+            objectiveChecks[asset] = { type, bytes: bytes.length, isPng };
+            if (!/image\/png/i.test(type) || !isPng) {
+              throw new Error(`Invalid objective asset ${asset}: ${JSON.stringify(objectiveChecks[asset])}`);
+            }
+          }
+
+          const removedAssets = ['tower-blue.png', 'tower-red.png', 'inhibitor-blue.png', 'inhibitor-red.png'];
+          const removedChecks = {};
+          for (const asset of removedAssets) {
+            const response = await fetch(`${web}/objectives/${asset}?release=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } });
+            removedChecks[asset] = response.status;
+            if (response.ok && /image\/png/i.test(response.headers.get('content-type') ?? '')) {
+              throw new Error(`Obsolete objective asset is still served: ${asset}`);
+            }
+          }
+
+          const markers = {
+            centralGoldLeadOnly: bundle.includes('Gold lead ·') && !bundle.includes('gold-difference'),
+            broadcastObjectivePaths: objectiveAssets.every(asset => bundle.includes(`/objectives/${asset}`)),
+            borderlessChampionPortraits: bundle.includes('background: transparent') && bundle.includes('border: 0'),
+            compactOverview: css.includes('team-overview') && css.includes('minmax(104px')
+          };
+          if (Object.values(markers).some(value => !value)) throw new Error(`Missing markers: ${JSON.stringify(markers)}`);
+
+          console.log(`PRODUCTION_BROADCAST_OBJECTIVE_REPORT=${JSON.stringify({ expectedAsset, expectedCss, jsContentType, markers, objectiveChecks, removedChecks })}`);
+          NODE

@@ -274,8 +274,7 @@ async function loadHistory(seriesId: string): Promise<void> {
 function syncSelection(): void {
   const seriesId = selectedSeriesIdentifier();
   const title = selectedSeries.textContent?.trim() ?? '';
-  const validSelection = Boolean(seriesId && title.includes(' vs '));
-  if (!validSelection) {
+  if (!seriesId || !title.includes(' vs ')) {
     activeSeriesId = null;
     requestId += 1;
     loading = false;

@@ -15,65 +15,44 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Inspect production history and Riot window fields
+      - name: Inspect final Riot window frames
         shell: bash
         run: |
           node - <<'NODE'
-          const apiBase = 'https://esports-live-api.acchtt.workers.dev';
           const liveBase = 'https://feed.lolesports.com/livestats/v1';
           const obj = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
           const arr = value => Array.isArray(value) ? value : [];
           const pick = (source, keys) => Object.fromEntries(keys.filter(key => source[key] !== undefined).map(key => [key, source[key]]));
-
+          const games = [
+            { id: '115548147900684638', start: Date.parse('2026-07-31T10:28:34.552Z') },
+            { id: '115548147900684639', start: Date.parse('2026-07-31T11:31:14.506Z') },
+            { id: '115570814727903842', start: Date.parse('2026-07-31T11:33:21.624Z') }
+          ];
           async function getJson(url) {
             const response = await fetch(url, { headers: { accept: 'application/json', 'cache-control': 'no-cache' } });
             const text = await response.text();
             let body = null;
             try { body = text ? JSON.parse(text) : null; } catch {}
-            return { status: response.status, body, text: body ? null : text.slice(0, 300) };
+            return { status: response.status, body };
           }
-
-          const schedule = await getJson(`${apiBase}/v1/lol/schedule?states=live,paused,scheduled&limit=80&probe=${Date.now()}`);
-          const events = arr(obj(schedule.body).events);
-          const targets = events.map(obj).filter(entry => ['live', 'paused'].includes(String(obj(entry.series).state))).slice(0, 4);
-          console.log(`LIVE_SERIES_COUNT=${targets.length}`);
-
-          for (const entry of targets) {
-            const series = obj(entry.series);
-            const seriesId = String(series.id ?? '');
-            const games = arr(series.games).map(obj);
-            const context = await getJson(`${apiBase}/v1/lol/series/${encodeURIComponent(seriesId)}/context?probe=${Date.now()}`);
-            console.log(`CONTEXT_REPORT=${JSON.stringify({
-              seriesId,
-              teams: arr(series.teams).map(team => pick(obj(team), ['id', 'name', 'code'])),
-              bestOf: series.bestOf,
-              state: series.state,
-              games: games.map(game => pick(game, ['id', 'number', 'state'])),
-              history: obj(context.body).history ?? null
-            })}`);
-
-            for (const rawGame of games) {
-              const gameId = String(rawGame.id ?? '');
-              if (!gameId) continue;
-              const windowResult = await getJson(`${liveBase}/window/${encodeURIComponent(gameId)}`);
-              const payload = obj(windowResult.body);
+          for (const game of games) {
+            for (const minutes of [20, 30, 35, 40, 45, 50, 55, 60]) {
+              const time = new Date(game.start + minutes * 60_000).toISOString();
+              const url = new URL(`${liveBase}/window/${game.id}`);
+              url.searchParams.set('startingTime', time);
+              const result = await getJson(url);
+              const payload = obj(result.body);
               const frames = arr(payload.frames ?? obj(payload.window).frames ?? obj(payload.data).frames).map(obj);
               const frame = frames.at(-1) ?? {};
-              const metadata = obj(payload.gameMetadata ?? frame.gameMetadata);
               const blue = obj(frame.blueTeam);
               const red = obj(frame.redTeam);
-              console.log(`WINDOW_REPORT=${JSON.stringify({
-                seriesId,
-                gameId,
-                listedState: rawGame.state,
-                status: windowResult.status,
-                payloadKeys: Object.keys(payload).sort(),
+              console.log(`FINAL_WINDOW_PROBE=${JSON.stringify({
+                gameId: game.id,
+                minutes,
+                status: result.status,
                 frameCount: frames.length,
-                firstFrame: frames[0] ? pick(frames[0], ['rfc460Timestamp', 'timestamp', 'gameState', 'state', 'gameClockSeconds', 'gameTimeSeconds']) : null,
-                lastFrame: pick(frame, ['rfc460Timestamp', 'timestamp', 'gameState', 'state', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameClockSeconds', 'gameTimeSeconds']),
                 frameKeys: Object.keys(frame).sort(),
-                metadataKeys: Object.keys(metadata).sort(),
-                metadata: pick(metadata, ['esportsMatchId', 'gameStartTime', 'startTime', 'patchVersion', 'gameVersion', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameState', 'state']),
+                frame: pick(frame, ['rfc460Timestamp', 'timestamp', 'gameState', 'state', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameClockSeconds', 'gameTimeSeconds']),
                 blue: pick(blue, ['esportsTeamId', 'teamID', 'teamId', 'id', 'result', 'outcome', 'win', 'winner', 'totalGold', 'totalKills', 'towers', 'inhibitors']),
                 red: pick(red, ['esportsTeamId', 'teamID', 'teamId', 'id', 'result', 'outcome', 'win', 'winner', 'totalGold', 'totalKills', 'towers', 'inhibitors'])
               })}`);

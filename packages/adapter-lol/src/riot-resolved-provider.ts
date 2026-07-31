@@ -83,6 +83,44 @@ function normalizedText(value: string | null): string {
     .trim();
 }
 
+type DevelopmentTier = 'academy' | 'challenger' | 'youth' | 'junior' | 'reserve';
+
+const DEVELOPMENT_TIER_PATTERNS: ReadonlyArray<readonly [DevelopmentTier, RegExp]> = [
+  ['academy', /(?:^| )(?:academy|academia|akademi)(?: |$)/],
+  ['challenger', /(?:^| )challengers?(?: |$)/],
+  ['youth', /(?:^| )youth(?: |$)/],
+  ['junior', /(?:^| )(?:junior|juniors|jr)(?: |$)/],
+  ['reserve', /(?:^| )(?:reserve|reserves|secondary|b team)(?: |$)/]
+];
+
+function developmentTiers(...values: readonly (string | null)[]): ReadonlySet<DevelopmentTier> {
+  const text = normalizedText(values.filter((value): value is string => Boolean(value)).join(' '));
+  const tiers = new Set<DevelopmentTier>();
+  for (const [tier, pattern] of DEVELOPMENT_TIER_PATTERNS) {
+    if (pattern.test(text)) tiers.add(tier);
+  }
+  return tiers;
+}
+
+function descriptorDevelopmentTiers(descriptor: TeamDescriptor): ReadonlySet<DevelopmentTier> {
+  return developmentTiers(descriptor.name, descriptor.slug);
+}
+
+function catalogDevelopmentTiers(team: Json): ReadonlySet<DevelopmentTier> {
+  return developmentTiers(
+    firstString(team, ['name']),
+    firstString(team, ['slug'])
+  );
+}
+
+function developmentTierCompatible(team: Json, descriptor: TeamDescriptor): boolean {
+  const expected = descriptorDevelopmentTiers(descriptor);
+  const candidate = catalogDevelopmentTiers(team);
+  if (!expected.size && !candidate.size) return true;
+  if (!expected.size || !candidate.size) return false;
+  return [...expected].some(tier => candidate.has(tier));
+}
+
 function isPlaceholderTeamId(value: string | null): boolean {
   return value === null
     || /^team-\d+$/i.test(value)
@@ -264,6 +302,11 @@ function teamCatalogScore(
   const name = firstString(team, ['name']);
   let score = 0;
   let method: TeamMatchMethod | null = null;
+  const leagueMatches = homeLeagueTokens(team).some(token => leagueTokens.has(token));
+
+  // Riot event details can point academy or challenger fixtures at the parent
+  // organization's team ID. Never accept a cross-tier catalog entry, even by ID.
+  if (!developmentTierCompatible(team, descriptor)) return { score: 0, method: null };
 
   if (!isPlaceholderTeamId(descriptor.id) && id === descriptor.id) {
     score = 10_000;
@@ -281,7 +324,9 @@ function teamCatalogScore(
 
   if (!method) return { score: 0, method: null };
   if (normalizedText(firstString(team, ['status'])) === 'active') score += 100;
-  if (homeLeagueTokens(team).some(token => leagueTokens.has(token))) score += 50;
+  // League affinity must dominate ambiguous shared organization codes such as
+  // DK, HLE, and BFX once the development tier has been validated.
+  if (leagueMatches) score += method === 'id' ? 250 : 500;
   score += Math.min(array(team.players).length, 25);
   return { score, method };
 }

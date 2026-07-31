@@ -11,118 +11,72 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    environment: production
-    env:
-      LOL_ESPORTS_API_KEY: ${{ secrets.LOL_ESPORTS_API_KEY }}
     steps:
-      - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Inspect Riot history fields
+      - name: Inspect production history and Riot window fields
         shell: bash
         run: |
           node - <<'NODE'
-          const key = process.env.LOL_ESPORTS_API_KEY;
-          if (!key) throw new Error('Missing LOL_ESPORTS_API_KEY');
-          const persisted = 'https://esports-api.lolesports.com/persisted/gw';
-          const live = 'https://feed.lolesports.com/livestats/v1';
-          const seriesId = '115548147900684637';
-          const gameIds = ['115548147900684638', '115548147900684639', '115548147900684640'];
-
-          async function request(url, withKey = false) {
-            const response = await fetch(url, {
-              headers: withKey ? { accept: 'application/json', 'x-api-key': key } : { accept: 'application/json' }
-            });
-            const text = await response.text();
-            let body = null;
-            try { body = text ? JSON.parse(text) : null; } catch {}
-            return { status: response.status, body, text: body ? null : text.slice(0, 200) };
-          }
-
+          const apiBase = 'https://esports-live-api.acchtt.workers.dev';
+          const liveBase = 'https://feed.lolesports.com/livestats/v1';
           const obj = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
           const arr = value => Array.isArray(value) ? value : [];
           const pick = (source, keys) => Object.fromEntries(keys.filter(key => source[key] !== undefined).map(key => [key, source[key]]));
 
-          const detailsUrl = new URL(`${persisted}/getEventDetails`);
-          detailsUrl.searchParams.set('hl', 'en-US');
-          detailsUrl.searchParams.set('id', seriesId);
-          const details = await request(detailsUrl, true);
-          const root = obj(details.body);
-          const data = obj(root.data);
-          const event = obj(data.event ?? root.event ?? data);
-          const match = obj(event.match);
-          const games = arr(match.games).map(obj);
-          const teams = arr(match.teams).map(obj);
-
-          const detailsReport = {
-            status: details.status,
-            eventKeys: Object.keys(event).sort(),
-            matchKeys: Object.keys(match).sort(),
-            matchTeams: teams.map(team => ({
-              ...pick(team, ['id', 'teamId', 'name', 'code', 'outcome', 'win', 'winner']),
-              result: pick(obj(team.result), ['outcome', 'win', 'winner', 'gameWins', 'wins', 'losses'])
-            })),
-            games: games.map(game => ({
-              ...pick(game, ['id', 'gameId', 'number', 'gameNumber', 'state', 'winnerTeamId', 'winningTeamId', 'winnerId', 'durationSeconds', 'gameDurationSeconds', 'gameDuration', 'duration']),
-              result: pick(obj(game.result), ['winnerTeamId', 'winningTeamId', 'winnerId', 'durationSeconds', 'duration', 'outcome', 'win', 'winner']),
-              winner: pick(obj(game.winner), ['id', 'teamId', 'name', 'code']),
-              metadata: pick(obj(game.metadata), ['durationSeconds', 'duration', 'winnerTeamId', 'winningTeamId', 'winnerId']),
-              teams: arr(game.teams).map(value => {
-                const team = obj(value);
-                return {
-                  ...pick(team, ['id', 'teamId', 'side', 'outcome', 'win', 'winner']),
-                  result: pick(obj(team.result), ['outcome', 'win', 'winner', 'gameWins', 'wins'])
-                };
-              })
-            }))
-          };
-          console.log(`EVENT_DETAILS_HISTORY_REPORT=${JSON.stringify(detailsReport)}`);
-
-          const variants = [];
-          for (const params of [
-            [['ids', gameIds.join(',')]],
-            gameIds.map(id => ['ids', id]),
-            [['id', gameIds[0]]],
-            [['gameIds', gameIds.join(',')]]
-          ]) {
-            const url = new URL(`${persisted}/getGames`);
-            url.searchParams.set('hl', 'en-US');
-            for (const [name, value] of params) url.searchParams.append(name, value);
-            const result = await request(url, true);
-            const resultRoot = obj(result.body);
-            const resultData = obj(resultRoot.data);
-            variants.push({
-              query: url.search,
-              status: result.status,
-              rootKeys: Object.keys(resultRoot).sort(),
-              dataKeys: Object.keys(resultData).sort(),
-              sample: JSON.stringify(result.body).slice(0, 1500)
-            });
+          async function getJson(url) {
+            const response = await fetch(url, { headers: { accept: 'application/json', 'cache-control': 'no-cache' } });
+            const text = await response.text();
+            let body = null;
+            try { body = text ? JSON.parse(text) : null; } catch {}
+            return { status: response.status, body, text: body ? null : text.slice(0, 300) };
           }
-          console.log(`GET_GAMES_VARIANTS=${JSON.stringify(variants)}`);
 
-          const windowReports = [];
-          for (const gameId of gameIds.slice(0, 2)) {
-            const result = await request(`${live}/window/${gameId}`);
-            const payload = obj(result.body);
-            const frames = arr(payload.frames ?? obj(payload.window).frames ?? obj(payload.data).frames).map(obj);
-            const frame = frames.at(-1) ?? {};
-            const blue = obj(frame.blueTeam);
-            const red = obj(frame.redTeam);
-            const metadata = obj(payload.gameMetadata ?? frame.gameMetadata);
-            windowReports.push({
-              gameId,
-              status: result.status,
-              payloadKeys: Object.keys(payload).sort(),
-              frameCount: frames.length,
-              frameKeys: Object.keys(frame).sort(),
-              frameSummary: pick(frame, ['rfc460Timestamp', 'timestamp', 'gameState', 'state', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameClockSeconds', 'gameTimeSeconds']),
-              blue: pick(blue, ['esportsTeamId', 'teamID', 'teamId', 'id', 'result', 'outcome', 'win', 'winner', 'totalGold', 'totalKills', 'towers', 'inhibitors']),
-              red: pick(red, ['esportsTeamId', 'teamID', 'teamId', 'id', 'result', 'outcome', 'win', 'winner', 'totalGold', 'totalKills', 'towers', 'inhibitors']),
-              metadataKeys: Object.keys(metadata).sort(),
-              metadataSummary: pick(metadata, ['esportsMatchId', 'gameStartTime', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameState', 'state'])
-            });
+          const schedule = await getJson(`${apiBase}/v1/lol/schedule?states=live,paused,scheduled&limit=80&probe=${Date.now()}`);
+          const events = arr(obj(schedule.body).events);
+          const targets = events.map(obj).filter(entry => ['live', 'paused'].includes(String(obj(entry.series).state))).slice(0, 4);
+          console.log(`LIVE_SERIES_COUNT=${targets.length}`);
+
+          for (const entry of targets) {
+            const series = obj(entry.series);
+            const seriesId = String(series.id ?? '');
+            const games = arr(series.games).map(obj);
+            const context = await getJson(`${apiBase}/v1/lol/series/${encodeURIComponent(seriesId)}/context?probe=${Date.now()}`);
+            console.log(`CONTEXT_REPORT=${JSON.stringify({
+              seriesId,
+              teams: arr(series.teams).map(team => pick(obj(team), ['id', 'name', 'code'])),
+              bestOf: series.bestOf,
+              state: series.state,
+              games: games.map(game => pick(game, ['id', 'number', 'state'])),
+              history: obj(context.body).history ?? null
+            })}`);
+
+            for (const rawGame of games) {
+              const gameId = String(rawGame.id ?? '');
+              if (!gameId) continue;
+              const windowResult = await getJson(`${liveBase}/window/${encodeURIComponent(gameId)}`);
+              const payload = obj(windowResult.body);
+              const frames = arr(payload.frames ?? obj(payload.window).frames ?? obj(payload.data).frames).map(obj);
+              const frame = frames.at(-1) ?? {};
+              const metadata = obj(payload.gameMetadata ?? frame.gameMetadata);
+              const blue = obj(frame.blueTeam);
+              const red = obj(frame.redTeam);
+              console.log(`WINDOW_REPORT=${JSON.stringify({
+                seriesId,
+                gameId,
+                listedState: rawGame.state,
+                status: windowResult.status,
+                payloadKeys: Object.keys(payload).sort(),
+                frameCount: frames.length,
+                firstFrame: frames[0] ? pick(frames[0], ['rfc460Timestamp', 'timestamp', 'gameState', 'state', 'gameClockSeconds', 'gameTimeSeconds']) : null,
+                lastFrame: pick(frame, ['rfc460Timestamp', 'timestamp', 'gameState', 'state', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameClockSeconds', 'gameTimeSeconds']),
+                frameKeys: Object.keys(frame).sort(),
+                metadataKeys: Object.keys(metadata).sort(),
+                metadata: pick(metadata, ['esportsMatchId', 'gameStartTime', 'startTime', 'patchVersion', 'gameVersion', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameState', 'state']),
+                blue: pick(blue, ['esportsTeamId', 'teamID', 'teamId', 'id', 'result', 'outcome', 'win', 'winner', 'totalGold', 'totalKills', 'towers', 'inhibitors']),
+                red: pick(red, ['esportsTeamId', 'teamID', 'teamId', 'id', 'result', 'outcome', 'win', 'winner', 'totalGold', 'totalKills', 'towers', 'inhibitors'])
+              })}`);
+            }
           }
-          console.log(`WINDOW_HISTORY_REPORT=${JSON.stringify(windowReports)}`);
           NODE

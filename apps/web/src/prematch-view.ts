@@ -173,7 +173,7 @@ function rosterMarkup(roster: TeamRosterRef | undefined, fallbackName: string): 
   const players = roster?.players ?? [];
   return `
     <article class="prematch-roster">
-      <span class="prematch-section-title">Roster</span>
+      <span class="prematch-section-title">Available five-player lineup</span>
       <h4>${escapeHtml(roster?.team.name ?? fallbackName)}</h4>
       ${players.length
         ? players.map(player => `
@@ -216,6 +216,9 @@ function contextMarkup(context: SeriesContext | null, left: string, right: strin
   const selectedNames = new Set([left.toLowerCase(), right.toLowerCase()]);
   const standings = context.standings.slice(0, 16);
   const reason = context.reasons[0]?.message;
+  const verifiedHistoricalLineup = context.reasons.some(item => (
+    item.code === 'roster_from_recent_verified_lineup'
+  ));
 
   return `
     <section class="prematch-context">
@@ -223,6 +226,11 @@ function contextMarkup(context: SeriesContext | null, left: string, right: strin
         ${rosterMarkup(leftRoster, left)}
         ${rosterMarkup(rightRoster, right)}
       </div>
+      ${verifiedHistoricalLineup ? `
+        <div class="prematch-notice warning">
+          <strong>Last verified gameplay lineup</strong>
+          <p>These five-player lineups come from each team's most recent available Riot gameplay frame. They are not confirmed starters for this match.</p>
+        </div>` : ''}
       <section class="prematch-standings">
         <span class="prematch-section-title">Competition standings</span>
         ${standings.length ? `

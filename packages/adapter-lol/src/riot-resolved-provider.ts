@@ -18,6 +18,10 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const EVENT_TIME_TOLERANCE_MS = 12 * 60 * 60 * 1_000;
 const MAX_RECENT_SERIES = 500;
 const TEAM_CATALOG_TTL_MS = 15 * 60 * 1_000;
+const VERIFIED_LINEUP_TTL_MS = 15 * 60 * 1_000;
+const FAILED_LINEUP_TTL_MS = 2 * 60 * 1_000;
+const MAX_LINEUP_CANDIDATE_GAMES = 10;
+const LIVE_BASE = 'https://feed.lolesports.com/livestats/v1';
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -39,6 +43,22 @@ interface TeamCatalogMatch {
 interface TeamCatalogCache {
   expiresAt: number;
   teams: readonly Json[];
+}
+
+type CanonicalRole = 'top' | 'jungle' | 'mid' | 'bottom' | 'support';
+
+interface VerifiedLineupResult {
+  gameId: string | null;
+  players: readonly PlayerRef[];
+}
+
+interface VerifiedLineupCacheEntry extends VerifiedLineupResult {
+  expiresAt: number;
+}
+
+interface GameWindowCacheEntry {
+  expiresAt: number;
+  payload: unknown;
 }
 
 const object = (value: unknown): Json => (
@@ -350,14 +370,129 @@ function matchCatalogTeam(
   return selected ? { team: selected.team, method: selected.method } : null;
 }
 
-function rosterFromCatalog(team: Json, descriptor: TeamDescriptor): TeamRosterRef {
-  const normalizedTeam = teamRef(team, descriptor);
+const CANONICAL_ROLE_ORDER: readonly CanonicalRole[] = [
+  'top',
+  'jungle',
+  'mid',
+  'bottom',
+  'support'
+];
+
+function canonicalRole(value: string | null): CanonicalRole | null {
+  switch (normalizedText(value).replaceAll(' ', '')) {
+    case 'top':
+    case 'toplane': return 'top';
+    case 'jungle':
+    case 'jungler': return 'jungle';
+    case 'mid':
+    case 'middle':
+    case 'midlane': return 'mid';
+    case 'bottom':
+    case 'bot':
+    case 'botlane':
+    case 'adc': return 'bottom';
+    case 'support':
+    case 'utility': return 'support';
+    default: return null;
+  }
+}
+
+function exactFivePlayerLineup(players: readonly PlayerRef[]): readonly PlayerRef[] | null {
+  const byRole = new Map<CanonicalRole, PlayerRef>();
+  const playerIds = new Set<string>();
+  for (const player of players) {
+    const role = canonicalRole(player.role ?? null);
+    if (!role || byRole.has(role) || playerIds.has(player.id)) return null;
+    playerIds.add(player.id);
+    byRole.set(role, { ...player, role });
+  }
+  if (byRole.size !== CANONICAL_ROLE_ORDER.length) return null;
+  return CANONICAL_ROLE_ORDER.map(role => byRole.get(role)!);
+}
+
+function catalogPlayers(team: Json, teamId: string): readonly PlayerRef[] {
   const playersById = new Map<string, PlayerRef>();
   for (const value of array(team.players)) {
-    const player = playerRef(value, normalizedTeam.id);
+    const player = playerRef(value, teamId);
     if (player) playersById.set(player.id, player);
   }
-  return { team: normalizedTeam, players: [...playersById.values()] };
+  return [...playersById.values()];
+}
+
+function developmentTierSetsCompatible(
+  expected: ReadonlySet<DevelopmentTier>,
+  candidate: ReadonlySet<DevelopmentTier>
+): boolean {
+  if (!expected.size && !candidate.size) return true;
+  if (!expected.size || !candidate.size) return false;
+  return [...expected].some(tier => candidate.has(tier));
+}
+
+function seriesTeamMatchesDescriptor(team: TeamRef, descriptor: TeamDescriptor): boolean {
+  if (!developmentTierSetsCompatible(
+    descriptorDevelopmentTiers(descriptor),
+    developmentTiers(team.name, team.slug ?? null)
+  )) return false;
+
+  if (!isPlaceholderTeamId(descriptor.id) && !isPlaceholderTeamId(team.id) && team.id === descriptor.id) {
+    return true;
+  }
+  if (normalizedText(team.name) === normalizedText(descriptor.name)) return true;
+  const teamCode = normalizedText(team.code ?? null);
+  const descriptorCode = normalizedText(descriptor.code);
+  return Boolean(teamCode && descriptorCode && teamCode === descriptorCode);
+}
+
+function verifiedPlayersFromWindow(
+  payload: unknown,
+  descriptor: TeamDescriptor,
+  normalizedTeam: TeamRef,
+  pool: readonly PlayerRef[]
+): readonly PlayerRef[] | null {
+  const root = object(payload);
+  const frames = array(root.frames).map(object);
+  const metadata = object(root.gameMetadata ?? frames.at(-1)?.gameMetadata);
+  const teamMetadata = [
+    object(metadata.blueTeamMetadata),
+    object(metadata.redTeamMetadata)
+  ];
+  const targetIds = new Set(
+    [descriptor.id, normalizedTeam.id].filter(id => !isPlaceholderTeamId(id))
+  );
+  const selected = teamMetadata.find(team => {
+    const id = firstString(team, ['esportsTeamId', 'teamId', 'id']);
+    return Boolean(id && targetIds.has(id));
+  });
+  if (!selected) return null;
+
+  const byHandle = new Map<string, PlayerRef[]>();
+  for (const player of pool) {
+    const key = normalizedText(player.handle);
+    byHandle.set(key, [...(byHandle.get(key) ?? []), player]);
+  }
+
+  const verified = array(selected.participantMetadata).flatMap(value => {
+    const participant = object(value);
+    const handle = firstString(participant, ['summonerName', 'name']);
+    const role = canonicalRole(firstString(participant, ['role', 'roleSlug']));
+    if (!handle || !role) return [];
+    const matches = byHandle.get(normalizedText(handle)) ?? [];
+    const catalogMatch = matches.find(player => canonicalRole(player.role ?? null) === role)
+      ?? matches[0]
+      ?? null;
+    const syntheticHandle = normalizedText(handle).replaceAll(' ', '-');
+    return [{
+      ...(catalogMatch ?? {
+        id: `verified:${normalizedTeam.id}:${syntheticHandle}`,
+        handle,
+        teamId: normalizedTeam.id
+      }),
+      handle,
+      teamId: normalizedTeam.id,
+      role
+    } satisfies PlayerRef];
+  });
+  return exactFivePlayerLineup(verified);
 }
 
 function scheduleRecordStandings(event: Json, descriptors: readonly TeamDescriptor[]): readonly StandingRef[] {
@@ -469,6 +604,24 @@ async function requestJson(fetcher: FetchLike, url: URL, apiKey: string): Promis
   }
 }
 
+
+async function requestPublicJson(fetcher: FetchLike, url: URL): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetcher(url, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    const body = await response.text();
+    if (!response.ok) throw new Error(`Riot live feed returned HTTP ${response.status}.`);
+    return body.trim() ? JSON.parse(body) : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): LolProviderClient {
   const apiKey = options.apiKey.trim();
   if (!apiKey) throw new Error('A Riot LoL Esports API key is required.');
@@ -480,6 +633,10 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
   const recentSeries = new Map<string, LolProviderSeries>();
   let teamCatalogCache: TeamCatalogCache | null = null;
   let teamCatalogInFlight: Promise<readonly Json[]> | null = null;
+  const verifiedLineupCache = new Map<string, VerifiedLineupCacheEntry>();
+  const verifiedLineupInFlight = new Map<string, Promise<VerifiedLineupResult>>();
+  const gameWindowCache = new Map<string, GameWindowCacheEntry>();
+  const gameWindowInFlight = new Map<string, Promise<unknown>>();
 
   const remember = (series: readonly LolProviderSeries[]): void => {
     if (recentSeries.size + series.length > MAX_RECENT_SERIES) recentSeries.clear();
@@ -516,6 +673,91 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
     teamCatalogInFlight = request;
     return request;
   };
+
+  const loadGameWindow = async (gameId: string): Promise<unknown> => {
+    const currentTime = now().getTime();
+    const cached = gameWindowCache.get(gameId);
+    if (cached && cached.expiresAt > currentTime) return cached.payload;
+    const pending = gameWindowInFlight.get(gameId);
+    if (pending) return pending;
+
+    const url = new URL(`${LIVE_BASE}/window/${encodeURIComponent(gameId)}`);
+    const request = requestPublicJson(fetcher, url)
+      .catch(() => null)
+      .then(payload => {
+        gameWindowCache.set(gameId, {
+          payload,
+          expiresAt: now().getTime() + (payload ? VERIFIED_LINEUP_TTL_MS : FAILED_LINEUP_TTL_MS)
+        });
+        return payload;
+      })
+      .finally(() => {
+        if (gameWindowInFlight.get(gameId) === request) gameWindowInFlight.delete(gameId);
+      });
+    gameWindowInFlight.set(gameId, request);
+    return request;
+  };
+
+  const loadVerifiedLineup = async (
+    descriptor: TeamDescriptor,
+    normalizedTeam: TeamRef,
+    pool: readonly PlayerRef[],
+    selectedSeries: LolProviderSeries
+  ): Promise<VerifiedLineupResult> => {
+    const key = [
+      normalizedTeam.id,
+      selectedSeries.competition.id,
+      normalizedText(descriptor.name)
+    ].join(':');
+    const cached = verifiedLineupCache.get(key);
+    if (cached && cached.expiresAt > now().getTime()) {
+      return { gameId: cached.gameId, players: cached.players };
+    }
+    const pending = verifiedLineupInFlight.get(key);
+    if (pending) return pending;
+
+    const request = (async (): Promise<VerifiedLineupResult> => {
+      const selectedStart = Date.parse(selectedSeries.scheduledStart);
+      const candidateGames = [...recentSeries.values()]
+        .filter(series => (
+          !Number.isFinite(selectedStart)
+          || !Number.isFinite(Date.parse(series.scheduledStart))
+          || Date.parse(series.scheduledStart) <= selectedStart + EVENT_TIME_TOLERANCE_MS
+        ))
+        .filter(series => series.teams.some(team => seriesTeamMatchesDescriptor(team, descriptor)))
+        .flatMap(series => series.games.map(game => ({ game, series })))
+        .sort((left, right) => (
+          Number(right.game.state === 'completed') - Number(left.game.state === 'completed')
+          || Date.parse(right.series.scheduledStart) - Date.parse(left.series.scheduledStart)
+          || right.game.number - left.game.number
+        ));
+
+      const seen = new Set<string>();
+      for (const { game } of candidateGames) {
+        if (seen.has(game.id)) continue;
+        seen.add(game.id);
+        if (seen.size > MAX_LINEUP_CANDIDATE_GAMES) break;
+        const payload = await loadGameWindow(game.id);
+        const players = verifiedPlayersFromWindow(payload, descriptor, normalizedTeam, pool);
+        if (players) return { gameId: game.id, players };
+      }
+      return { gameId: null, players: [] };
+    })()
+      .then(result => {
+        verifiedLineupCache.set(key, {
+          ...result,
+          expiresAt: now().getTime()
+            + (result.players.length === 5 ? VERIFIED_LINEUP_TTL_MS : FAILED_LINEUP_TTL_MS)
+        });
+        return result;
+      })
+      .finally(() => {
+        if (verifiedLineupInFlight.get(key) === request) verifiedLineupInFlight.delete(key);
+      });
+    verifiedLineupInFlight.set(key, request);
+    return request;
+  };
+
 
   return {
     id: primary.id,
@@ -608,14 +850,25 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
               message: `${descriptor.name} was matched to the Riot team catalog by ${match.method}.`
             });
           }
-          const roster = rosterFromCatalog(match.team, descriptor);
-          if (roster.players.length < 5) {
-            reasons.push({
-              code: 'roster_player_count_low',
-              message: `${roster.team.name} has fewer than five players in Riot's current team catalog.`
-            });
+          const normalizedTeam = teamRef(match.team, descriptor);
+          const pool = catalogPlayers(match.team, normalizedTeam.id);
+          let players = exactFivePlayerLineup(pool) ?? [];
+          if (players.length !== 5) {
+            const verified = await loadVerifiedLineup(descriptor, normalizedTeam, pool, normalized);
+            players = verified.players;
+            if (players.length === 5) {
+              reasons.push({
+                code: 'roster_from_recent_verified_lineup',
+                message: `${normalizedTeam.name} uses the last five-player lineup verified from Riot gameplay${verified.gameId ? ` (${verified.gameId})` : ''}; it is not a confirmed starting lineup for this match.`
+              });
+            } else {
+              reasons.push({
+                code: 'roster_pool_ambiguous',
+                message: `${normalizedTeam.name}'s Riot team record combines substitutes or multiple squads, and no exact five-player gameplay lineup could be verified.`
+              });
+            }
           }
-          resolved.push(roster);
+          resolved.push({ team: normalizedTeam, players });
         }
         rosters = resolved;
       } catch (error) {
@@ -670,7 +923,7 @@ export function createRiotLolResolvedProvider(options: RiotLolProviderOptions): 
       }
 
       const rostersComplete = rosters.length >= 2
-        && rosters.every(roster => roster.players.length >= 5);
+        && rosters.every(roster => exactFivePlayerLineup(roster.players) !== null);
       return {
         seriesId,
         observedAt: now().toISOString(),

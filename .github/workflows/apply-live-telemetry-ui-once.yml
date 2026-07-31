@@ -1,0 +1,737 @@
+name: Apply Live Telemetry UI Redesign Once
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/apply-live-telemetry-ui-once.yml
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply-redesign:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Apply synchronized telemetry layout
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(text: str, pattern: str, replacement: str, label: str, flags: int = re.S) -> str:
+              updated, count = re.subn(pattern, lambda _: replacement, text, count=1, flags=flags)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected one match, found {count}")
+              return updated
+
+          main_path = Path("apps/web/src/main.ts")
+          main = main_path.read_text()
+
+          main = main.replace(
+              "let liveClockTimer: ReturnType<typeof setInterval> | null = null;\n"
+              "let liveClockBaseSeconds: number | null = null;\n"
+              "let liveClockBaseAt = 0;\n"
+              "let liveClockAdvancing = false;\n",
+              "let liveClockBaseSeconds: number | null = null;\n",
+              1,
+          )
+
+          main = replace_once(
+              main,
+              r"function sumPlayerField\(team: LolTeamState, field: 'creepScore' \| 'level'\): number \| null \{.*?\n\}\n\n",
+              "",
+              "remove aggregate player fields",
+          )
+
+          main = replace_once(
+              main,
+              r"function clearLiveClock\(\): void \{.*?\n\}\n\nfunction updateLiveClock\(\): void \{.*?\n\}\n\nfunction startLiveClock\(snapshot: LiveSnapshot<LolStats>\): void \{.*?\n\}\n\n",
+              """function clearLiveClock(): void {
+            liveClockBaseSeconds = null;
+          }
+
+          function updateLiveClock(): void {
+            const element = document.querySelector<HTMLElement>('#live-game-clock');
+            if (!element || liveClockBaseSeconds === null) return;
+            element.textContent = formatClock(liveClockBaseSeconds);
+          }
+
+          function startLiveClock(snapshot: LiveSnapshot<LolStats>): void {
+            clearLiveClock();
+            liveClockBaseSeconds = snapshot.stats?.gameClockSeconds ?? null;
+            updateLiveClock();
+          }
+
+          """,
+              "freeze clock to telemetry snapshot",
+          )
+
+          main = main.replace(
+              """function formatSigned(value: number | null): string {
+            if (value === null) return '—';
+            return `${value > 0 ? '+' : ''}${value.toLocaleString()}`;
+          }
+
+          """,
+              """function formatSigned(value: number | null): string {
+            if (value === null) return '—';
+            return `${value > 0 ? '+' : ''}${value.toLocaleString()}`;
+          }
+
+          function publicPatchLabel(value: string | null): string {
+            const match = value?.match(/^(\\d+)\\.(\\d+)/);
+            return match ? `Patch ${match[1]}.${match[2]}` : 'Patch unavailable';
+          }
+
+          """,
+              1,
+          )
+
+          main = replace_once(
+              main,
+              r"function objectiveMarkup\(team: LolTeamState\): string \{.*?\n\}\n\nfunction playerRows",
+              """type ObjectiveKind = 'towers' | 'dragons' | 'barons' | 'heralds' | 'inhibitors';
+
+          function objectiveIcon(kind: ObjectiveKind): string {
+            const icons: Record<ObjectiveKind, string> = {
+              towers: '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h3v3h4V3h3v5l-2 2v8h2v3H7v-3h2v-8L7 8V3Zm4 8v7h2v-7h-2Z" fill="currentColor"/></svg>',
+              dragons: '<svg viewBox="0 0 24 24" focusable="false"><path d="M3 14c3-5 7-8 11-8l-1-3 6 4-3 3c2 1 4 3 5 6-3-2-6-2-8-1-2 1-4 3-8 4l2-5-4 0Zm8-4-2 2 4 1 2-3-4 0Z" fill="currentColor"/></svg>',
+              barons: '<svg viewBox="0 0 24 24" focusable="false"><path d="m5 4 4 4 3-6 3 6 4-4-2 7 3 4-4 6H8l-4-6 3-4-2-7Zm7 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" fill="currentColor"/></svg>',
+              heralds: '<svg viewBox="0 0 24 24" focusable="false"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12Zm10-3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" fill="currentColor"/></svg>',
+              inhibitors: '<svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 6 5-2 10-4 5-4-5L6 7l6-5Zm0 4-2 3 2 8 2-8-2-3Z" fill="currentColor"/></svg>'
+            };
+            return `<span class="objective-icon objective-icon-${kind}" aria-hidden="true">${icons[kind]}</span>`;
+          }
+
+          function objectiveMarkup(team: LolTeamState): string {
+            const objectives = team.objectives;
+            const dragonCount = objectives.dragons === null ? null : objectives.dragons.length;
+            const dragonList = objectives.dragons?.length
+              ? objectives.dragons.map(dragon => String(dragon).replaceAll('_', ' ')).join(', ')
+              : null;
+            const cell = (kind: ObjectiveKind, label: string, value: number | null, detail?: string | null): string => {
+              const formatted = formatNumber(value);
+              const title = detail ? `${label}: ${formatted} · ${detail}` : `${label}: ${formatted}`;
+              return `
+                <div class="objective-stat" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
+                  ${objectiveIcon(kind)}
+                  <strong>${formatted}</strong>
+                  <span class="sr-only">${escapeHtml(label)}</span>
+                </div>`;
+            };
+            return `
+              <div class="objective-grid">
+                ${cell('towers', 'Towers', objectives.towers)}
+                ${cell('dragons', 'Dragons', dragonCount, dragonList)}
+                ${cell('barons', 'Barons', objectives.barons)}
+                ${cell('heralds', 'Heralds', objectives.heralds)}
+                ${cell('inhibitors', 'Inhibitors', objectives.inhibitors)}
+              </div>`;
+          }
+
+          function playerRows""",
+              "replace objective labels with icons",
+          )
+
+          main = replace_once(
+              main,
+              r"function teamMarkup\(team: LolTeamState, opponentGold: number \| null, imageUrl\?: string\): string \{.*?\n\}\n\nfunction renderSnapshot",
+              """function teamMarkup(team: LolTeamState, opponentGold: number | null, imageUrl?: string): string {
+            const goldDifference = team.gold === null || opponentGold === null ? null : team.gold - opponentGold;
+            const goldDifferenceClass = goldDifference === null
+              ? 'unknown'
+              : goldDifference > 0
+                ? 'positive'
+                : goldDifference < 0
+                  ? 'negative'
+                  : 'even';
+            return `
+              <section class="team-card ${team.side}">
+                <div class="team-heading">
+                  ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="" />` : '<span class="team-placeholder"></span>'}
+                  <div><small>${team.side.toUpperCase()} SIDE</small><h3>${escapeHtml(team.name)}</h3></div>
+                </div>
+                <div class="team-primary live-team-primary">
+                  <div><span>Total gold</span><strong>${formatNumber(team.gold)}</strong></div>
+                  <div class="gold-difference ${goldDifferenceClass}"><span>Gold lead</span><strong>${formatSigned(goldDifference)}</strong></div>
+                </div>
+                ${objectiveMarkup(team)}
+                <div class="player-list">${playerRows(team)}</div>
+              </section>`;
+          }
+
+          function renderSnapshot""",
+              "simplify team macro section",
+          )
+
+          main = replace_once(
+              main,
+              r"function renderSnapshot\(snapshot: LiveSnapshot<LolStats>\): void \{.*?\n\}\n\nfunction renderUpcoming",
+              """function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
+            const stats = snapshot.stats;
+            if (!stats) {
+              if (renderedGameId === snapshot.game.id) return;
+              renderedGameId = null;
+              clearLiveClock();
+              const reason = snapshot.quality.reasons.map(item => item.message).join(' ') || 'No normalized gameplay frame is available.';
+              gameContent.innerHTML = `
+                <div class="analysis-empty">
+                  <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
+                  <h3>Waiting for verified gameplay</h3>
+                  <p>${escapeHtml(reason)}</p>
+                </div>`;
+              return;
+            }
+
+            renderedGameId = snapshot.game.id;
+            const blueRef = snapshot.series.teams.find(team => team.id === stats.blue.id);
+            const redRef = snapshot.series.teams.find(team => team.id === stats.red.id);
+            const goldDifference = stats.blue.gold === null || stats.red.gold === null
+              ? null
+              : stats.blue.gold - stats.red.gold;
+            const goldLeadClass = goldDifference === null
+              ? 'unknown'
+              : goldDifference > 0
+                ? 'blue'
+                : goldDifference < 0
+                  ? 'red'
+                  : 'even';
+            const goldLeader = goldDifference === null
+              ? 'Gold unavailable'
+              : goldDifference === 0
+                ? 'Gold even'
+                : `Gold lead · ${goldDifference > 0 ? stats.blue.name : stats.red.name} ${formatSigned(Math.abs(goldDifference))}`;
+
+            gameContent.innerHTML = `
+              <div class="scoreboard">
+                <div class="score-team blue"><span>${escapeHtml(stats.blue.name)}</span><strong>${formatNumber(stats.blue.kills)}</strong></div>
+                <div class="clock">
+                  <small>GAME ${snapshot.game.number} · TELEMETRY TIME</small>
+                  <strong id="live-game-clock" title="Game time of this telemetry snapshot">${formatClock(stats.gameClockSeconds)}</strong>
+                  <span class="patch-label">${escapeHtml(publicPatchLabel(stats.patch ?? null))}</span>
+                  <em class="gold-lead ${goldLeadClass}">${escapeHtml(goldLeader)}</em>
+                </div>
+                <div class="score-team red right"><strong>${formatNumber(stats.red.kills)}</strong><span>${escapeHtml(stats.red.name)}</span></div>
+              </div>
+              <div class="team-grid">
+                ${teamMarkup(stats.blue, stats.red.gold, blueRef?.imageUrl)}
+                ${teamMarkup(stats.red, stats.blue.gold, redRef?.imageUrl)}
+              </div>`;
+            startLiveClock(snapshot);
+            window.dispatchEvent(new CustomEvent<LiveSnapshot<LolStats>>('esports-live:snapshot', { detail: snapshot }));
+          }
+
+          function renderUpcoming""",
+              "redesign scoreboard and gold lead",
+          )
+
+          if "liveClockTimer" in main or "liveClockAdvancing" in main or "liveClockBaseAt" in main:
+              raise RuntimeError("advancing clock state remains")
+          if "Total CS" in main or "Total level" in main:
+              raise RuntimeError("removed team aggregates remain")
+          main_path.write_text(main)
+
+          player_path = Path("apps/web/src/player-board-view.ts")
+          player = player_path.read_text()
+
+          player = replace_once(
+              player,
+              r"style\.textContent = `.*?`;\ndocument\.head\.append\(style\);",
+              """style.textContent = `
+            .team-card {
+              container-type: inline-size;
+            }
+
+            .player-list.telemetry-player-list {
+              gap: 6px;
+              margin-top: 11px;
+            }
+
+            .telemetry-player-board {
+              display: grid;
+              grid-template-areas:
+                "champion copy level kda cs gold"
+                "inventory inventory inventory inventory inventory inventory";
+              grid-template-columns: 34px minmax(78px, 1fr) 34px 50px 32px 46px;
+              align-items: center;
+              gap: 6px;
+              min-width: 0;
+              min-height: 62px;
+              padding: 8px 9px;
+              border: 1px solid rgba(148, 163, 184, 0.1);
+              border-radius: 10px;
+              background: rgba(2, 6, 23, 0.2);
+            }
+
+            .team-card.blue .telemetry-player-board {
+              border-left: 2px solid rgba(56, 189, 248, 0.52);
+            }
+
+            .team-card.red .telemetry-player-board {
+              border-left: 2px solid rgba(251, 113, 133, 0.52);
+            }
+
+            .telemetry-champion {
+              grid-area: champion;
+              position: relative;
+              width: 34px;
+              height: 34px;
+              overflow: hidden;
+              border: 1px solid rgba(148, 163, 184, 0.16);
+              border-radius: 8px;
+              background: rgba(15, 23, 42, 0.92);
+            }
+
+            .telemetry-champion img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+
+            .telemetry-champion-fallback {
+              position: absolute;
+              inset: 0;
+              display: grid;
+              place-items: center;
+              color: #94a3b8;
+              font-size: .6rem;
+              font-weight: 900;
+            }
+
+            .telemetry-champion img:not([hidden]) + .telemetry-champion-fallback {
+              display: none;
+            }
+
+            .telemetry-player-copy {
+              grid-area: copy;
+              min-width: 0;
+            }
+
+            .telemetry-player-copy strong,
+            .telemetry-player-copy span {
+              display: block;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            .telemetry-player-copy strong {
+              color: #f1f5f9;
+              font-size: .72rem;
+              line-height: 1.2;
+            }
+
+            .telemetry-player-copy span {
+              margin-top: 2px;
+              color: #8190a6;
+              font-size: .53rem;
+              text-transform: capitalize;
+            }
+
+            .telemetry-level {
+              grid-area: level;
+              color: #bfdbfe;
+              font-size: .5rem;
+              font-weight: 850;
+              text-align: center;
+              white-space: nowrap;
+            }
+
+            .telemetry-player-stat {
+              min-width: 0;
+              text-align: right;
+            }
+
+            .telemetry-player-stat.kda { grid-area: kda; }
+            .telemetry-player-stat.cs { grid-area: cs; }
+            .telemetry-player-stat.gold { grid-area: gold; }
+
+            .telemetry-player-stat span,
+            .telemetry-player-stat strong {
+              display: block;
+              white-space: nowrap;
+            }
+
+            .telemetry-player-stat span {
+              color: #68788f;
+              font-size: .42rem;
+              font-weight: 850;
+              letter-spacing: .06em;
+            }
+
+            .telemetry-player-stat strong {
+              margin-top: 2px;
+              color: #dbe5f3;
+              font-size: .6rem;
+            }
+
+            .telemetry-inventory {
+              grid-area: inventory;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              min-width: 0;
+              min-height: 22px;
+              padding-left: 40px;
+            }
+
+            .telemetry-inventory-label {
+              margin-right: 2px;
+              color: #64748b;
+              font-size: .43rem;
+              font-weight: 850;
+              letter-spacing: .08em;
+            }
+
+            .telemetry-item-slot {
+              position: relative;
+              width: 22px;
+              height: 22px;
+              flex: 0 0 22px;
+              overflow: hidden;
+              border: 1px solid rgba(148, 163, 184, 0.12);
+              border-radius: 5px;
+              background: rgba(2, 6, 23, 0.42);
+            }
+
+            .telemetry-item-slot.empty {
+              opacity: .3;
+            }
+
+            .telemetry-item-slot.empty::after,
+            .telemetry-item-slot.image-missing::after {
+              content: '';
+              position: absolute;
+              inset: 7px;
+              border: 1px solid rgba(100, 116, 139, 0.2);
+              border-radius: 2px;
+            }
+
+            .telemetry-item-slot img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+
+            @container (max-width: 320px) {
+              .telemetry-player-board {
+                grid-template-areas:
+                  "champion copy level"
+                  "kda cs gold"
+                  "inventory inventory inventory";
+                grid-template-columns: 34px minmax(0, 1fr) 38px;
+                gap: 7px 8px;
+              }
+
+              .telemetry-player-stat {
+                text-align: left;
+              }
+
+              .telemetry-inventory {
+                padding-left: 0;
+              }
+            }
+
+            @media (max-width: 620px) {
+              .telemetry-inventory {
+                overflow-x: auto;
+              }
+            }
+          `;
+          document.head.append(style);""",
+              "replace live player board layout",
+          )
+
+          player = replace_once(
+              player,
+              r"function statMarkup\(label: string, value: string\): string \{.*?\n\}\n\nfunction playerMarkup\(player: LolPlayerState, patch: string \| null\): string \{.*?\n\}\n\nfunction renderTeam",
+              """function statMarkup(className: 'kda' | 'cs' | 'gold', label: string, value: string): string {
+            return `<div class="telemetry-player-stat ${className}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+          }
+
+          function playerMarkup(player: LolPlayerState, patch: string | null): string {
+            const role = player.role ? player.role.replaceAll('_', ' ') : 'Role unavailable';
+            const champion = player.championId ?? 'Champion unavailable';
+            return `
+              <article class="telemetry-player-board">
+                ${championMarkup(player, patch)}
+                <div class="telemetry-player-copy">
+                  <strong>${escapeHtml(player.handle ?? 'Unknown player')}</strong>
+                  <span>${escapeHtml(role)} · ${escapeHtml(champion)}</span>
+                </div>
+                <span class="telemetry-level">LV ${escapeHtml(formatNumber(player.level))}</span>
+                ${statMarkup('kda', 'KDA', `${formatNumber(player.kills)}/${formatNumber(player.deaths)}/${formatNumber(player.assists)}`)}
+                ${statMarkup('cs', 'CS', formatNumber(player.creepScore))}
+                ${statMarkup('gold', 'GOLD', formatNumber(player.totalGold))}
+                ${inventoryMarkup(player, patch)}
+              </article>`;
+          }
+
+          function renderTeam""",
+              "make player boards symmetrical",
+          )
+
+          player = player.replace(
+              "const patchElement = document.querySelector<HTMLElement>('.scoreboard .clock > span');",
+              "const patchElement = document.querySelector<HTMLElement>('.scoreboard .patch-label');",
+              1,
+          )
+          player_path.write_text(player)
+
+          styles_path = Path("apps/web/src/styles.css")
+          styles = styles_path.read_text()
+          styles += """
+
+          /* synchronized-live-telemetry-redesign */
+          .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+          }
+
+          .scoreboard {
+            grid-template-columns: minmax(0, 1fr) minmax(190px, auto) minmax(0, 1fr);
+            gap: 18px;
+            padding: 17px 20px;
+            background:
+              linear-gradient(90deg, rgba(14, 165, 233, 0.16), rgba(255, 255, 255, 0.018) 39%, rgba(255, 255, 255, 0.018) 61%, rgba(244, 63, 94, 0.16)),
+              #0a1120;
+          }
+
+          .scoreboard .score-team.blue > span,
+          .scoreboard .score-team.blue > strong {
+            color: #b9ebff;
+          }
+
+          .scoreboard .score-team.red > span,
+          .scoreboard .score-team.red > strong {
+            color: #ffc2ce;
+          }
+
+          .scoreboard .clock {
+            min-width: 190px;
+            gap: 4px;
+          }
+
+          .scoreboard .clock small {
+            color: #9aa9bf;
+            font-size: 0.52rem;
+          }
+
+          .scoreboard .clock > strong {
+            font-variant-numeric: tabular-nums;
+          }
+
+          .scoreboard .clock .patch-label {
+            color: #74859d;
+            font-size: 0.57rem;
+          }
+
+          .scoreboard .clock .gold-lead {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 28px;
+            margin-top: 2px;
+            padding: 0 11px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 999px;
+            font-size: 0.67rem;
+            font-style: normal;
+            font-weight: 900;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+          }
+
+          .scoreboard .clock .gold-lead.blue {
+            border-color: rgba(56, 189, 248, 0.42);
+            color: #d9f5ff;
+            background: rgba(14, 165, 233, 0.18);
+            box-shadow: 0 0 24px rgba(14, 165, 233, 0.14);
+          }
+
+          .scoreboard .clock .gold-lead.red {
+            border-color: rgba(251, 113, 133, 0.42);
+            color: #ffe1e7;
+            background: rgba(244, 63, 94, 0.18);
+            box-shadow: 0 0 24px rgba(244, 63, 94, 0.14);
+          }
+
+          .scoreboard .clock .gold-lead.even,
+          .scoreboard .clock .gold-lead.unknown {
+            color: #cbd5e1;
+            background: rgba(148, 163, 184, 0.1);
+          }
+
+          .team-card {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+          }
+
+          .team-card.blue {
+            border-color: rgba(56, 189, 248, 0.4);
+            background:
+              radial-gradient(circle at -8% 0%, rgba(14, 165, 233, 0.34), transparent 50%),
+              linear-gradient(120deg, rgba(7, 57, 82, 0.58), rgba(9, 16, 31, 0.94) 58%);
+            box-shadow:
+              inset 5px 0 0 rgba(56, 189, 248, 0.92),
+              0 0 34px rgba(14, 165, 233, 0.12);
+          }
+
+          .team-card.red {
+            border-color: rgba(251, 113, 133, 0.4);
+            background:
+              radial-gradient(circle at 108% 0%, rgba(244, 63, 94, 0.34), transparent 50%),
+              linear-gradient(240deg, rgba(88, 21, 42, 0.58), rgba(9, 16, 31, 0.94) 58%);
+            box-shadow:
+              inset -5px 0 0 rgba(251, 113, 133, 0.92),
+              0 0 34px rgba(244, 63, 94, 0.12);
+          }
+
+          .team-card.blue .team-heading small,
+          .team-card.blue .team-primary span {
+            color: #8bdcff;
+          }
+
+          .team-card.red .team-heading small,
+          .team-card.red .team-primary span {
+            color: #ff9fb2;
+          }
+
+          .live-team-primary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .live-team-primary > div {
+            min-height: 60px;
+            padding: 10px 12px;
+          }
+
+          .live-team-primary strong {
+            font-size: 1.16rem;
+            font-variant-numeric: tabular-nums;
+          }
+
+          .gold-difference.positive strong {
+            color: #86efac;
+          }
+
+          .gold-difference.negative strong {
+            color: #fda4af;
+          }
+
+          .gold-difference.even strong,
+          .gold-difference.unknown strong {
+            color: #cbd5e1;
+          }
+
+          .objective-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 7px;
+            margin-top: 8px;
+          }
+
+          .objective-grid > .objective-stat {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            min-height: 43px;
+            padding: 7px 6px;
+            text-align: left;
+          }
+
+          .objective-icon {
+            display: grid;
+            place-items: center;
+            width: 21px;
+            height: 21px;
+            flex: 0 0 21px;
+            font-size: initial;
+            line-height: 1;
+          }
+
+          .objective-icon svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+          }
+
+          .team-card.blue .objective-icon {
+            color: #62d5ff;
+            filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.34));
+          }
+
+          .team-card.red .objective-icon {
+            color: #ff8399;
+            filter: drop-shadow(0 0 7px rgba(251, 113, 133, 0.34));
+          }
+
+          .objective-grid > .objective-stat strong {
+            margin-top: 0;
+            color: #f1f5f9;
+            font-size: 0.92rem;
+            font-variant-numeric: tabular-nums;
+          }
+
+          @media (max-width: 620px) {
+            .scoreboard {
+              grid-template-columns: minmax(0, 1fr) minmax(122px, auto) minmax(0, 1fr);
+              gap: 8px;
+            }
+
+            .scoreboard .clock {
+              min-width: 122px;
+            }
+
+            .scoreboard .clock .gold-lead {
+              max-width: 160px;
+              min-height: 24px;
+              padding: 0 8px;
+              overflow: hidden;
+              font-size: 0.58rem;
+              text-overflow: ellipsis;
+            }
+
+            .objective-grid {
+              grid-template-columns: repeat(5, minmax(48px, 1fr));
+              overflow-x: auto;
+            }
+          }
+          """
+          styles_path.write_text(styles)
+          PY
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck and test
+        run: npm run check
+
+      - name: Build web application
+        run: npm run build:web
+
+      - name: Commit redesign
+        shell: bash
+        run: |
+          rm .github/workflows/apply-live-telemetry-ui-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Improve live telemetry hierarchy and synchronization"
+          git push origin HEAD:${{ github.head_ref }}

@@ -207,6 +207,17 @@ function newestTimedFrame(value: unknown, ceilingMs = Number.POSITIVE_INFINITY):
   return selected;
 }
 
+function earliestFrameTime(value: unknown): number | null {
+  let earliest: number | null = null;
+  for (const frame of frames(value)) {
+    const timestamp = frameTime(frame);
+    const timestampMs = timestamp ? parseTime(timestamp) : null;
+    if (timestampMs === null) continue;
+    if (earliest === null || timestampMs < earliest) earliest = timestampMs;
+  }
+  return earliest;
+}
+
 function frameTeam(frame: Json, side: LolSide): Json {
   const direct = object(frame[side === 'blue' ? 'blueTeam' : 'redTeam']);
   if (Object.keys(direct).length) return direct;
@@ -381,10 +392,17 @@ function startTime(event: Json, gameId: string, metadata: Json): number | null {
   return null;
 }
 
-function gameClock(frame: Json, event: Json, gameId: string, metadata: Json, sourceMs: number): number | null {
+function gameClock(
+  frame: Json,
+  event: Json,
+  gameId: string,
+  metadata: Json,
+  sourceMs: number,
+  openingFrameMs: number | null
+): number | null {
   const direct = firstNumber(frame, ['gameClockSeconds', 'gameTimeSeconds', 'gameTime']);
   if (direct !== null) return Math.max(0, Math.round(direct));
-  const start = startTime(event, gameId, metadata);
+  const start = startTime(event, gameId, metadata) ?? openingFrameMs;
   return start !== null && sourceMs >= start ? Math.round((sourceMs - start) / 1000) : null;
 }
 
@@ -447,6 +465,7 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
   const fetcher = options.fetcher ?? fetch;
   const locale = options.locale ?? 'en-US';
   const now = options.now ?? (() => new Date());
+  const gameStartTimes = new Map<string, number>();
 
   const persisted = async (path: string, params: Record<string, string | string[] | undefined>): Promise<unknown> => {
     const url = new URL(`${PERSISTED_BASE}/${path}`);
@@ -471,7 +490,13 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
 
   const bestWindow = async (gameId: string, after?: string): Promise<Candidate | null> => {
     const observedMs = now().getTime();
-    const first = windowCandidate(await live(`window/${encodeURIComponent(gameId)}`, {}));
+    const openingPayload = await live(`window/${encodeURIComponent(gameId)}`, {});
+    const openingTime = earliestFrameTime(openingPayload);
+    if (openingTime !== null) {
+      const previous = gameStartTimes.get(gameId);
+      if (previous === undefined || openingTime < previous) gameStartTimes.set(gameId, openingTime);
+    }
+    const first = windowCandidate(openingPayload);
     const afterMs = parseTime(after);
     if (first?.gameplay && observedMs - first.timestampMs <= 30_000 && (afterMs === null || first.timestampMs > afterMs)) {
       return first;
@@ -589,7 +614,14 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
       const blueInfo = teamForSide(event, series, gameId, 'blue', firstString(blueMetadata, ['esportsTeamId']));
       const redInfo = teamForSide(event, series, gameId, 'red', firstString(redMetadata, ['esportsTeamId']));
       const stats: LolStats = {
-        gameClockSeconds: gameClock(effectiveCandidate.frame, event, gameId, metadata, effectiveCandidate.timestampMs),
+        gameClockSeconds: gameClock(
+          effectiveCandidate.frame,
+          event,
+          gameId,
+          metadata,
+          effectiveCandidate.timestampMs,
+          gameStartTimes.get(gameId) ?? null
+        ),
         patch: firstString(metadata, ['patchVersion', 'gameVersion']),
         blue: teamState('blue', effectiveCandidate.frame, blueMetadata, detailMap, blueInfo),
         red: teamState('red', effectiveCandidate.frame, redMetadata, detailMap, redInfo)

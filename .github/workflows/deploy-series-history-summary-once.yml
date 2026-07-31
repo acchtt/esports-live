@@ -1,0 +1,166 @@
+name: Deploy Series History Summary Once
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy-and-verify:
+    if: github.head_ref == 'ops/deploy-series-history-summary'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 2a1ac777eb11e87c4601a732815a97ba94cbe784
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install --no-package-lock
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npx wrangler pages deploy apps/web/dist --project-name esports-live --branch main --commit-hash 2a1ac777eb11e87c4601a732815a97ba94cbe784 --commit-message "Merge completed series history summary"; then exit 0; fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+      - name: Verify production bundle markers
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const web = 'https://esports-live.pages.dev';
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const localHtml = fs.readFileSync('apps/web/dist/index.html', 'utf8');
+          const expectedJs = localHtml.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          if (!expectedJs) throw new Error('Built JavaScript entry is missing.');
+          let assetInfo = null;
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const html = await fetch(`${web}/?release=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text()).catch(() => '');
+            if (!html.includes(expectedJs)) { await sleep(4000); continue; }
+            const bundle = await fetch(`${new URL(expectedJs, web)}?release=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text()).catch(() => '');
+            const markers = {
+              mergedHeader: bundle.includes('history-summary-active'),
+              scoreChip: bundle.includes('history-header-score'),
+              clickableCards: bundle.includes('data-history-game-id'),
+              navigationBinding: bundle.includes('bindHistoryGameNavigation'),
+              duplicateHeadingRemoved: !bundle.includes('series-history-heading'),
+              duplicateScoreRemoved: !bundle.includes('series-score-value')
+            };
+            if (Object.values(markers).every(Boolean)) { assetInfo = { expectedJs, markers }; break; }
+            await sleep(4000);
+          }
+          if (!assetInfo) throw new Error('Production series-history bundle markers were not verified.');
+          console.log(`PRODUCTION_SERIES_HISTORY_ASSETS=${JSON.stringify(assetInfo)}`);
+          NODE
+      - name: Install browser verifier
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Verify consolidated completed-series fixture
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import { chromium } from 'playwright';
+
+          const now = new Date().toISOString();
+          const mkoi = { id: 'mkoi', name: 'Movistar KOI', code: 'MKOI' };
+          const shft = { id: 'shft', name: 'Shifters', code: 'SHFT' };
+          const games = [
+            { id: 'g1', number: 1, state: 'completed' },
+            { id: 'g2', number: 2, state: 'completed' },
+            { id: 'g3', number: 3, state: 'completed' }
+          ];
+          const series = {
+            id: 'series-history-fixture', esport: 'lol',
+            competition: { id: 'lec', name: 'LEC', region: 'EU', stage: 'Week 2' },
+            teams: [mkoi, shft], bestOf: 3, state: 'live', scheduledStart: now, games
+          };
+          const provider = { id: 'fixture', name: 'Production verifier' };
+          const history = {
+            bestOf: 3, winsRequired: 2, drawPossible: false,
+            score: [{ team: mkoi, wins: 2 }, { team: shft, wins: 1 }],
+            games: [
+              { ...games[0], blueTeam: mkoi, redTeam: shft, winner: shft, durationSeconds: 2591 },
+              { ...games[1], blueTeam: shft, redTeam: mkoi, winner: mkoi, durationSeconds: 1855 },
+              { ...games[2], blueTeam: mkoi, redTeam: shft, winner: mkoi, durationSeconds: 1741 }
+            ]
+          };
+          const scheduleEvent = { series, provider, observedAt: now };
+          const context = {
+            schemaVersion: '1.0', esport: 'lol', seriesId: series.id, provider, observedAt: now,
+            rosters: [], standings: [], history, complete: true, reasons: []
+          };
+          const snapshot = game => ({
+            schemaVersion: '1.0', esport: 'lol', provider, series, game, stats: null,
+            quality: { freshness: 'unavailable', sourceTimestamp: null, observedAt: now, ageSeconds: null, complete: false, advancing: null, safeForLiveAnalysis: false, reasons: [{ code: 'fixture', message: 'Completed fixture' }] }
+          });
+
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+          await page.route('https://esports-live-api.acchtt.workers.dev/**', async route => {
+            const url = new URL(route.request().url());
+            const json = value => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+            if (url.pathname === '/health') return json({ ok: true, service: 'fixture', schemaVersion: '1.0', adapters: ['lol'] });
+            if (url.pathname === '/v1/lol/schedule') {
+              if (url.searchParams.get('states')?.includes('completed')) return json({ esport: 'lol', events: [] });
+              return json({ esport: 'lol', events: [scheduleEvent] });
+            }
+            if (url.pathname.includes('/context')) return json(context);
+            if (url.pathname.includes('/live')) {
+              const id = url.pathname.split('/').at(-2);
+              return json(snapshot(games.find(game => game.id === id) ?? games[0]));
+            }
+            return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Fixture route unavailable' }) });
+          });
+
+          await page.goto(`https://esports-live.pages.dev/?verification=${Date.now()}`, { waitUntil: 'networkidle' });
+          await page.locator('.analysis-header.history-summary-active').waitFor({ state: 'visible', timeout: 30000 });
+          await page.locator('.history-game').first().waitFor({ state: 'visible', timeout: 30000 });
+
+          const counts = {
+            mergedHeaders: await page.locator('.analysis-header.history-summary-active').count(),
+            scoreChips: await page.locator('.history-header-score').count(),
+            historyCards: await page.locator('button.history-game').count(),
+            duplicateHeadings: await page.locator('.series-history-heading').count(),
+            duplicateScores: await page.locator('.series-score').count()
+          };
+          const expected = { mergedHeaders: 1, scoreChips: 1, historyCards: 3, duplicateHeadings: 0, duplicateScores: 0 };
+          for (const [key, value] of Object.entries(expected)) {
+            if (counts[key] !== value) throw new Error(`${key}: expected ${value}, received ${counts[key]}`);
+          }
+
+          const selectorDisplay = await page.locator('#game-selector').evaluate(element => getComputedStyle(element).display);
+          if (selectorDisplay !== 'none') throw new Error(`Redundant game selector remains visible: ${selectorDisplay}`);
+          const title = (await page.locator('#selected-series').innerText()).replace(/\s+/g, ' ').trim();
+          const meta = (await page.locator('#selected-meta').innerText()).replace(/\s+/g, ' ').trim();
+          for (const value of ['Movistar KOI', '2', '1', 'Shifters']) if (!title.includes(value)) throw new Error(`Merged title missing ${value}: ${title}`);
+          for (const value of ['FINAL', 'Best of 3', 'First to 2', '3/3 games completed']) if (!meta.includes(value)) throw new Error(`Merged meta missing ${value}: ${meta}`);
+
+          await page.locator('button.history-game').nth(1).click();
+          await page.waitForTimeout(300);
+          const activeCard = await page.locator('button.history-game.active').innerText();
+          const activeTab = await page.locator('#game-selector .game-button.active').innerText();
+          if (!activeCard.includes('Game 2')) throw new Error(`Game 2 card did not become active: ${activeCard}`);
+          if (!activeTab.includes('G2')) throw new Error(`Underlying Game 2 navigation did not update: ${activeTab}`);
+
+          await page.locator('.analysis-panel').screenshot({ path: 'production-series-history-summary.png' });
+          console.log(`PRODUCTION_SERIES_HISTORY_RENDERED=${JSON.stringify({ counts, selectorDisplay, title, meta })}`);
+          await browser.close();
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-series-history-summary-verification
+          path: production-series-history-summary.png
+          retention-days: 1

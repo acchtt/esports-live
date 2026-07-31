@@ -2,6 +2,7 @@ export {};
 
 const DDRAGON_VERSIONS = 'https://ddragon.leagueoflegends.com/api/versions.json';
 const DDRAGON_CDN = 'https://ddragon.leagueoflegends.com/cdn';
+const DDRAGON_TIMEOUT_MS = 4_000;
 const ITEM_SLOTS = 7;
 
 let versionPromise: Promise<string | null> | null = null;
@@ -30,10 +31,13 @@ function esc(value: unknown): string {
 
 function version(): Promise<string | null> {
   if (versionPromise) return versionPromise;
-  versionPromise = fetch(DDRAGON_VERSIONS,{cache:'force-cache'})
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), DDRAGON_TIMEOUT_MS);
+  versionPromise = fetch(DDRAGON_VERSIONS,{cache:'force-cache',signal:controller.signal})
     .then(response => response.ok ? response.json() : [])
     .then(value => Array.isArray(value) && typeof value[0] === 'string' ? value[0] : null)
-    .catch(() => null);
+    .catch(() => null)
+    .finally(() => window.clearTimeout(timeout));
   return versionPromise;
 }
 
@@ -90,9 +94,33 @@ function numberOf(game: HTMLElement,index: number): string {
   return game.querySelector('.completed-final-game-header strong')?.textContent?.match(/Game\s+(\d+)/i)?.[1] ?? String(index+1);
 }
 
+function applySelection(host: HTMLElement, selected: string): void {
+  const games = [...host.querySelectorAll<HTMLElement>('.completed-final-game')];
+  const tabs = host.querySelector<HTMLElement>('.completed-game-tabs');
+  host.dataset.selectedFinalGame = selected;
+  games.forEach((game,index) => { game.dataset.boardHidden = String(numberOf(game,index)!==selected); });
+  tabs?.querySelectorAll<HTMLButtonElement>('[data-final-game-tab]').forEach(button => {
+    button.classList.toggle('active',button.dataset.finalGameTab===selected);
+  });
+}
+
+function bindTabs(host: HTMLElement): void {
+  if (host.dataset.finalGameTabsBound === 'true') return;
+  host.dataset.finalGameTabsBound = 'true';
+  host.addEventListener('click',event => {
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLButtonElement>('[data-final-game-tab]')
+      : null;
+    if (!target || !host.contains(target)) return;
+    const selected = target.dataset.finalGameTab;
+    if (selected) applySelection(host,selected);
+  });
+}
+
 function installTabs(host: HTMLElement): void {
   const games = [...host.querySelectorAll<HTMLElement>('.completed-final-game')];
   if (!games.length) return;
+  bindTabs(host);
   let tabs = host.querySelector<HTMLElement>('.completed-game-tabs');
   if (!tabs) {
     tabs = document.createElement('div');
@@ -100,33 +128,71 @@ function installTabs(host: HTMLElement): void {
     host.querySelector('.completed-telemetry-heading')?.insertAdjacentElement('afterend',tabs);
   }
   const numbers = games.map(numberOf);
-  const selected = host.dataset.selectedFinalGame && numbers.includes(host.dataset.selectedFinalGame) ? host.dataset.selectedFinalGame : numbers.at(-1)!;
-  host.dataset.selectedFinalGame = selected;
-  tabs.innerHTML = games.map((game,index) => {
+  const selected = host.dataset.selectedFinalGame && numbers.includes(host.dataset.selectedFinalGame)
+    ? host.dataset.selectedFinalGame
+    : numbers.at(-1)!;
+  const entries = games.map((game,index) => {
     const number = numberOf(game,index);
     const label = game.querySelector('.completed-final-game-header strong')?.textContent?.trim() || `Game ${number}`;
-    return `<button type="button" class="completed-game-tab ${number===selected?'active':''}" data-final-game-tab="${esc(number)}">${esc(label)}</button>`;
-  }).join('');
-  games.forEach((game,index) => { game.dataset.boardHidden = String(numberOf(game,index)!==selected); });
-  tabs.querySelectorAll<HTMLButtonElement>('[data-final-game-tab]').forEach(button => button.addEventListener('click',() => {
-    host.dataset.selectedFinalGame = button.dataset.finalGameTab ?? selected;
-    installTabs(host);
-  }));
+    return {number,label};
+  });
+  const signature = JSON.stringify(entries);
+  if (tabs.dataset.signature !== signature) {
+    tabs.dataset.signature = signature;
+    tabs.innerHTML = entries.map(({number,label}) =>
+      `<button type="button" class="completed-game-tab" data-final-game-tab="${esc(number)}">${esc(label)}</button>`
+    ).join('');
+  }
+  applySelection(host,selected);
 }
 
 async function enhance(): Promise<void> {
   const host = document.querySelector<HTMLElement>('#completed-final-telemetry');
   if (!host) return;
-  const patch = await version();
-  host.querySelectorAll<HTMLElement>('.completed-final-player').forEach(row => transform(row,patch));
   installTabs(host);
+  const rows = [...host.querySelectorAll<HTMLElement>('.completed-final-player')]
+    .filter(row => row.dataset.boardEnhanced !== 'true');
+  if (!rows.length) return;
+  const patch = await version();
+  rows.filter(row => row.isConnected).forEach(row => transform(row,patch));
+  if (host.isConnected) installTabs(host);
 }
 
-let queued = false;
-function queue(): void {
-  if (queued) return;
-  queued = true;
-  queueMicrotask(() => { queued = false; void enhance(); });
+function includesTelemetry(node: Node): boolean {
+  if (!(node instanceof Element)) return false;
+  return node.matches('#completed-final-telemetry,.completed-final-game,.completed-final-player')
+    || Boolean(node.querySelector('#completed-final-telemetry,.completed-final-game,.completed-final-player'));
 }
-new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
+
+let scheduled = false;
+let running = false;
+let rerun = false;
+
+function queue(): void {
+  if (running) {
+    rerun = true;
+    return;
+  }
+  if (scheduled) return;
+  scheduled = true;
+  queueMicrotask(() => { void run(); });
+}
+
+async function run(): Promise<void> {
+  scheduled = false;
+  running = true;
+  try {
+    await enhance();
+  } finally {
+    running = false;
+    if (rerun) {
+      rerun = false;
+      queue();
+    }
+  }
+}
+
+new MutationObserver(mutations => {
+  if (mutations.some(mutation => [...mutation.addedNodes].some(includesTelemetry))) queue();
+}).observe(document.body,{childList:true,subtree:true});
 queue();

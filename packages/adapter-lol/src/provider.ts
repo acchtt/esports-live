@@ -2,6 +2,7 @@ import type {
   CompetitionRef,
   GameState,
   QualityReason,
+  SeriesHistoryRef,
   SeriesState,
   StandingRef,
   TeamRef,
@@ -46,6 +47,7 @@ export interface LolProviderSeriesContext {
   observedAt: string;
   rosters: readonly TeamRosterRef[];
   standings: readonly StandingRef[];
+  history?: SeriesHistoryRef;
   complete: boolean;
   reasons?: readonly QualityReason[];
 }

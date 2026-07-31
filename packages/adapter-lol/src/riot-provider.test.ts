@@ -246,3 +246,42 @@ test('aligns team and participant frames before normalization', async () => {
   assert.equal(detailRequest?.searchParams.get('startingTime'), '2026-07-31T08:08:50.000Z');
   assert.equal(detailRequest?.searchParams.has('participantIds'), false);
 });
+
+
+test('uses the opening Riot window frame as a game-clock fallback', async () => {
+  const opening = '2026-07-31T08:00:00.000Z';
+  const current = '2026-07-31T08:09:50.000Z';
+  const customFetcher = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/getEventDetails')) {
+      const payload = eventPayload();
+      payload.data.event.match.games[0]!.vods = [];
+      return json(payload);
+    }
+    if (url.pathname.includes('/window/game-1')) {
+      const payload = windowPayload();
+      if (!url.searchParams.has('startingTime')) {
+        const frame = structuredClone(payload.frames[0]!);
+        frame.rfc460Timestamp = opening;
+        frame.blueTeam.totalGold = 0;
+        frame.redTeam.totalGold = 0;
+        frame.blueTeam.participants = frame.blueTeam.participants.map(player => ({ ...player, creepScore: 0, level: 1 }));
+        frame.redTeam.participants = frame.redTeam.participants.map(player => ({ ...player, creepScore: 0, level: 1 }));
+        payload.frames = [frame];
+      } else {
+        payload.frames[0]!.rfc460Timestamp = current;
+      }
+      return json(payload);
+    }
+    if (url.pathname.includes('/details/game-1')) return json(detailsPayload());
+    return json({ error: 'unexpected_url', url: url.toString() }, 500);
+  };
+
+  const adapter = new LolAdapter(createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: customFetcher,
+    now: () => new Date(NOW)
+  }));
+  const snapshot = await adapter.getLiveSnapshot('game-1');
+  assert.equal(snapshot.stats?.gameClockSeconds, 590);
+});

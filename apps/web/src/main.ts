@@ -206,13 +206,13 @@ function renderSeriesHeader(event: ScheduleEvent): void {
 
 type ObjectiveKind = 'towers' | 'dragons' | 'barons' | 'heralds' | 'inhibitors';
 
-function objectiveAsset(kind: ObjectiveKind, side: LolTeamState['side']): string {
+function objectiveAsset(kind: ObjectiveKind): string {
   const assets: Record<ObjectiveKind, string> = {
-    towers: `/objectives/tower-${side}.png`,
+    towers: '/objectives/tower.png',
     dragons: '/objectives/dragon.png',
     barons: '/objectives/baron.png',
     heralds: '/objectives/herald.png',
-    inhibitors: `/objectives/inhibitor-${side}.png`
+    inhibitors: '/objectives/inhibitor.png'
   };
   return assets[kind];
 }
@@ -228,7 +228,7 @@ function objectiveMarkup(team: LolTeamState): string {
     const title = detail ? `${label}: ${formatted} · ${detail}` : `${label}: ${formatted}`;
     return `
       <div class="objective-stat" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
-        <img class="objective-icon" src="${escapeHtml(objectiveAsset(kind, team.side))}" alt="" aria-hidden="true" />
+        <img class="objective-icon" src="${escapeHtml(objectiveAsset(kind))}" alt="" aria-hidden="true" />
         <strong>${formatted}</strong>
         <span class="sr-only">${escapeHtml(label)}</span>
       </div>`;
@@ -260,15 +260,7 @@ function playerRows(team: LolTeamState): string {
   }).join('');
 }
 
-function teamMarkup(team: LolTeamState, opponentGold: number | null, imageUrl?: string): string {
-  const goldDifference = team.gold === null || opponentGold === null ? null : team.gold - opponentGold;
-  const goldDifferenceClass = goldDifference === null
-    ? 'unknown'
-    : goldDifference > 0
-      ? 'positive'
-      : goldDifference < 0
-        ? 'negative'
-        : 'even';
+function teamMarkup(team: LolTeamState, imageUrl?: string): string {
   return `
     <section class="team-card ${team.side}">
       <div class="team-heading">
@@ -277,8 +269,7 @@ function teamMarkup(team: LolTeamState, opponentGold: number | null, imageUrl?: 
       </div>
       <div class="team-overview">
         <div class="team-primary live-team-primary">
-        <div><span>Total gold</span><strong>${formatNumber(team.gold)}</strong></div>
-        <div class="gold-difference ${goldDifferenceClass}"><span>Gold lead</span><strong>${formatSigned(goldDifference)}</strong></div>
+          <div><span>Total gold</span><strong>${formatNumber(team.gold)}</strong></div>
         </div>
         ${objectiveMarkup(team)}
       </div>
@@ -333,8 +324,8 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
       <div class="score-team red right"><strong>${formatNumber(stats.red.kills)}</strong><span>${escapeHtml(stats.red.name)}</span></div>
     </div>
     <div class="team-grid">
-      ${teamMarkup(stats.blue, stats.red.gold, blueRef?.imageUrl)}
-      ${teamMarkup(stats.red, stats.blue.gold, redRef?.imageUrl)}
+      ${teamMarkup(stats.blue, blueRef?.imageUrl)}
+      ${teamMarkup(stats.red, redRef?.imageUrl)}
     </div>`;
   startLiveClock(snapshot);
   window.dispatchEvent(new CustomEvent<LiveSnapshot<LolStats>>('esports-live:snapshot', { detail: snapshot }));

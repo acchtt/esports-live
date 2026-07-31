@@ -8,7 +8,7 @@ on:
       - .github/workflows/deploy-web-once.yml
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -42,3 +42,13 @@ jobs:
           --branch main
           --commit-hash "$GITHUB_SHA"
           --commit-message "Deploy scheduled-series web update"
+      - name: Record successful deployment
+        shell: bash
+        run: |
+          mkdir -p .deployment
+          printf 'status=success\nsource_commit=%s\ndeployed_at=%s\nurl=https://esports-live.pages.dev\n' "$GITHUB_SHA" "$(date -u +%FT%TZ)" > .deployment/web-latest.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .deployment/web-latest.txt
+          git commit -m "Record successful web deployment"
+          git push

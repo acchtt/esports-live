@@ -206,15 +206,16 @@ function renderSeriesHeader(event: ScheduleEvent): void {
 
 type ObjectiveKind = 'towers' | 'dragons' | 'barons' | 'heralds' | 'inhibitors';
 
+const OBJECTIVE_ASSETS: Record<ObjectiveKind, string> = {
+  towers: new URL('./assets/objectives/tower.png', import.meta.url).href,
+  dragons: new URL('./assets/objectives/dragon.png', import.meta.url).href,
+  barons: new URL('./assets/objectives/baron.png', import.meta.url).href,
+  heralds: new URL('./assets/objectives/herald.png', import.meta.url).href,
+  inhibitors: new URL('./assets/objectives/inhibitor.png', import.meta.url).href
+};
+
 function objectiveAsset(kind: ObjectiveKind): string {
-  const assets: Record<ObjectiveKind, string> = {
-    towers: '/objectives/tower.png',
-    dragons: '/objectives/dragon.png',
-    barons: '/objectives/baron.png',
-    heralds: '/objectives/herald.png',
-    inhibitors: '/objectives/inhibitor.png'
-  };
-  return assets[kind];
+  return OBJECTIVE_ASSETS[kind];
 }
 
 function objectiveMarkup(team: LolTeamState): string {
@@ -228,7 +229,7 @@ function objectiveMarkup(team: LolTeamState): string {
     const title = detail ? `${label}: ${formatted} · ${detail}` : `${label}: ${formatted}`;
     return `
       <div class="objective-stat" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
-        <img class="objective-icon" src="${escapeHtml(objectiveAsset(kind))}" alt="" aria-hidden="true" />
+        <img class="objective-icon" src="${escapeHtml(objectiveAsset(kind))}" alt="" width="24" height="24" decoding="async" aria-hidden="true" />
         <strong>${formatted}</strong>
         <span class="sr-only">${escapeHtml(label)}</span>
       </div>`;

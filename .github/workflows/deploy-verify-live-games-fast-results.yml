@@ -29,20 +29,41 @@ jobs:
           test "$(git rev-parse HEAD)" = "d17e05e604c8e663718fe688319a6c879fa9884b"
           npm install
           npm run check
-      - name: Deploy API Worker
-        run: npm run deploy:api
+      - name: Deploy API Worker with retry
+        shell: bash
+        run: |
+          for attempt in {1..8}; do
+            echo "Worker deployment attempt ${attempt}/8"
+            if npm run deploy:api; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 8 ]; then
+              sleep $((attempt * 15))
+            fi
+          done
+          exit 1
       - name: Build web application
         run: npm run build:web
         env:
           VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
-      - name: Deploy Pages application
-        run: >-
-          npx wrangler pages deploy apps/web/dist
-          --project-name esports-live
-          --branch main
-          --commit-hash "$(git rev-parse HEAD)"
-          --commit-message "Restore live games and speed Results"
-          --commit-dirty=true
+      - name: Deploy Pages application with retry
+        shell: bash
+        run: |
+          for attempt in {1..8}; do
+            echo "Pages deployment attempt ${attempt}/8"
+            if npx wrangler pages deploy apps/web/dist \
+              --project-name esports-live \
+              --branch main \
+              --commit-hash "$(git rev-parse HEAD)" \
+              --commit-message "Restore live games and speed Results" \
+              --commit-dirty=true; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 8 ]; then
+              sleep $((attempt * 15))
+            fi
+          done
+          exit 1
       - name: Verify production live game selection and web bundle
         shell: bash
         run: |

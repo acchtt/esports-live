@@ -1,4 +1,0 @@
-status=success
-source_commit=943f78c58254baf92274ae724186ec35aebc37dc
-deployed_at=2026-07-31T01:27:10Z
-url=https://esports-live.pages.dev

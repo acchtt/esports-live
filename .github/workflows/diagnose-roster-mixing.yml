@@ -1,0 +1,95 @@
+name: Diagnose Roster Mixing
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/diagnose-roster-mixing.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit production roster contexts
+        env:
+          API_BASE: https://esports-live-api.acchtt.workers.dev
+        run: |
+          node - <<'NODE'
+          const base = process.env.API_BASE;
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+          async function get(path) {
+            const response = await fetch(`${base}${path}`, {
+              headers: { accept: 'application/json', 'cache-control': 'no-cache' }
+            });
+            const text = await response.text();
+            let body = null;
+            try { body = JSON.parse(text); } catch {}
+            return { status: response.status, ok: response.ok, body, text: text.slice(0, 300) };
+          }
+
+          const schedule = await get(`/v1/lol/schedule?limit=100&audit=${Date.now()}`);
+          const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+          const ranked = [...events].sort((a, b) => {
+            const stateRank = value => value === 'live' ? 0 : value === 'scheduled' ? 1 : value === 'paused' ? 2 : 3;
+            return stateRank(a?.series?.state) - stateRank(b?.series?.state)
+              || Math.abs(Date.parse(a?.series?.scheduledStart) - Date.now())
+                - Math.abs(Date.parse(b?.series?.scheduledStart) - Date.now());
+          }).slice(0, 30);
+
+          const reports = [];
+          for (const event of ranked) {
+            const series = event?.series;
+            if (!series?.id) continue;
+            const context = await get(`/v1/lol/series/${encodeURIComponent(series.id)}/context?audit=${Date.now()}`);
+            const rosters = Array.isArray(context.body?.rosters) ? context.body.rosters : [];
+            const rosterReports = rosters.map(roster => {
+              const players = Array.isArray(roster?.players) ? roster.players : [];
+              const roles = players.map(player => String(player?.role ?? 'unknown').toLowerCase());
+              const roleCounts = Object.fromEntries([...new Set(roles)].map(role => [role, roles.filter(value => value === role).length]));
+              return {
+                team: roster?.team?.name ?? null,
+                teamId: roster?.team?.id ?? null,
+                slug: roster?.team?.slug ?? null,
+                count: players.length,
+                roleCounts,
+                players: players.map(player => ({
+                  id: player?.id ?? null,
+                  handle: player?.handle ?? null,
+                  role: player?.role ?? null,
+                  displayName: player?.displayName ?? null
+                }))
+              };
+            });
+            const anomalous = rosterReports.some(roster => (
+              roster.count !== 5
+              || Object.values(roster.roleCounts).some(count => count > 1)
+              || roster.roleCounts.unknown
+            ));
+            reports.push({
+              seriesId: series.id,
+              state: series.state,
+              competition: series.competition?.name ?? null,
+              stage: series.competition?.stage ?? null,
+              teams: series.teams?.map(team => ({ id: team.id, name: team.name, code: team.code })) ?? [],
+              contextStatus: context.status,
+              anomalous,
+              rosters: rosterReports,
+              reasons: context.body?.reasons ?? []
+            });
+            await sleep(150);
+          }
+
+          const anomalies = reports.filter(report => report.anomalous);
+          console.log(`ROSTER_AUDIT=${JSON.stringify({
+            checkedAt: new Date().toISOString(),
+            scheduleStatus: schedule.status,
+            eventCount: events.length,
+            seriesChecked: reports.length,
+            anomalyCount: anomalies.length,
+            anomalies,
+            reports
+          })}`);
+          NODE

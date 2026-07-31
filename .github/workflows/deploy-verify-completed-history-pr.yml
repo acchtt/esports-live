@@ -1,0 +1,147 @@
+name: Deploy Verify Completed History PR
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/deploy-verify-completed-history-pr.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      WEB_BASE_URL: https://esports-live.pages.dev
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages application
+        run: >-
+          npx wrangler pages deploy apps/web/dist
+          --project-name esports-live
+          --branch main
+          --commit-hash "$(git rev-parse HEAD)"
+          --commit-message "Deploy completed match history"
+      - name: Verify production completed history
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const apiBase = process.env.API_BASE_URL;
+          const webBase = process.env.WEB_BASE_URL;
+          const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+          async function response(url) {
+            try {
+              const result = await fetch(url, {
+                headers: { accept: 'application/json,text/html,*/*', 'cache-control': 'no-cache' }
+              });
+              const text = await result.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: result.ok, status: result.status, text, body };
+            } catch (error) {
+              return { ok: false, status: 0, text: '', body: { message: String(error) } };
+            }
+          }
+
+          function isEnded(event, history) {
+            if (event?.series?.state === 'completed') return true;
+            const games = Array.isArray(history?.games) ? history.games : [];
+            const completedGames = games.filter(game => game?.state === 'completed').length;
+            const scores = Array.isArray(history?.score) ? history.score.map(row => Number(row?.wins ?? 0)) : [];
+            const leadingWins = scores.length ? Math.max(...scores) : 0;
+            if (leadingWins >= Number(history?.winsRequired ?? Number.MAX_SAFE_INTEGER)) return true;
+            return Boolean(history?.drawPossible) && completedGames >= Number(history?.bestOf ?? Number.MAX_SAFE_INTEGER);
+          }
+
+          async function loadContexts(events) {
+            const output = [];
+            let cursor = 0;
+            const workers = Array.from({ length: Math.min(3, events.length) }, async () => {
+              while (cursor < events.length) {
+                const index = cursor++;
+                const event = events[index];
+                const result = await response(
+                  `${apiBase}/v1/lol/series/${encodeURIComponent(event.series.id)}/context?verify=${Date.now()}`
+                );
+                const history = result.body?.history ?? null;
+                if (result.ok && history && isEnded(event, history)) {
+                  output.push({
+                    seriesId: event.series.id,
+                    competition: event.series.competition?.name ?? null,
+                    teams: event.series.teams?.map(team => team.name) ?? [],
+                    scheduleState: event.series.state,
+                    bestOf: history.bestOf,
+                    score: history.score?.map(row => row.wins) ?? [],
+                    completedGames: history.games?.filter(game => game.state === 'completed').length ?? 0
+                  });
+                }
+              }
+            });
+            await Promise.all(workers);
+            return output;
+          }
+
+          let finalReport = null;
+          for (let attempt = 1; attempt <= 18; attempt += 1) {
+            const cacheBust = Date.now();
+            const [web, schedule] = await Promise.all([
+              response(`${webBase}?verify=${cacheBust}`),
+              response(`${apiBase}/v1/lol/schedule?limit=80&verify=${cacheBust}`)
+            ]);
+
+            const scriptSources = [...web.text.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+              .map(match => new URL(match[1], webBase).toString());
+            const scriptBodies = await Promise.all(scriptSources.map(async source => (await response(source)).text));
+            const bundle = scriptBodies.join('\n');
+            const resultsBundlePresent = bundle.includes('No recent results found')
+              && bundle.includes('completed-match-detail')
+              && bundle.includes('Results');
+
+            const now = Date.now();
+            const events = (Array.isArray(schedule.body?.events) ? schedule.body.events : [])
+              .filter(event => {
+                const start = Date.parse(event?.series?.scheduledStart ?? '');
+                return Number.isFinite(start)
+                  && start <= now
+                  && start >= now - 14 * 24 * 60 * 60 * 1000;
+              })
+              .sort((left, right) => Date.parse(right.series.scheduledStart) - Date.parse(left.series.scheduledStart))
+              .slice(0, 24);
+            const ended = schedule.ok ? await loadContexts(events) : [];
+
+            finalReport = {
+              checkedAt: new Date().toISOString(),
+              attempt,
+              webStatus: web.status,
+              scheduleStatus: schedule.status,
+              scheduleCount: Array.isArray(schedule.body?.events) ? schedule.body.events.length : 0,
+              candidateCount: events.length,
+              endedCount: ended.length,
+              ended: ended.slice(0, 12),
+              resultsBundlePresent
+            };
+            console.log(`COMPLETED_HISTORY_REPORT=${JSON.stringify(finalReport)}`);
+
+            if (web.ok && schedule.ok && resultsBundlePresent && ended.length > 0) process.exit(0);
+            await wait(10_000);
+          }
+
+          console.error(`FINAL_COMPLETED_HISTORY_REPORT=${JSON.stringify(finalReport)}`);
+          process.exit(1);
+          NODE

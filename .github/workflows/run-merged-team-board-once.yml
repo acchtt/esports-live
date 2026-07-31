@@ -45,7 +45,7 @@ jobs:
           test -s apps/web/dist/objectives/inhibitor-blue.png
           test -s apps/web/dist/objectives/inhibitor-red.png
           grep -R "team-overview" apps/web/dist/assets/*.js
-          grep -R "merged-team-board-official-objectives" apps/web/dist/assets/*.css
+          grep -R "team-overview" apps/web/dist/assets/*.css
 
       - name: Commit redesign
         shell: bash

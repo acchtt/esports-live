@@ -163,8 +163,8 @@ test('uses event details, cached team catalog, and numeric league ID for context
         data: {
           teams: [
             catalogTeam('unrelated-team', 'unrelated', 'OTHER', 'Other Team', 5),
-            catalogTeam('new-bfx-id', 'bnk-fearx', 'BFX', 'BNK FEARX', 6),
-            catalogTeam('dns-current-id', 'kwangdong-freecs', 'DNS', 'DN SOOPers', 12)
+            catalogTeam('new-bfx-id', 'bnk-fearx', 'BFX', 'BNK FEARX', 5),
+            catalogTeam('dns-current-id', 'kwangdong-freecs', 'DNS', 'DN SOOPers', 5)
           ]
         }
       });
@@ -207,7 +207,7 @@ test('uses event details, cached team catalog, and numeric league ID for context
   assert.equal(tournamentLeagueId, LEAGUE_ID);
   assert.equal(first.complete, true);
   assert.equal(first.rosters.length, 2);
-  assert.deepEqual(first.rosters.map(roster => roster.players.length), [6, 12]);
+  assert.deepEqual(first.rosters.map(roster => roster.players.length), [5, 5]);
   assert.equal(first.rosters[0]?.team.id, 'new-bfx-id');
   assert.equal(first.rosters[1]?.team.id, 'dns-current-id');
   assert.ok(first.reasons?.some(reason => (
@@ -236,7 +236,7 @@ test('keeps schedule records when full standings fail and reports a missing rost
     if (url.pathname.endsWith('/getTeams')) {
       return json({
         data: {
-          teams: [catalogTeam('dns-current-id', 'kwangdong-freecs', 'DNS', 'DN SOOPers', 12)]
+          teams: [catalogTeam('dns-current-id', 'kwangdong-freecs', 'DNS', 'DN SOOPers', 5)]
         }
       });
     }
@@ -365,7 +365,7 @@ test('keeps academy and challenger rosters isolated from parent organizations', 
               'T1A',
               'T1 Esports Academy',
               developmentLeague,
-              7
+              5
             ),
             developmentCatalogTeam('dk-main-id', 'dplus-kia', 'DK', 'Dplus KIA', mainLeague, 12),
             developmentCatalogTeam(
@@ -374,7 +374,7 @@ test('keeps academy and challenger rosters isolated from parent organizations', 
               'DK',
               'DK Challengers',
               developmentLeague,
-              8
+              5
             )
           ]
         }
@@ -401,8 +401,130 @@ test('keeps academy and challenger rosters isolated from parent organizations', 
     context.rosters.map(roster => roster.team.id),
     ['t1-academy-id', 'dk-challengers-id']
   );
-  assert.deepEqual(context.rosters.map(roster => roster.players.length), [7, 8]);
+  assert.deepEqual(context.rosters.map(roster => roster.players.length), [5, 5]);
   assert.equal(context.rosters.some(roster => roster.team.id === 't1-main-id'), false);
   assert.equal(context.rosters.some(roster => roster.team.id === 'dk-main-id'), false);
   assert.ok(context.reasons?.filter(reason => reason.code === 'roster_team_fallback_match').length === 2);
+});
+
+
+test('resolves mixed organization pools from a verified five-player game lineup', async () => {
+  const developmentLeagueId = 'lck-challengers-id';
+  const currentEvent = {
+    state: 'unstarted',
+    startTime: '2026-07-31T08:00:00.000Z',
+    league: { id: developmentLeagueId, slug: 'lck-challengers', name: 'LCK Challengers' },
+    match: {
+      id: 'academy-current',
+      strategy: { count: 3 },
+      teams: [
+        { id: 't1-academy-id', name: 'T1 Esports Academy', code: 'T1A' },
+        { id: 'dk-challengers-id', name: 'DK Challengers', code: 'DK' }
+      ],
+      games: []
+    }
+  };
+  const detailsEvent = {
+    ...currentEvent,
+    state: 'completed',
+    startTime: '2026-07-30T08:00:00.000Z',
+    match: {
+      ...currentEvent.match,
+      games: [{ id: 'verified-game', number: 1, state: 'completed' }]
+    }
+  };
+  const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
+  const academyHandles = ['Guardian', 'Painter', 'Guti', 'Cypher', 'Cloud'];
+  const dkHandles = ['Nevid', 'Solid', 'Garden', 'Wayne', 'Career'];
+  const mixedTeam = (id: string, slug: string, code: string, name: string, own: readonly string[], senior: readonly string[]) => ({
+    id,
+    slug,
+    code,
+    name,
+    status: 'active',
+    homeLeague: { id: developmentLeagueId, slug: 'lck-challengers', name: 'LCK Challengers' },
+    players: [...own, ...senior].map((handle, index) => ({
+      id: `${id}-${handle}`,
+      summonerName: handle,
+      role: roles[index % 5]
+    }))
+  });
+  let verifiedWindowCalls = 0;
+  const fetcher = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/getSchedule')) {
+      return json({ data: { schedule: { events: [currentEvent] } } });
+    }
+    if (url.pathname.endsWith('/getLive')) return json({ data: { schedule: { events: [] } } });
+    if (url.pathname.endsWith('/getEventDetails')) {
+      return json({ data: { event: detailsEvent } });
+    }
+    if (url.pathname.endsWith('/getTeams')) {
+      return json({ data: { teams: [
+        mixedTeam('t1-academy-id', 't1-challengers', 'T1A', 'T1 Esports Academy', academyHandles, ['Doran', 'Oner', 'Faker', 'Peyz', 'Keria']),
+        mixedTeam('dk-challengers-id', 'dwg-kia-challengers', 'DK', 'DK Challengers', dkHandles, ['Siwoo', 'Lucid', 'ShowMaker', 'Smash', 'Loopy'])
+      ] } });
+    }
+    if (url.pathname.endsWith('/getTournamentsForLeague')) return json({ error: 'unavailable' }, 503);
+    if (url.pathname.includes('/window/future-game')) return json({ error: 'not_started' }, 404);
+    if (url.pathname.includes('/window/verified-game')) {
+      verifiedWindowCalls += 1;
+      const metadata = (teamId: string, prefix: string, handles: readonly string[]) => ({
+        esportsTeamId: teamId,
+        participantMetadata: handles.map((handle, index) => ({
+          participantId: index + 1,
+          esportsPlayerId: `${teamId}-${handle}`,
+          summonerName: `${prefix} ${handle}`,
+          role: roles[index]
+        }))
+      });
+      return json({
+        gameMetadata: {
+          blueTeamMetadata: metadata('t1-academy-id', 'T1A', academyHandles),
+          redTeamMetadata: metadata('dk-challengers-id', 'DK', dkHandles)
+        },
+        frames: []
+      });
+    }
+    return json({ error: 'unexpected_url', url: url.toString() }, 500);
+  };
+
+  const provider = createRiotLolResolvedProvider({ apiKey: 'test-key', fetcher, now: () => new Date(NOW) });
+  await provider.getSchedule();
+  const context = await provider.getSeriesContext?.('academy-current');
+  assert.ok(context);
+  assert.equal(context.complete, false);
+  assert.deepEqual(context.rosters.map(roster => roster.players.map(player => player.handle)), [
+    academyHandles,
+    dkHandles
+  ]);
+  assert.equal(context.rosters.every(roster => roster.players.length === 5), true);
+  assert.equal(context.rosters.some(roster => roster.players.some(player => ['Faker', 'ShowMaker'].includes(player.handle))), false);
+  assert.equal(verifiedWindowCalls, 1);
+  assert.equal(context.reasons?.filter(reason => reason.code === 'roster_from_recent_verified_lineup').length, 2);
+});
+
+test('hides an ambiguous organization pool when no gameplay lineup can be verified', async () => {
+  const event = scheduleEvent('selected-series');
+  const fetcher = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/getSchedule')) return json({ data: { schedule: { events: [event] } } });
+    if (url.pathname.endsWith('/getLive')) return json({ data: { schedule: { events: [] } } });
+    if (url.pathname.endsWith('/getEventDetails')) return json({ data: { event: eventDetails() } });
+    if (url.pathname.endsWith('/getTeams')) return json({ data: { teams: [
+      catalogTeam('new-bfx-id', 'bnk-fearx', 'BFX', 'BNK FEARX', 10),
+      catalogTeam('dns-current-id', 'kwangdong-freecs', 'DNS', 'DN SOOPers', 10)
+    ] } });
+    if (url.pathname.endsWith('/getTournamentsForLeague')) return json({ error: 'unavailable' }, 503);
+    if (url.pathname.includes('/window/')) return json({ error: 'unavailable' }, 404);
+    return json({ error: 'unexpected_url', url: url.toString() }, 500);
+  };
+
+  const provider = createRiotLolResolvedProvider({ apiKey: 'test-key', fetcher, now: () => new Date(NOW) });
+  await provider.getSchedule();
+  const context = await provider.getSeriesContext?.('selected-series');
+  assert.ok(context);
+  assert.equal(context.complete, false);
+  assert.deepEqual(context.rosters.map(roster => roster.players.length), [0, 0]);
+  assert.equal(context.reasons?.filter(reason => reason.code === 'roster_pool_ambiguous').length, 2);
 });

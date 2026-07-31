@@ -1,5 +1,6 @@
 import type {
   GameState,
+  QualityReason,
   SeriesGameHistoryRef,
   SeriesHistoryRef,
   TeamRef
@@ -17,6 +18,8 @@ const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_RECENT_SERIES = 500;
 const BASE_CONTEXT_TTL_MS = 5 * 60 * 1_000;
+const DETAILS_RETRY_ATTEMPTS = 3;
+const DETAILS_RETRY_DELAY_MS = 250;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -241,6 +244,10 @@ export function parseRiotSeriesHistory(
   };
 }
 
+function delay(milliseconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 async function requestJson(fetcher: FetchLike, url: URL, apiKey: string): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -305,7 +312,22 @@ export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): L
     const url = new URL(`${PERSISTED_BASE}/getEventDetails`);
     url.searchParams.set('hl', locale);
     url.searchParams.set('id', seriesId);
-    return requestJson(fetcher, url, apiKey);
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= DETAILS_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        return await requestJson(fetcher, url, apiKey);
+      } catch (error) {
+        lastError = error;
+        if (attempt < DETAILS_RETRY_ATTEMPTS) {
+          await delay(DETAILS_RETRY_DELAY_MS * attempt);
+        }
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Riot event details are unavailable.');
   };
 
   return {
@@ -322,18 +344,28 @@ export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): L
         series = recentSeries.get(seriesId);
       }
 
-      const [context, detailsPayload] = await Promise.all([
-        loadBaseContext(seriesId),
-        details(seriesId).catch(() => null)
-      ]);
+      const context = await loadBaseContext(seriesId);
       const observedAt = now().toISOString();
-      if (!series || !detailsPayload) return { ...context, observedAt };
+      if (!series) return { ...context, observedAt };
 
-      return {
-        ...context,
-        observedAt,
-        history: parseRiotSeriesHistory(series, detailsPayload)
-      };
+      try {
+        const detailsPayload = await details(seriesId);
+        return {
+          ...context,
+          observedAt,
+          history: parseRiotSeriesHistory(series, detailsPayload)
+        };
+      } catch (error) {
+        const reason: QualityReason = {
+          code: 'game_history_unavailable',
+          message: error instanceof Error ? error.message : 'Riot game history is unavailable.'
+        };
+        return {
+          ...context,
+          observedAt,
+          reasons: [...(context.reasons ?? []), reason]
+        };
+      }
     }
   };
 }

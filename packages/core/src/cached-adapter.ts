@@ -1,14 +1,16 @@
 import type { EsportAdapter, ScheduleQuery } from './adapter.ts';
-import type { EsportId, LiveSnapshot, ScheduleEvent } from './domain.ts';
+import type { EsportId, LiveSnapshot, ScheduleEvent, SeriesContext } from './domain.ts';
 
 export interface AdapterCachePolicy {
   scheduleTtlMs: number;
   liveSnapshotTtlMs: number;
+  seriesContextTtlMs: number;
 }
 
 export const DEFAULT_ADAPTER_CACHE_POLICY: AdapterCachePolicy = {
   scheduleTtlMs: 10_000,
-  liveSnapshotTtlMs: 1_500
+  liveSnapshotTtlMs: 1_500,
+  seriesContextTtlMs: 300_000
 };
 
 interface CacheEntry<T> {
@@ -21,6 +23,7 @@ function queryKey(query: ScheduleQuery): string {
     from: query.from ?? null,
     to: query.to ?? null,
     competitionId: query.competitionId ?? null,
+    competitionIds: query.competitionIds ? [...query.competitionIds].sort() : [],
     states: query.states ? [...query.states].sort() : []
   });
 }
@@ -28,6 +31,7 @@ function queryKey(query: ScheduleQuery): string {
 export class CachedAdapter<TStats = unknown> implements EsportAdapter<TStats> {
   readonly esport: EsportId;
   readonly providerId: string;
+  readonly getSeriesContext?: (seriesId: string) => Promise<SeriesContext>;
   readonly #adapter: EsportAdapter<TStats>;
   readonly #policy: AdapterCachePolicy;
   readonly #now: () => number;
@@ -44,6 +48,14 @@ export class CachedAdapter<TStats = unknown> implements EsportAdapter<TStats> {
     this.providerId = adapter.providerId;
     this.#policy = { ...DEFAULT_ADAPTER_CACHE_POLICY, ...policy };
     this.#now = now;
+
+    if (adapter.getSeriesContext) {
+      this.getSeriesContext = (seriesId: string) => this.#load(
+        `context:${seriesId}`,
+        this.#policy.seriesContextTtlMs,
+        () => adapter.getSeriesContext!(seriesId)
+      );
+    }
   }
 
   async #load<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {

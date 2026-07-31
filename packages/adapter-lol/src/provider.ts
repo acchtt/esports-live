@@ -3,7 +3,9 @@ import type {
   GameState,
   QualityReason,
   SeriesState,
-  TeamRef
+  StandingRef,
+  TeamRef,
+  TeamRosterRef
 } from '@esports-live/core';
 import type { LolStats } from './types.ts';
 
@@ -39,6 +41,15 @@ export interface LolProviderSnapshot {
   reasons?: readonly QualityReason[];
 }
 
+export interface LolProviderSeriesContext {
+  seriesId: string;
+  observedAt: string;
+  rosters: readonly TeamRosterRef[];
+  standings: readonly StandingRef[];
+  complete: boolean;
+  reasons?: readonly QualityReason[];
+}
+
 export interface LolProviderClient {
   readonly id: string;
   readonly name: string;
@@ -46,4 +57,5 @@ export interface LolProviderClient {
 
   getSchedule(): Promise<readonly LolProviderScheduleEntry[]>;
   getSnapshot(gameId: string, after?: string): Promise<LolProviderSnapshot>;
+  getSeriesContext?(seriesId: string): Promise<LolProviderSeriesContext>;
 }

@@ -1,19 +1,30 @@
+import type { SeriesContext, StandingRef, TeamRosterRef } from '@esports-live/core';
+
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) throw new Error(`Missing required element: ${selector}`);
   return element;
 }
 
+const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const selectedCompetition = requiredElement<HTMLElement>('#selected-competition');
 const selectedSeries = requiredElement<HTMLElement>('#selected-series');
 const selectedMeta = requiredElement<HTMLElement>('#selected-meta');
+const scheduleList = requiredElement<HTMLElement>('#schedule-list');
 const gameContent = requiredElement<HTMLElement>('#game-content');
+
+let activeSignature = '';
+let activeSeriesId: string | null = null;
+let activeContext: SeriesContext | null = null;
+let contextError: string | null = null;
+let contextLoading = false;
+let contextRequest = 0;
 
 const style = document.createElement('style');
 style.textContent = `
   .prematch-overview {
     display: grid;
-    align-content: center;
+    align-content: start;
     gap: 22px;
     min-height: 520px;
     padding: 34px;
@@ -35,33 +46,30 @@ style.textContent = `
     background: rgba(255, 255, 255, 0.025);
     text-align: center;
   }
-  .prematch-team-mark {
+  .prematch-team-mark,
+  .prematch-team-logo {
     display: grid;
     place-items: center;
     width: 70px;
     height: 70px;
     border: 1px solid rgba(56, 189, 248, 0.3);
     border-radius: 22px;
-    color: #d9f4ff;
     background: rgba(56, 189, 248, 0.07);
+  }
+  .prematch-team-mark {
+    color: #d9f4ff;
     font-size: 1.15rem;
     font-weight: 900;
     letter-spacing: -0.04em;
   }
-  .prematch-team:last-child .prematch-team-mark {
+  .prematch-team-logo { object-fit: contain; padding: 8px; }
+  .prematch-team:last-child .prematch-team-mark,
+  .prematch-team:last-child .prematch-team-logo {
     border-color: rgba(251, 113, 133, 0.3);
     background: rgba(251, 113, 133, 0.06);
   }
-  .prematch-team strong {
-    overflow-wrap: anywhere;
-    font-size: 1.05rem;
-  }
-  .prematch-vs {
-    color: #64748b;
-    font-size: 0.75rem;
-    font-weight: 900;
-    letter-spacing: 0.14em;
-  }
+  .prematch-team strong { overflow-wrap: anywhere; font-size: 1.05rem; }
+  .prematch-vs { color: #64748b; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.14em; }
   .prematch-facts {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -73,7 +81,8 @@ style.textContent = `
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.02);
   }
-  .prematch-fact span {
+  .prematch-fact span,
+  .prematch-section-title {
     display: block;
     margin-bottom: 5px;
     color: var(--muted);
@@ -82,38 +91,58 @@ style.textContent = `
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
-  .prematch-fact strong {
-    display: block;
-    overflow-wrap: anywhere;
-    font-size: 0.82rem;
+  .prematch-fact strong { display: block; overflow-wrap: anywhere; font-size: 0.82rem; }
+  .prematch-context { display: grid; gap: 18px; }
+  .prematch-rosters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .prematch-roster,
+  .prematch-standings {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.02);
   }
+  .prematch-roster h4 { margin: 0 0 12px; font-size: 0.88rem; }
+  .prematch-player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+    font-size: 0.76rem;
+  }
+  .prematch-player:first-of-type { border-top: 0; }
+  .prematch-player span { color: var(--muted); text-transform: capitalize; }
+  .prematch-table { width: 100%; border-collapse: collapse; font-size: 0.73rem; }
+  .prematch-table th,
+  .prematch-table td { padding: 8px 7px; border-top: 1px solid rgba(148, 163, 184, 0.1); text-align: left; }
+  .prematch-table th { color: var(--muted); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .prematch-table tr.selected-team td { color: #bae6fd; background: rgba(56, 189, 248, 0.035); }
+  .prematch-record { white-space: nowrap; }
   .prematch-notice {
     padding: 16px 18px;
     border: 1px solid rgba(56, 189, 248, 0.22);
     border-radius: 13px;
     background: rgba(56, 189, 248, 0.045);
   }
-  .prematch-notice strong {
-    display: block;
-    color: #bae6fd;
-  }
-  .prematch-notice p {
-    margin: 7px 0 0;
-    color: var(--muted);
-    font-size: 0.78rem;
-    line-height: 1.55;
-  }
+  .prematch-notice.warning { border-color: rgba(251, 191, 36, 0.24); background: rgba(251, 191, 36, 0.045); }
+  .prematch-notice strong { display: block; color: #bae6fd; }
+  .prematch-notice.warning strong { color: #fcd34d; }
+  .prematch-notice p { margin: 7px 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.55; }
   @media (max-width: 720px) {
     .prematch-overview { min-height: 440px; padding: 22px; }
-    .prematch-versus { grid-template-columns: 1fr; gap: 12px; }
+    .prematch-versus,
+    .prematch-rosters { grid-template-columns: 1fr; gap: 12px; }
     .prematch-vs { text-align: center; }
     .prematch-facts { grid-template-columns: 1fr; }
+    .prematch-standings { overflow-x: auto; }
   }
 `;
 document.head.append(style);
 
-function escapeHtml(value: string): string {
-  return value
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
@@ -129,6 +158,112 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
+function selectedSeriesIdentifier(): string | null {
+  return scheduleList.querySelector<HTMLButtonElement>('.match-card.selected')?.dataset.seriesId ?? null;
+}
+
+function teamVisual(name: string, roster: TeamRosterRef | undefined): string {
+  const image = roster?.team.imageUrl;
+  return image
+    ? `<img class="prematch-team-logo" src="${escapeHtml(image)}" alt="" />`
+    : `<span class="prematch-team-mark">${escapeHtml(initials(name))}</span>`;
+}
+
+function rosterMarkup(roster: TeamRosterRef | undefined, fallbackName: string): string {
+  const players = roster?.players ?? [];
+  return `
+    <article class="prematch-roster">
+      <span class="prematch-section-title">Roster</span>
+      <h4>${escapeHtml(roster?.team.name ?? fallbackName)}</h4>
+      ${players.length
+        ? players.map(player => `
+          <div class="prematch-player">
+            <strong>${escapeHtml(player.handle)}</strong>
+            <span>${escapeHtml(player.role ?? 'role unavailable')}</span>
+          </div>`).join('')
+        : '<div class="prematch-player"><span>Roster unavailable</span></div>'}
+    </article>`;
+}
+
+function standingRow(standing: StandingRef, selectedNames: ReadonlySet<string>): string {
+  const selected = selectedNames.has(standing.team.name.toLowerCase());
+  const record = standing.wins === null && standing.losses === null
+    ? '—'
+    : `${standing.wins ?? '—'}–${standing.losses ?? '—'}`;
+  return `
+    <tr class="${selected ? 'selected-team' : ''}">
+      <td>${escapeHtml(standing.rank ?? '—')}</td>
+      <td>${escapeHtml(standing.team.name)}</td>
+      <td class="prematch-record">${escapeHtml(record)}</td>
+      <td>${escapeHtml(standing.group ?? '')}</td>
+    </tr>`;
+}
+
+function contextMarkup(context: SeriesContext | null, left: string, right: string): string {
+  if (contextLoading) {
+    return '<div class="prematch-notice"><strong>Loading team context</strong><p>Fetching current rosters and competition standings from Riot.</p></div>';
+  }
+  if (contextError) {
+    return `<div class="prematch-notice warning"><strong>Pre-match context unavailable</strong><p>${escapeHtml(contextError)}</p></div>`;
+  }
+  if (!context) return '';
+
+  const leftRoster = context.rosters.find(roster => roster.team.name.toLowerCase() === left.toLowerCase())
+    ?? context.rosters[0];
+  const rightRoster = context.rosters.find(roster => roster.team.name.toLowerCase() === right.toLowerCase())
+    ?? context.rosters.find(roster => roster.team.id !== leftRoster?.team.id)
+    ?? context.rosters[1];
+  const selectedNames = new Set([left.toLowerCase(), right.toLowerCase()]);
+  const standings = context.standings.slice(0, 16);
+  const reason = context.reasons[0]?.message;
+
+  return `
+    <section class="prematch-context">
+      <div class="prematch-rosters">
+        ${rosterMarkup(leftRoster, left)}
+        ${rosterMarkup(rightRoster, right)}
+      </div>
+      <section class="prematch-standings">
+        <span class="prematch-section-title">Competition standings</span>
+        ${standings.length ? `
+          <table class="prematch-table">
+            <thead><tr><th>#</th><th>Team</th><th>W–L</th><th>Stage</th></tr></thead>
+            <tbody>${standings.map(row => standingRow(row, selectedNames)).join('')}</tbody>
+          </table>` : `<p>${escapeHtml(reason ?? 'Standings are unavailable for this stage.')}</p>`}
+      </section>
+    </section>`;
+}
+
+async function loadContext(seriesId: string, signature: string): Promise<void> {
+  const requestId = ++contextRequest;
+  contextLoading = true;
+  contextError = null;
+  activeContext = null;
+  renderPrematch();
+
+  try {
+    const response = await fetch(
+      `${API_BASE}/v1/lol/series/${encodeURIComponent(seriesId)}/context`,
+      { cache: 'no-store' }
+    );
+    const body = await response.json().catch(() => null) as SeriesContext | { message?: string } | null;
+    if (!response.ok) {
+      const message = body && 'message' in body ? body.message : null;
+      throw new Error(message ?? `Context API returned ${response.status}.`);
+    }
+    if (requestId !== contextRequest || activeSignature !== signature) return;
+    activeContext = body as SeriesContext;
+  } catch (error) {
+    if (requestId !== contextRequest || activeSignature !== signature) return;
+    contextError = error instanceof Error ? error.message : 'Unknown context error.';
+  } finally {
+    if (requestId === contextRequest && activeSignature === signature) {
+      contextLoading = false;
+      renderPrematch();
+    }
+  }
+}
+
 function renderPrematch(): void {
   const title = selectedSeries.textContent?.trim() ?? '';
   const meta = selectedMeta.textContent?.trim() ?? '';
@@ -141,21 +276,40 @@ function renderPrematch(): void {
 
   const [left = 'Team 1', right = 'Team 2'] = title.split(/\s+vs\s+/i, 2);
   const [start = 'Scheduled', format = 'Series format pending'] = meta.split(' · ', 2);
-  const signature = `${title}|${meta}|${competition}`;
-  const overviewVisible = Boolean(gameContent.querySelector('[data-prematch-overview]'));
-  if (overviewVisible && gameContent.dataset.prematchSignature === signature) return;
+  const seriesId = selectedSeriesIdentifier();
+  const signature = `${seriesId ?? 'unknown'}|${title}|${meta}|${competition}`;
 
-  gameContent.dataset.prematchSignature = signature;
+  if (activeSignature !== signature) {
+    activeSignature = signature;
+    activeSeriesId = seriesId;
+    activeContext = null;
+    contextError = null;
+    contextLoading = false;
+    contextRequest += 1;
+    if (seriesId) void loadContext(seriesId, signature);
+  }
+
+  const renderKey = `${signature}|${contextLoading}|${contextError ?? ''}|${activeContext?.observedAt ?? ''}`;
+  if (gameContent.dataset.prematchRenderKey === renderKey
+    && gameContent.querySelector('[data-prematch-overview]')) return;
+
+  const leftRoster = activeContext?.rosters.find(roster => roster.team.name.toLowerCase() === left.toLowerCase())
+    ?? activeContext?.rosters[0];
+  const rightRoster = activeContext?.rosters.find(roster => roster.team.name.toLowerCase() === right.toLowerCase())
+    ?? activeContext?.rosters.find(roster => roster.team.id !== leftRoster?.team.id)
+    ?? activeContext?.rosters[1];
+
+  gameContent.dataset.prematchRenderKey = renderKey;
   gameContent.innerHTML = `
-    <section class="prematch-overview" data-prematch-overview>
+    <section class="prematch-overview" data-prematch-overview data-series-id="${escapeHtml(activeSeriesId ?? '')}">
       <div class="prematch-versus">
         <article class="prematch-team">
-          <span class="prematch-team-mark">${escapeHtml(initials(left))}</span>
+          ${teamVisual(left, leftRoster)}
           <strong>${escapeHtml(left)}</strong>
         </article>
         <span class="prematch-vs">VERSUS</span>
         <article class="prematch-team">
-          <span class="prematch-team-mark">${escapeHtml(initials(right))}</span>
+          ${teamVisual(right, rightRoster)}
           <strong>${escapeHtml(right)}</strong>
         </article>
       </div>
@@ -164,6 +318,7 @@ function renderPrematch(): void {
         <div class="prematch-fact"><span>Competition</span><strong>${escapeHtml(competition || 'Competition unavailable')}</strong></div>
         <div class="prematch-fact"><span>Format</span><strong>${escapeHtml(format)}</strong></div>
       </div>
+      ${contextMarkup(activeContext, left, right)}
       <div class="prematch-notice">
         <strong>Live statistics are not available yet</strong>
         <p>Riot has not published an active gameplay frame for this scheduled series. Once a game starts, this panel will switch automatically to verified gold, kills, towers, dragons, barons, player KDA, CS, items, and source-quality status.</p>
@@ -175,5 +330,6 @@ const observer = new MutationObserver(() => queueMicrotask(renderPrematch));
 observer.observe(selectedCompetition, { childList: true, characterData: true, subtree: true });
 observer.observe(selectedSeries, { childList: true, characterData: true, subtree: true });
 observer.observe(selectedMeta, { childList: true, characterData: true, subtree: true });
+observer.observe(scheduleList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 observer.observe(gameContent, { childList: true, subtree: true });
 renderPrematch();

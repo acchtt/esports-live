@@ -31,7 +31,7 @@ jobs:
       - name: Apply objective icon fix
         run: python scripts/apply-objective-icon-rendering-fix.py
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Typecheck and test
         run: npm run check
       - name: Build web application
@@ -78,6 +78,7 @@ jobs:
           rm -f .github/workflows/diagnose-objective-icons-once.yml
           rm -f .github/workflows/diagnose-objective-columns-once.yml
           rm -f scripts/apply-objective-icon-rendering-fix.py
+          rm -f package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A

@@ -198,5 +198,5 @@ test('uses full tournament rankings when Riot standings resolve', async () => {
   assert.equal(context.standings.length, 2);
   assert.equal(context.standings[0]?.rank, 1);
   assert.equal(context.standings[0]?.team.id, 'team-b');
-  assert.equal(context.reasons?.some(reason => reason.code === 'standings_from_schedule_record'), false);
+  assert.equal(context.reasons?.some(reason => reason.code === 'standings_from_schedule_record') ?? false, false);
 });

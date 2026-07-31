@@ -53,6 +53,26 @@ export interface SeriesGameRef {
   state: GameState;
 }
 
+export interface SeriesScoreRef {
+  team: TeamRef;
+  wins: number;
+}
+
+export interface SeriesGameHistoryRef extends SeriesGameRef {
+  blueTeam: TeamRef | null;
+  redTeam: TeamRef | null;
+  winner: TeamRef | null;
+  durationSeconds: number | null;
+}
+
+export interface SeriesHistoryRef {
+  bestOf: number;
+  winsRequired: number;
+  drawPossible: boolean;
+  score: readonly [SeriesScoreRef, SeriesScoreRef];
+  games: readonly SeriesGameHistoryRef[];
+}
+
 export interface SeriesRef {
   id: string;
   esport: EsportId;
@@ -84,6 +104,7 @@ export interface SeriesContext {
   observedAt: string;
   rosters: readonly TeamRosterRef[];
   standings: readonly StandingRef[];
+  history?: SeriesHistoryRef;
   complete: boolean;
   reasons: readonly QualityReason[];
 }

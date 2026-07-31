@@ -1,0 +1,227 @@
+name: Diagnose Live and History Latency
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/diagnose-live-history-latency.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare Riot live feed and production API
+        env:
+          API_BASE: https://esports-live-api.acchtt.workers.dev
+          WEB_BASE: https://esports-live.pages.dev
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const apiBase = process.env.API_BASE;
+          const webBase = process.env.WEB_BASE;
+          const source = await fetch('https://raw.githubusercontent.com/Aureom/live-lol-esports/main/src/utils/LoLEsportsAPI.ts').then(response => response.text());
+          const apiKey = source.match(/API_KEY\s*=\s*["']([^"']+)["']/)?.[1];
+          if (!apiKey) throw new Error('Unable to resolve public Riot web API key.');
+          console.log(`::add-mask::${apiKey}`);
+
+          async function timed(url, init = {}) {
+            const started = performance.now();
+            try {
+              const response = await fetch(url, {
+                ...init,
+                headers: {
+                  accept: 'application/json,text/html,*/*',
+                  'cache-control': 'no-cache',
+                  ...(init.headers ?? {})
+                }
+              });
+              const text = await response.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return {
+                ok: response.ok,
+                status: response.status,
+                ms: Math.round(performance.now() - started),
+                body,
+                text
+              };
+            } catch (error) {
+              return {
+                ok: false,
+                status: 0,
+                ms: Math.round(performance.now() - started),
+                body: null,
+                text: String(error)
+              };
+            }
+          }
+
+          async function persisted(path, params = {}) {
+            const url = new URL(`https://esports-api.lolesports.com/persisted/gw/${path}`);
+            url.searchParams.set('hl', 'en-US');
+            for (const [key, value] of Object.entries(params)) {
+              for (const item of Array.isArray(value) ? value : [value]) {
+                if (item !== null && item !== undefined) url.searchParams.append(key, String(item));
+              }
+            }
+            return timed(url, { headers: { 'x-api-key': apiKey } });
+          }
+
+          const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+          const array = value => Array.isArray(value) ? value : [];
+          const text = value => typeof value === 'string' && value.trim() ? value.trim() : value !== null && value !== undefined ? String(value) : null;
+          const normalized = value => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+          function rawEvents(payload) {
+            const root = object(payload);
+            return array(object(object(root.data).schedule ?? root.schedule).events).map(object);
+          }
+
+          function rawSummary(event) {
+            const match = object(event.match);
+            return {
+              eventId: text(event.id),
+              matchId: text(match.id),
+              state: text(event.state),
+              startTime: text(event.startTime),
+              league: text(object(event.league).name),
+              teams: array(match.teams).map(team => text(object(team).name ?? object(team).code)),
+              games: array(match.games).map(game => ({
+                id: text(object(game).id),
+                state: text(object(game).state),
+                number: object(game).number ?? null
+              }))
+            };
+          }
+
+          function apiEvents(payload) {
+            return array(object(payload).events);
+          }
+
+          function apiSummary(event) {
+            const series = object(event.series);
+            return {
+              seriesId: text(series.id),
+              state: text(series.state),
+              startTime: text(series.scheduledStart),
+              league: text(object(series.competition).name),
+              teams: array(series.teams).map(team => text(object(team).name)),
+              games: array(series.games).map(game => ({
+                id: text(object(game).id),
+                state: text(object(game).state),
+                number: object(game).number ?? null
+              }))
+            };
+          }
+
+          function sameTeams(left, right) {
+            const a = [...left].map(normalized).filter(Boolean).sort();
+            const b = [...right].map(normalized).filter(Boolean).sort();
+            return a.length === 2 && b.length === 2 && a.every((value, index) => value === b[index]);
+          }
+
+          const cacheBust = Date.now();
+          const [health, schedule, liveOnly, web, rawSchedule, rawLive] = await Promise.all([
+            timed(`${apiBase}/health?diagnose=${cacheBust}`),
+            timed(`${apiBase}/v1/lol/schedule?limit=100&diagnose=${cacheBust}`),
+            timed(`${apiBase}/v1/lol/schedule?states=live,paused,scheduled&limit=100&diagnose=${cacheBust}`),
+            timed(`${webBase}?diagnose=${cacheBust}`),
+            persisted('getSchedule'),
+            persisted('getLive')
+          ]);
+
+          const allApi = apiEvents(schedule.body).map(apiSummary);
+          const filteredApi = apiEvents(liveOnly.body).map(apiSummary);
+          const riotSchedule = rawEvents(rawSchedule.body).map(rawSummary);
+          const riotLive = rawEvents(rawLive.body).map(rawSummary);
+          const API_ACTIVE_STATES = new Set(['live', 'paused']);
+          const GAME_ACTIVE_STATES = new Set(['live', 'draft', 'paused', 'inprogress', 'in_progress', 'championselect', 'champion_select']);
+          const apiActive = allApi.filter(event => API_ACTIVE_STATES.has(String(event.state).toLowerCase())
+            || event.games.some(game => GAME_ACTIVE_STATES.has(String(game.state).toLowerCase())));
+
+          const rawLiveComparisons = [];
+          for (const raw of riotLive) {
+            const byId = allApi.find(item => item.seriesId === raw.matchId || item.seriesId === raw.eventId);
+            const byTeams = allApi.find(item => sameTeams(item.teams, raw.teams));
+            const match = byId ?? byTeams ?? null;
+            const gameIds = raw.games.map(game => game.id).filter(Boolean);
+            const gameProbes = [];
+            for (const gameId of gameIds.slice(0, 3)) {
+              const result = await timed(`${apiBase}/v1/lol/games/${encodeURIComponent(gameId)}/live?diagnose=${Date.now()}`);
+              gameProbes.push({
+                gameId,
+                status: result.status,
+                ms: result.ms,
+                gameState: result.body?.game?.state ?? null,
+                seriesState: result.body?.series?.state ?? null,
+                statsPresent: Boolean(result.body?.stats),
+                sourceTimestamp: result.body?.quality?.sourceTimestamp ?? null,
+                reasonCodes: array(result.body?.quality?.reasons).map(reason => object(reason).code ?? null)
+              });
+            }
+            rawLiveComparisons.push({ raw, matchedApi: match, gameProbes });
+          }
+
+          const recentCandidates = allApi
+            .filter(event => Number.isFinite(Date.parse(event.startTime ?? '')) && Date.parse(event.startTime) <= Date.now())
+            .sort((a, b) => Date.parse(b.startTime) - Date.parse(a.startTime))
+            .slice(0, 8);
+          const contextLatency = [];
+          for (const event of recentCandidates) {
+            const result = await timed(`${apiBase}/v1/lol/series/${encodeURIComponent(event.seriesId)}/context?diagnose=${Date.now()}`);
+            contextLatency.push({
+              seriesId: event.seriesId,
+              league: event.league,
+              teams: event.teams,
+              scheduleState: event.state,
+              ms: result.ms,
+              status: result.status,
+              historyPresent: Boolean(result.body?.history),
+              rosterCounts: array(result.body?.rosters).map(roster => array(object(roster).players).length),
+              reasonCodes: array(result.body?.reasons).map(reason => object(reason).code ?? null)
+            });
+          }
+
+          const scriptSources = [...web.text.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+            .map(match => new URL(match[1], webBase).toString());
+          const scripts = await Promise.all(scriptSources.map(source => timed(`${source}?diagnose=${cacheBust}`)));
+          const bundle = scripts.map(result => result.text).join('\n');
+
+          const report = {
+            checkedAt: new Date().toISOString(),
+            health: { status: health.status, ms: health.ms, adapters: health.body?.adapters ?? [] },
+            productionSchedule: {
+              status: schedule.status,
+              ms: schedule.ms,
+              count: allApi.length,
+              active: apiActive,
+              filteredStatus: liveOnly.status,
+              filteredMs: liveOnly.ms,
+              filteredCount: filteredApi.length,
+              filtered: filteredApi
+            },
+            riot: {
+              getScheduleStatus: rawSchedule.status,
+              getScheduleMs: rawSchedule.ms,
+              scheduleCount: riotSchedule.length,
+              getLiveStatus: rawLive.status,
+              getLiveMs: rawLive.ms,
+              liveCount: riotLive.length,
+              live: riotLive
+            },
+            rawLiveComparisons,
+            contextLatency,
+            web: {
+              status: web.status,
+              ms: web.ms,
+              scriptCount: scriptSources.length,
+              scriptLatencies: scripts.map((result, index) => ({ source: scriptSources[index], status: result.status, ms: result.ms })),
+              hasResultsScanner: bundle.includes('Loading recent results'),
+              candidateLimit24: bundle.includes('CANDIDATE_LIMIT=24') || bundle.includes('CANDIDATE_LIMIT = 24'),
+              hasLivePolling: bundle.includes('/v1/lol/games/') && bundle.includes('/live')
+            }
+          };
+          console.log(`LIVE_HISTORY_DIAGNOSTIC=${JSON.stringify(report)}`);
+          NODE

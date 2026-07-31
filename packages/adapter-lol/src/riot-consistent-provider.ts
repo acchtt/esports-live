@@ -1,5 +1,4 @@
 import type {
-  QualityReason,
   SeriesGameHistoryRef,
   SeriesHistoryRef,
   TeamRef
@@ -35,12 +34,6 @@ function stringValue(value: unknown): string | null {
   if (typeof value === 'string' && value.trim()) return value.trim();
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   return null;
-}
-
-function numericValue(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function firstString(source: Json, keys: readonly string[]): string | null {
@@ -148,10 +141,11 @@ export function mergeMonotonicSnapshot(
 }
 
 function participantIds(stats: LolStats): string | null {
-  const ids = [...stats.blue.players, ...stats.red.players]
-    .map(player => player.id)
-    .filter(id => /^\d{1,2}$/.test(id))
-    .sort((left, right) => Number(left) - Number(right));
+  const ids = [...new Set(
+    [...stats.blue.players, ...stats.red.players]
+      .map(player => player.id)
+      .filter(id => /^\d{1,2}$/.test(id))
+  )].sort((left, right) => Number(left) - Number(right));
   return ids.length === 10 ? ids.join('_') : null;
 }
 
@@ -177,7 +171,13 @@ function frameItems(payload: unknown, ceilingMs: number): { sourceMs: number; it
       if (items !== null) entries.set(id, items);
     });
     if (!entries.size) continue;
-    if (!selected || timestamp > selected.sourceMs) selected = { sourceMs: timestamp, items: entries };
+    if (
+      !selected
+      || entries.size > selected.items.size
+      || (entries.size === selected.items.size && timestamp > selected.sourceMs)
+    ) {
+      selected = { sourceMs: timestamp, items: entries };
+    }
   }
   return selected;
 }
@@ -228,8 +228,9 @@ function withResolvedReasons(snapshot: LolProviderSnapshot, stats: LolStats): Lo
   const reasons = (snapshot.reasons ?? []).filter(reason => (
     !reason.field?.endsWith('.items') || unresolved.has(reason.field)
   ));
+  const { reasons: _oldReasons, ...base } = snapshot;
   return {
-    ...snapshot,
+    ...base,
     stats,
     complete: reasons.length === 0,
     ...(reasons.length ? { reasons } : {})
@@ -314,20 +315,30 @@ export function createRiotLolConsistentProvider(options: RiotLolProviderOptions)
       return withResolvedReasons(snapshot, mergeItems(snapshot.stats, cached.items));
     }
 
+    let best: { sourceMs: number; items: ReadonlyMap<string, readonly string[]> } | null = null;
     for (const offset of [10_000, 30_000, 60_000]) {
       const url = new URL(`${LIVE_BASE}/details/${encodeURIComponent(gameId)}`);
       url.searchParams.set('startingTime', roundedIso(source - offset));
       url.searchParams.set('participantIds', ids);
       const result = frameItems(await requestJson(fetcher, url), source + 10_000);
       if (!result) continue;
-      detailCache.set(gameId, {
-        expiresAt: now().getTime() + DETAIL_CACHE_MS,
-        sourceMs: result.sourceMs,
-        items: result.items
-      });
-      return withResolvedReasons(snapshot, mergeItems(snapshot.stats, result.items));
+      if (
+        !best
+        || result.items.size > best.items.size
+        || (result.items.size === best.items.size && result.sourceMs > best.sourceMs)
+      ) {
+        best = result;
+      }
+      if (best.items.size === 10) break;
     }
-    return snapshot;
+    if (!best) return snapshot;
+
+    detailCache.set(gameId, {
+      expiresAt: now().getTime() + DETAIL_CACHE_MS,
+      sourceMs: best.sourceMs,
+      items: best.items
+    });
+    return withResolvedReasons(snapshot, mergeItems(snapshot.stats, best.items));
   };
 
   const getSnapshot = async (gameId: string, after?: string): Promise<LolProviderSnapshot> => {

@@ -1,0 +1,11 @@
+MATCHES
+game/assets/ux/scoreboard/_baronnashor.png
+game/assets/ux/scoreboard/_dragon.png
+game/assets/ux/scoreboard/_riftherald.png
+game/assets/ux/spectator/inhibitor_blue_square.png
+game/assets/ux/spectator/inhibitor_red_square.png
+
+LISTINGS
+DIR game/assets/ux/scoreboard entries=16
+DIR game/assets/ux/spectator entries=5
+ERROR plugins/rcp-fe-lol-esports-observer: HTTP Error 404: Not Found

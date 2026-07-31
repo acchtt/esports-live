@@ -1,0 +1,22 @@
+{
+  "status": "success",
+  "checkedAt": "2026-07-31T02:46:59.027Z",
+  "adapters": [
+    "lol"
+  ],
+  "scheduleTotal": 80,
+  "firstPageCount": 2,
+  "secondPageCount": 2,
+  "firstSeriesId": "116837891489321427",
+  "contextComplete": false,
+  "rosterCount": 0,
+  "rosterPlayerCounts": [],
+  "standingsCount": 0,
+  "reasonCodes": [
+    "team_slugs_missing",
+    "league_id_missing",
+    "rosters_incomplete",
+    "standings_empty"
+  ],
+  "webHtmlPresent": true
+}

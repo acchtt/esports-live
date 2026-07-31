@@ -1,9 +1,10 @@
-import type { EsportId, LiveSnapshot, ScheduleEvent } from './domain.ts';
+import type { EsportId, LiveSnapshot, ScheduleEvent, SeriesContext } from './domain.ts';
 
 export interface ScheduleQuery {
   from?: string;
   to?: string;
   competitionId?: string;
+  competitionIds?: readonly string[];
   states?: readonly string[];
 }
 
@@ -13,6 +14,7 @@ export interface EsportAdapter<TStats = unknown> {
 
   getSchedule(query?: ScheduleQuery): Promise<readonly ScheduleEvent[]>;
   getLiveSnapshot(gameId: string, after?: string): Promise<LiveSnapshot<TStats>>;
+  getSeriesContext?(seriesId: string): Promise<SeriesContext>;
 }
 
 export class AdapterRegistry {

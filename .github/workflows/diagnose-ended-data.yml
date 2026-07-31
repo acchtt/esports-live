@@ -1,4 +1,4 @@
-name: Diagnose Ended Match Data
+name: Diagnose Riot Telemetry
 
 on:
   pull_request:
@@ -12,6 +12,95 @@ jobs:
   diagnose:
     runs-on: ubuntu-latest
     steps:
+      - name: Probe current live-feed anchors
+        env:
+          API_BASE: https://esports-live-api.acchtt.workers.dev
+        run: |
+          node - <<'NODE'
+          const apiBase = process.env.API_BASE;
+          const liveBase = 'https://feed.lolesports.com/livestats/v1';
+
+          async function response(url) {
+            try {
+              const result = await fetch(url, { headers: { accept: 'application/json', 'cache-control': 'no-cache' } });
+              const text = await result.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: result.ok, status: result.status, body, text: text.slice(0, 300) };
+            } catch (error) {
+              return { ok: false, status: 0, body: null, text: String(error) };
+            }
+          }
+
+          function roundedIso(milliseconds) {
+            return new Date(Math.floor(milliseconds / 10000) * 10000).toISOString();
+          }
+
+          function frameSummary(payload) {
+            const frames = Array.isArray(payload?.frames) ? payload.frames : [];
+            const first = frames[0] ?? null;
+            const last = frames.at(-1) ?? null;
+            return {
+              frameCount: frames.length,
+              firstTimestamp: first?.rfc460Timestamp ?? first?.timestamp ?? null,
+              lastTimestamp: last?.rfc460Timestamp ?? last?.timestamp ?? null,
+              lastGameState: last?.gameState ?? null,
+              blueGold: last?.blueTeam?.totalGold ?? null,
+              redGold: last?.redTeam?.totalGold ?? null,
+              blueKills: last?.blueTeam?.totalKills ?? null,
+              redKills: last?.redTeam?.totalKills ?? null,
+              participantCount: Array.isArray(last?.participants) ? last.participants.length : null
+            };
+          }
+
+          const schedule = await response(`${apiBase}/v1/lol/schedule?states=live,paused,scheduled&limit=100&diagnose=${Date.now()}`);
+          const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+          const active = events.find(event => event?.series?.games?.some(game => game.state === 'live' || game.state === 'draft'))
+            ?? events.find(event => event?.series?.state === 'live');
+
+          if (!active) {
+            console.log(`LIVE_ANCHOR_DIAGNOSTIC=${JSON.stringify({ scheduleStatus: schedule.status, liveSeriesFound: false })}`);
+          } else {
+            const game = active.series.games.find(game => game.state === 'live')
+              ?? active.series.games.find(game => game.state === 'draft')
+              ?? active.series.games.find(game => game.state !== 'completed');
+            const now = Date.now();
+            const offsets = [null, 20, 40, 60, 80, 100, 120];
+            const anchors = [];
+            for (const offset of offsets) {
+              const startingTime = offset === null ? null : roundedIso(now - offset * 1000);
+              const query = startingTime ? `?startingTime=${encodeURIComponent(startingTime)}` : '';
+              const [windowResult, detailsAll, detailsParticipants] = await Promise.all([
+                response(`${liveBase}/window/${encodeURIComponent(game.id)}${query}`),
+                response(`${liveBase}/details/${encodeURIComponent(game.id)}${query}`),
+                response(`${liveBase}/details/${encodeURIComponent(game.id)}${query}${query ? '&' : '?'}participantIds=1_2_3_4_5_6_7_8_9_10`)
+              ]);
+              anchors.push({
+                offsetSeconds: offset,
+                startingTime,
+                windowStatus: windowResult.status,
+                window: frameSummary(windowResult.body),
+                detailsAllStatus: detailsAll.status,
+                detailsAll: frameSummary(detailsAll.body),
+                detailsParticipantsStatus: detailsParticipants.status,
+                detailsParticipants: frameSummary(detailsParticipants.body),
+                windowError: windowResult.ok ? null : windowResult.text,
+                detailsAllError: detailsAll.ok ? null : detailsAll.text,
+                detailsParticipantsError: detailsParticipants.ok ? null : detailsParticipants.text
+              });
+            }
+            console.log(`LIVE_ANCHOR_DIAGNOSTIC=${JSON.stringify({
+              scheduleStatus: schedule.status,
+              liveSeriesFound: true,
+              seriesId: active.series.id,
+              competition: active.series.competition?.name ?? null,
+              teams: active.series.teams?.map(team => team.name) ?? [],
+              gameId: game.id,
+              anchors
+            })}`);
+          }
+          NODE
+
       - name: Probe completed game telemetry
         env:
           API_BASE: https://esports-live-api.acchtt.workers.dev
@@ -48,8 +137,8 @@ jobs:
                 contextDuration: game.durationSeconds ?? null,
                 liveStatus: live.status,
                 liveGameState: live.body?.game?.state ?? null,
-                sourceTimestamp: live.body?.sourceTimestamp ?? null,
-                complete: live.body?.complete ?? null,
+                sourceTimestamp: live.body?.quality?.sourceTimestamp ?? null,
+                complete: live.body?.quality?.complete ?? null,
                 freshness: live.body?.quality?.freshness ?? null,
                 gameClockSeconds: stats?.gameClockSeconds ?? null,
                 blue: stats ? {
@@ -68,7 +157,7 @@ jobs:
                 } : null,
                 reasonCodes: Array.isArray(live.body?.quality?.reasons)
                   ? live.body.quality.reasons.map(reason => reason.code)
-                  : Array.isArray(live.body?.reasons) ? live.body.reasons.map(reason => reason.code) : []
+                  : []
               });
             }
             report.push({

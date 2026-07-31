@@ -1,4 +1,4 @@
-name: Deploy Live Data Parity Once
+name: Verify Live Data Parity Release
 
 on:
   pull_request:
@@ -8,55 +8,27 @@ on:
 permissions:
   contents: read
 
-env:
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
 jobs:
-  deploy-and-verify:
+  verify:
     runs-on: ubuntu-latest
-    environment: production
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: 09622760138c4e38f8e0bb971971c7a88139ed3e
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - run: npm install
-      - run: npm run check
-      - name: Deploy Worker with retry
-        shell: bash
-        run: |
-          for attempt in 1 2 3 4 5; do
-            if npm run deploy:api; then exit 0; fi
-            sleep $((attempt * 20))
-          done
-          exit 1
-      - name: Build web application
-        run: npm run build:web
-        env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-      - name: Deploy Pages with retry
-        shell: bash
-        run: |
-          for attempt in 1 2 3 4 5; do
-            if npx wrangler pages deploy apps/web/dist --project-name esports-live --branch main --commit-hash 09622760138c4e38f8e0bb971971c7a88139ed3e --commit-message "Live data parity release"; then exit 0; fi
-            sleep $((attempt * 20))
-          done
-          exit 1
-      - name: Verify production API and web bundle
+      - name: Verify propagated API and Pages release
         shell: bash
         run: |
           node - <<'NODE'
           const api = 'https://esports-live-api.acchtt.workers.dev';
           const web = 'https://esports-live.pages.dev';
           const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
           async function json(url) {
             const response = await fetch(url, { headers: { accept: 'application/json', 'cache-control': 'no-cache' } });
             if (!response.ok) throw new Error(`${url} -> ${response.status}`);
             return response.json();
           }
+
           async function text(url) {
             const response = await fetch(url, { headers: { 'cache-control': 'no-cache' } });
             if (!response.ok) throw new Error(`${url} -> ${response.status}`);
@@ -64,7 +36,7 @@ jobs:
           }
 
           let health = null;
-          for (let attempt = 1; attempt <= 20; attempt += 1) {
+          for (let attempt = 1; attempt <= 24; attempt += 1) {
             try {
               health = await json(`${api}/health?probe=${Date.now()}`);
               if (health?.ok) break;
@@ -73,19 +45,23 @@ jobs:
           }
           if (!health?.ok) throw new Error('Production API did not become healthy.');
 
-          const schedule = await json(`${api}/v1/lol/schedule?states=live,paused,scheduled&limit=80&probe=${Date.now()}`);
+          const schedule = await json(`${api}/v1/lol/schedule?states=live,paused,completed,scheduled&limit=80&probe=${Date.now()}`);
           const events = Array.isArray(schedule.events) ? schedule.events : [];
-          const live = events.find(event => ['live', 'paused'].includes(event?.series?.state));
-          let liveReport = { available: false };
-          if (live) {
-            const game = live.series.games.find(game => ['live', 'draft'].includes(game.state)) ?? live.series.games[0];
+          const target = events.find(event => ['live', 'paused'].includes(event?.series?.state))
+            ?? events.find(event => event?.series?.games?.some(game => game.state === 'completed'));
+          let snapshotReport = { available: false };
+          if (target) {
+            const games = Array.isArray(target.series?.games) ? target.series.games : [];
+            const game = games.find(game => ['live', 'draft'].includes(game.state))
+              ?? [...games].reverse().find(game => game.state === 'completed');
             if (game?.id) {
               const snapshot = await json(`${api}/v1/lol/games/${encodeURIComponent(game.id)}/live?verify=${Date.now()}`);
-              liveReport = {
+              snapshotReport = {
                 available: true,
-                seriesId: live.series.id,
+                seriesId: target.series.id,
                 gameId: game.id,
-                gameState: snapshot.game?.state ?? null,
+                listedState: game.state,
+                snapshotState: snapshot.game?.state ?? null,
                 clock: snapshot.stats?.gameClockSeconds ?? null,
                 blueGold: snapshot.stats?.blue?.gold ?? null,
                 redGold: snapshot.stats?.red?.gold ?? null,
@@ -93,29 +69,34 @@ jobs:
                 redPlayers: snapshot.stats?.red?.players?.length ?? 0,
                 sourceTimestamp: snapshot.quality?.sourceTimestamp ?? null
               };
-              if (snapshot.stats && snapshot.stats.gameClockSeconds == null) throw new Error('Live stats returned without a game clock.');
+              if (snapshot.stats && snapshot.stats.gameClockSeconds == null) {
+                throw new Error(`Stats-bearing snapshot returned without a clock: ${JSON.stringify(snapshotReport)}`);
+              }
             }
           }
 
-          let html = null;
-          for (let attempt = 1; attempt <= 20; attempt += 1) {
+          let markers = null;
+          let assetSources = [];
+          for (let attempt = 1; attempt <= 24; attempt += 1) {
             try {
-              html = await text(`${web}/?verify=${Date.now()}`);
-              if (html.includes('/assets/')) break;
+              const html = await text(`${web}/?verify=${Date.now()}`);
+              const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
+              assetSources = scripts;
+              const bundles = await Promise.all(scripts.map(src => text(`${new URL(src, web)}?verify=${Date.now()}`)));
+              const bundle = bundles.join('\n');
+              markers = {
+                liveClock: bundle.includes('live-game-clock'),
+                historyEvent: bundle.includes('esports-live:snapshot'),
+                durationEnrichment: bundle.includes('Duration loading'),
+                goldDifference: bundle.includes('Gold diff'),
+                playerItems: bundle.includes('Items unavailable')
+              };
+              if (Object.values(markers).every(Boolean)) break;
             } catch {}
             await sleep(5000);
           }
-          if (!html) throw new Error('Production Pages did not become available.');
-          const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
-          const bundles = await Promise.all(scripts.map(src => text(new URL(src, web).toString())));
-          const bundle = bundles.join('\n');
-          const markers = {
-            liveClock: bundle.includes('live-game-clock'),
-            historyEvent: bundle.includes('esports-live:snapshot'),
-            durationEnrichment: bundle.includes('Duration loading'),
-            goldDifference: bundle.includes('Gold diff'),
-            playerItems: bundle.includes('Items unavailable')
-          };
-          if (Object.values(markers).some(value => !value)) throw new Error(`Missing production bundle markers: ${JSON.stringify(markers)}`);
-          console.log(`PRODUCTION_REPORT=${JSON.stringify({ health, listings: events.length, liveReport, markers })}`);
+          if (!markers || Object.values(markers).some(value => !value)) {
+            throw new Error(`Pages release did not propagate: ${JSON.stringify({ assetSources, markers })}`);
+          }
+          console.log(`PRODUCTION_REPORT=${JSON.stringify({ health, listings: events.length, snapshotReport, assetSources, markers })}`);
           NODE

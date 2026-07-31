@@ -1,0 +1,163 @@
+name: Deploy Verify Live Games and Fast Results
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/deploy-verify-live-games-fast-results.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      WEB_BASE_URL: https://esports-live.pages.dev
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Validate exact main
+        run: |
+          test "$(git rev-parse HEAD)" = "d17e05e604c8e663718fe688319a6c879fa9884b"
+          npm install
+          npm run check
+      - name: Deploy API Worker
+        run: npm run deploy:api
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages application
+        run: >-
+          npx wrangler pages deploy apps/web/dist
+          --project-name esports-live
+          --branch main
+          --commit-hash "$(git rev-parse HEAD)"
+          --commit-message "Restore live games and speed Results"
+          --commit-dirty=true
+      - name: Verify production live game selection and web bundle
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const apiBase = process.env.API_BASE_URL;
+          const webBase = process.env.WEB_BASE_URL;
+          const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+          async function response(url) {
+            const started = performance.now();
+            try {
+              const result = await fetch(url, {
+                headers: { accept: 'application/json,text/html,*/*', 'cache-control': 'no-cache' }
+              });
+              const text = await result.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: result.ok, status: result.status, ms: Math.round(performance.now() - started), text, body };
+            } catch (error) {
+              return { ok: false, status: 0, ms: Math.round(performance.now() - started), text: String(error), body: null };
+            }
+          }
+
+          const activeGameStates = new Set(['live', 'draft', 'paused']);
+          let finalReport = null;
+          for (let attempt = 1; attempt <= 18; attempt += 1) {
+            const bust = Date.now();
+            const [health, schedule, web] = await Promise.all([
+              response(`${apiBase}/health?verify=${bust}`),
+              response(`${apiBase}/v1/lol/schedule?states=live,paused,scheduled&limit=100&verify=${bust}`),
+              response(`${webBase}?verify=${bust}`)
+            ]);
+
+            const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+            const liveEvents = events.filter(event => event?.series?.state === 'live' || event?.series?.state === 'paused');
+            const liveReports = [];
+            for (const event of liveEvents.slice(0, 4)) {
+              const games = Array.isArray(event?.series?.games) ? event.series.games : [];
+              const activeGame = games.find(game => activeGameStates.has(game?.state))
+                ?? games.find(game => game?.state !== 'completed')
+                ?? null;
+              let snapshot = null;
+              if (activeGame?.id) {
+                const result = await response(`${apiBase}/v1/lol/games/${encodeURIComponent(activeGame.id)}/live?verify=${bust}`);
+                snapshot = {
+                  status: result.status,
+                  ms: result.ms,
+                  statsPresent: Boolean(result.body?.stats),
+                  gameState: result.body?.game?.state ?? null,
+                  seriesState: result.body?.series?.state ?? null,
+                  sourceTimestamp: result.body?.quality?.sourceTimestamp ?? null,
+                  blueGold: result.body?.stats?.blue?.gold ?? null,
+                  redGold: result.body?.stats?.red?.gold ?? null
+                };
+              }
+              liveReports.push({
+                seriesId: event?.series?.id ?? null,
+                competition: event?.series?.competition?.name ?? null,
+                teams: event?.series?.teams?.map(team => team.name) ?? [],
+                gameCount: games.length,
+                games: games.map(game => ({ id: game.id, number: game.number, state: game.state })),
+                activeGameId: activeGame?.id ?? null,
+                snapshot
+              });
+            }
+
+            const scriptSources = [...web.text.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+              .map(match => new URL(match[1], webBase).toString());
+            const stylesheetSources = [...web.text.matchAll(/<link[^>]+href=["']([^"']+\.css[^"']*)["']/g)]
+              .map(match => new URL(match[1], webBase).toString());
+            const [scripts, stylesheets] = await Promise.all([
+              Promise.all(scriptSources.map(source => response(`${source}${source.includes('?') ? '&' : '?'}verify=${bust}`))),
+              Promise.all(stylesheetSources.map(source => response(`${source}${source.includes('?') ? '&' : '?'}verify=${bust}`)))
+            ]);
+            const bundle = scripts.map(item => item.text).join('\n');
+            const css = stylesheets.map(item => item.text).join('\n');
+            const webReady = bundle.includes('Loading recent results')
+              && bundle.includes('Confirming final series scores and game states')
+              && css.includes('grid-auto-rows:max-content')
+              && css.includes('overscroll-behavior:contain');
+            const liveReady = liveReports.length === 0
+              ? true
+              : liveReports.every(item => item.gameCount > 0 && item.activeGameId && item.snapshot?.status === 200 && item.snapshot?.statsPresent);
+
+            finalReport = {
+              checkedAt: new Date().toISOString(),
+              attempt,
+              healthStatus: health.status,
+              adapters: health.body?.adapters ?? [],
+              scheduleStatus: schedule.status,
+              scheduleMs: schedule.ms,
+              scheduleCount: events.length,
+              liveCount: liveEvents.length,
+              liveReports,
+              webStatus: web.status,
+              webMs: web.ms,
+              scriptCount: scriptSources.length,
+              stylesheetCount: stylesheetSources.length,
+              webReady,
+              liveReady
+            };
+            console.log(`LIVE_RESULTS_RELEASE_REPORT=${JSON.stringify(finalReport)}`);
+
+            if (
+              health.ok
+              && health.body?.adapters?.includes('lol')
+              && schedule.ok
+              && web.ok
+              && webReady
+              && liveReady
+            ) process.exit(0);
+
+            await wait(10_000);
+          }
+
+          console.error(`FINAL_LIVE_RESULTS_RELEASE_REPORT=${JSON.stringify(finalReport)}`);
+          process.exit(1);
+          NODE

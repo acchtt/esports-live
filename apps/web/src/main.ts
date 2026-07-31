@@ -35,7 +35,6 @@ const selectedCompetition = requiredElement<HTMLElement>('#selected-competition'
 const selectedSeries = requiredElement<HTMLElement>('#selected-series');
 const selectedMeta = requiredElement<HTMLElement>('#selected-meta');
 const gameSelector = requiredElement<HTMLElement>('#game-selector');
-const qualityBanner = requiredElement<HTMLElement>('#quality-banner');
 const gameContent = requiredElement<HTMLElement>('#game-content');
 const adapterList = requiredElement<HTMLElement>('#adapter-list');
 
@@ -43,6 +42,7 @@ let events: ScheduleEvent[] = [];
 let selectedSeriesId: string | null = null;
 let selectedGameId: string | null = null;
 let lastSourceTimestamp: string | null = null;
+let renderedGameId: string | null = null;
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
 let scheduleTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -177,34 +177,6 @@ function renderSeriesHeader(event: ScheduleEvent): void {
   renderGameSelector(event);
 }
 
-function hideQuality(): void {
-  qualityBanner.className = 'quality-banner hidden';
-  qualityBanner.replaceChildren();
-}
-
-function renderQuality(snapshot: LiveSnapshot<LolStats>): void {
-  const quality = snapshot.quality;
-  let title = 'Telemetry unavailable';
-  let className = 'unavailable';
-  if (quality.safeForLiveAnalysis) {
-    title = 'Verified live telemetry';
-    className = 'verified';
-  } else if (quality.freshness === 'fresh') {
-    title = 'Fresh partial telemetry';
-    className = 'partial';
-  } else if (quality.freshness === 'degraded') {
-    title = 'Delayed source context';
-    className = 'delayed';
-  } else if (quality.freshness === 'stale') {
-    title = 'Stale historical context';
-    className = 'stale';
-  }
-  const age = quality.ageSeconds === null ? 'Source age unavailable' : `${quality.ageSeconds}s source age`;
-  const reason = quality.reasons[0]?.message ?? 'No additional quality details.';
-  qualityBanner.className = `quality-banner ${className}`;
-  qualityBanner.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(age)} · ${escapeHtml(reason)}</span>`;
-}
-
 function objectiveMarkup(team: LolTeamState): string {
   const objectives = team.objectives;
   return `
@@ -242,9 +214,10 @@ function teamMarkup(team: LolTeamState, imageUrl?: string): string {
 }
 
 function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
-  renderQuality(snapshot);
   const stats = snapshot.stats;
   if (!stats) {
+    if (renderedGameId === snapshot.game.id) return;
+    renderedGameId = null;
     const reason = snapshot.quality.reasons.map(item => item.message).join(' ') || 'No normalized gameplay frame is available.';
     gameContent.innerHTML = `
       <div class="analysis-empty">
@@ -255,6 +228,7 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
     return;
   }
 
+  renderedGameId = snapshot.game.id;
   const blueRef = snapshot.series.teams.find(team => team.id === stats.blue.id);
   const redRef = snapshot.series.teams.find(team => team.id === stats.red.id);
   gameContent.innerHTML = `
@@ -270,7 +244,7 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
 }
 
 function renderUpcoming(event: ScheduleEvent): void {
-  hideQuality();
+  renderedGameId = null;
   gameContent.innerHTML = `
     <div class="analysis-empty">
       <span class="analysis-empty-icon" aria-hidden="true">◷</span>
@@ -300,8 +274,10 @@ async function refreshSnapshot(): Promise<void> {
     renderSnapshot(snapshot);
   } catch (error) {
     if (selectedSeriesId !== requestedSeries || selectedGameId !== requestedGame) return;
-    hideQuality();
-    gameContent.innerHTML = `<div class="analysis-empty"><h3>Live feed unavailable</h3><p>${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</p></div>`;
+    if (renderedGameId !== requestedGame) {
+      renderedGameId = null;
+      gameContent.innerHTML = `<div class="analysis-empty"><h3>Live feed unavailable</h3><p>${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</p></div>`;
+    }
   }
 
   const current = currentEvent();

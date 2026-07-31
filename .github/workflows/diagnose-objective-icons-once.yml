@@ -1,9 +1,7 @@
 name: Diagnose Objective Icons Once
 
 on:
-  push:
-    paths:
-      - .github/workflows/diagnose-objective-icons-once.yml
+  pull_request:
 
 permissions:
   contents: read
@@ -13,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: fix/objective-icon-rendering
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'

@@ -1,4 +1,4 @@
-name: Deploy Consistency Fix Once
+name: Verify Consistency Fix Release
 
 on:
   pull_request:
@@ -8,44 +8,14 @@ on:
 permissions:
   contents: read
 
-env:
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
 jobs:
-  deploy-and-verify:
+  verify:
     runs-on: ubuntu-latest
-    environment: production
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: fe758c9ff2aa6faa3242e7b2ccd47126ee9f41ac
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - run: npm install
-      - run: npm run check
-      - name: Deploy Worker with retry
-        shell: bash
-        run: |
-          for attempt in 1 2 3 4 5; do
-            if npm run deploy:api; then exit 0; fi
-            sleep $((attempt * 20))
-          done
-          exit 1
-      - name: Build web application
-        run: npm run build:web
-        env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-      - name: Deploy Pages with retry
-        shell: bash
-        run: |
-          for attempt in 1 2 3 4 5; do
-            if npx wrangler pages deploy apps/web/dist --project-name esports-live --branch main --commit-hash fe758c9ff2aa6faa3242e7b2ccd47126ee9f41ac --commit-message "Snapshot consistency and game details fix"; then exit 0; fi
-            sleep $((attempt * 20))
-          done
-          exit 1
-      - name: Verify propagated release
+      - name: Verify production release
         shell: bash
         run: |
           node - <<'NODE'
@@ -64,15 +34,8 @@ jobs:
             return response.text();
           }
 
-          let health = null;
-          for (let attempt = 1; attempt <= 24; attempt += 1) {
-            try {
-              health = await json(`${api}/health?probe=${Date.now()}`);
-              if (health?.ok) break;
-            } catch {}
-            await sleep(5000);
-          }
-          if (!health?.ok) throw new Error('Production API did not become healthy.');
+          const health = await json(`${api}/health?probe=${Date.now()}`);
+          if (!health?.ok) throw new Error('Production API is not healthy.');
 
           let bundleMarkers = null;
           let assetSources = [];
@@ -84,8 +47,8 @@ jobs:
               const bundle = bundles.join('\n');
               bundleMarkers = {
                 responseRewrite: bundle.includes('application/json; charset=utf-8'),
-                itemFallback: bundle.includes('items:null') || bundle.includes('Items unavailable'),
-                liveEndpointGuard: bundle.includes('/v1/lol/games/') || bundle.includes('v1\\/lol\\/games')
+                itemPreservation: bundle.includes('incoming.items') && bundle.includes('previous.items'),
+                clockRegressionGuard: bundle.includes('newClock+2<oldClock') || bundle.includes('newClock + 2 < oldClock')
               };
               if (Object.values(bundleMarkers).every(Boolean)) break;
             } catch {}
@@ -97,75 +60,93 @@ jobs:
 
           const schedule = await json(`${api}/v1/lol/schedule?states=live,paused,completed,scheduled&limit=80&probe=${Date.now()}`);
           const events = Array.isArray(schedule.events) ? schedule.events : [];
-          const snapshotCandidates = events.flatMap(event => {
-            const games = Array.isArray(event?.series?.games) ? event.series.games : [];
-            return games.map(game => ({ event, game }));
-          }).filter(entry => entry.game?.id && ['live', 'completed'].includes(entry.game.state));
+          const knownArchived = [
+            '115548147900684638',
+            '115548147900684639',
+            '115548147900684640',
+            '115570814727903842',
+            '115570814727903843'
+          ];
+          const scheduleGameIds = events.flatMap(event => (
+            Array.isArray(event?.series?.games) ? event.series.games.map(game => game?.id) : []
+          )).filter(Boolean);
+          const gameIds = [...new Set([...knownArchived, ...scheduleGameIds])];
 
           let snapshotReport = null;
-          for (const entry of snapshotCandidates.slice(0, 20)) {
+          const snapshotErrors = [];
+          for (const gameId of gameIds.slice(0, 35)) {
             try {
-              const first = await json(`${api}/v1/lol/games/${encodeURIComponent(entry.game.id)}/live?verify=${Date.now()}`);
+              const first = await json(`${api}/v1/lol/games/${encodeURIComponent(gameId)}/live?verify=${Date.now()}`);
               await sleep(2200);
-              const second = await json(`${api}/v1/lol/games/${encodeURIComponent(entry.game.id)}/live?verify=${Date.now()}`);
+              const second = await json(`${api}/v1/lol/games/${encodeURIComponent(gameId)}/live?verify=${Date.now()}`);
               if (!first.stats && !second.stats) continue;
               const firstSource = Date.parse(first.quality?.sourceTimestamp ?? '');
               const secondSource = Date.parse(second.quality?.sourceTimestamp ?? '');
               const firstClock = first.stats?.gameClockSeconds ?? null;
               const secondClock = second.stats?.gameClockSeconds ?? null;
               if (Number.isFinite(firstSource) && Number.isFinite(secondSource) && secondSource < firstSource) {
-                throw new Error('Production source timestamp regressed.');
+                throw new Error('source timestamp regressed');
               }
               if (firstClock !== null && secondClock !== null && secondClock + 2 < firstClock) {
-                throw new Error('Production game clock regressed.');
+                throw new Error('game clock regressed');
               }
               const players = [...(second.stats?.blue?.players ?? []), ...(second.stats?.red?.players ?? [])];
               snapshotReport = {
-                gameId: entry.game.id,
-                state: entry.game.state,
+                gameId,
                 firstSource: first.quality?.sourceTimestamp ?? null,
                 secondSource: second.quality?.sourceTimestamp ?? null,
                 firstClock,
                 secondClock,
                 players: players.length,
-                playersWithItems: players.filter(player => Array.isArray(player.items)).length
+                playersWithItemArrays: players.filter(player => Array.isArray(player.items)).length,
+                playersWithNonemptyItems: players.filter(player => Array.isArray(player.items) && player.items.length > 0).length
               };
               break;
             } catch (error) {
+              snapshotErrors.push({ gameId, message: String(error?.message ?? error) });
               if (String(error?.message ?? '').includes('regressed')) throw error;
             }
           }
+          if (!snapshotReport) {
+            throw new Error(`No stats-bearing archived or current snapshot was available: ${JSON.stringify(snapshotErrors.slice(0, 8))}`);
+          }
+          if (snapshotReport.players === 10 && snapshotReport.playersWithItemArrays < 10) {
+            throw new Error(`Not all players have item arrays: ${JSON.stringify(snapshotReport)}`);
+          }
+
+          const contexts = [];
+          const seriesIds = events.slice(0, 32).map(event => event?.series?.id).filter(Boolean);
+          let cursor = 0;
+          const workers = Array.from({ length: 4 }, async () => {
+            while (cursor < seriesIds.length) {
+              const index = cursor++;
+              const seriesId = seriesIds[index];
+              try {
+                contexts.push(await json(`${api}/v1/lol/series/${encodeURIComponent(seriesId)}/context?verify=${Date.now()}`));
+              } catch {}
+            }
+          });
+          await Promise.all(workers);
 
           let winnerReport = null;
-          for (const event of events.slice(0, 30)) {
-            const seriesId = event?.series?.id;
-            if (!seriesId) continue;
-            try {
-              const context = await json(`${api}/v1/lol/series/${encodeURIComponent(seriesId)}/context?verify=${Date.now()}`);
-              const history = context.history;
-              if (!history?.games?.length) continue;
-              const completed = history.games.filter(game => game.state === 'completed');
-              if (!completed.length) continue;
-              const score = history.score.map(entry => entry.wins);
-              const winnerIndex = score[0] >= history.winsRequired ? 0 : score[1] >= history.winsRequired ? 1 : null;
-              const sweep = score[0] === 0 || score[1] === 0;
-              const clincher = [...completed].sort((a, b) => b.number - a.number)[0];
-              if (sweep && completed.every(game => game.winner?.id)) {
-                winnerReport = { seriesId, mode: 'sweep', score, resolved: completed.length };
-                break;
-              }
-              if (winnerIndex !== null && clincher?.winner?.id === history.score[winnerIndex]?.team?.id) {
-                winnerReport = { seriesId, mode: 'clincher', score, game: clincher.number };
-                break;
-              }
-            } catch {}
+          for (const context of contexts) {
+            const history = context?.history;
+            if (!history?.games?.length) continue;
+            const completed = history.games.filter(game => game.state === 'completed');
+            if (!completed.length) continue;
+            const score = history.score.map(entry => entry.wins);
+            const winnerIndex = score[0] >= history.winsRequired ? 0 : score[1] >= history.winsRequired ? 1 : null;
+            const clincher = [...completed].sort((a, b) => b.number - a.number)[0];
+            if ((score[0] === 0 || score[1] === 0) && completed.every(game => game.winner?.id)) {
+              winnerReport = { seriesId: context.seriesId, mode: 'sweep', score, resolvedGames: completed.length };
+              break;
+            }
+            if (winnerIndex !== null && clincher?.winner?.id === history.score[winnerIndex]?.team?.id) {
+              winnerReport = { seriesId: context.seriesId, mode: 'clincher', score, game: clincher.number };
+              break;
+            }
           }
-
-          if (!snapshotReport) throw new Error('No stats-bearing completed or live snapshot was available for item/monotonic verification.');
-          if (snapshotReport.players === 10 && snapshotReport.playersWithItems === 0) {
-            throw new Error(`Ten players were returned without any item arrays: ${JSON.stringify(snapshotReport)}`);
-          }
-          if (!winnerReport) throw new Error('No deterministic production winner case was verified.');
+          if (!winnerReport) throw new Error('No deterministic production winner case was available in the current context sample.');
 
           console.log(`PRODUCTION_REPORT=${JSON.stringify({
             health,

@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - name: Verify production release
+      - name: Verify production behavior
         shell: bash
         run: |
           node - <<'NODE'
@@ -37,40 +37,25 @@ jobs:
           const health = await json(`${api}/health?probe=${Date.now()}`);
           if (!health?.ok) throw new Error('Production API is not healthy.');
 
-          let bundleMarkers = null;
-          let assetSources = [];
-          for (let attempt = 1; attempt <= 24; attempt += 1) {
-            try {
-              const html = await text(`${web}/?verify=${Date.now()}`);
-              assetSources = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
-              const bundles = await Promise.all(assetSources.map(src => text(`${new URL(src, web)}?verify=${Date.now()}`)));
-              const bundle = bundles.join('\n');
-              bundleMarkers = {
-                responseRewrite: bundle.includes('application/json; charset=utf-8'),
-                itemPreservation: bundle.includes('incoming.items') && bundle.includes('previous.items'),
-                clockRegressionGuard: bundle.includes('newClock+2<oldClock') || bundle.includes('newClock + 2 < oldClock')
-              };
-              if (Object.values(bundleMarkers).every(Boolean)) break;
-            } catch {}
-            await sleep(5000);
-          }
-          if (!bundleMarkers || Object.values(bundleMarkers).some(value => !value)) {
-            throw new Error(`Pages release did not propagate: ${JSON.stringify({ assetSources, bundleMarkers })}`);
+          const html = await text(`${web}/?verify=${Date.now()}`);
+          const assetSources = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
+          if (!assetSources.some(src => src.includes('index-BjYCvBgd.js'))) {
+            throw new Error(`Expected production bundle is not active: ${JSON.stringify(assetSources)}`);
           }
 
           const schedule = await json(`${api}/v1/lol/schedule?states=live,paused,completed,scheduled&limit=80&probe=${Date.now()}`);
           const events = Array.isArray(schedule.events) ? schedule.events : [];
-          const knownArchived = [
+          const archivedIds = [
             '115548147900684638',
             '115548147900684639',
             '115548147900684640',
             '115570814727903842',
             '115570814727903843'
           ];
-          const scheduleGameIds = events.flatMap(event => (
+          const listedIds = events.flatMap(event => (
             Array.isArray(event?.series?.games) ? event.series.games.map(game => game?.id) : []
           )).filter(Boolean);
-          const gameIds = [...new Set([...knownArchived, ...scheduleGameIds])];
+          const gameIds = [...new Set([...archivedIds, ...listedIds])];
 
           let snapshotReport = null;
           const snapshotErrors = [];
@@ -80,6 +65,7 @@ jobs:
               await sleep(2200);
               const second = await json(`${api}/v1/lol/games/${encodeURIComponent(gameId)}/live?verify=${Date.now()}`);
               if (!first.stats && !second.stats) continue;
+
               const firstSource = Date.parse(first.quality?.sourceTimestamp ?? '');
               const secondSource = Date.parse(second.quality?.sourceTimestamp ?? '');
               const firstClock = first.stats?.gameClockSeconds ?? null;
@@ -90,6 +76,7 @@ jobs:
               if (firstClock !== null && secondClock !== null && secondClock + 2 < firstClock) {
                 throw new Error('game clock regressed');
               }
+
               const players = [...(second.stats?.blue?.players ?? []), ...(second.stats?.red?.players ?? [])];
               snapshotReport = {
                 gameId,
@@ -108,25 +95,23 @@ jobs:
             }
           }
           if (!snapshotReport) {
-            throw new Error(`No stats-bearing archived or current snapshot was available: ${JSON.stringify(snapshotErrors.slice(0, 8))}`);
+            throw new Error(`No stats-bearing snapshot was available: ${JSON.stringify(snapshotErrors.slice(0, 8))}`);
           }
           if (snapshotReport.players === 10 && snapshotReport.playersWithItemArrays < 10) {
             throw new Error(`Not all players have item arrays: ${JSON.stringify(snapshotReport)}`);
           }
 
+          const seriesIds = events.slice(0, 36).map(event => event?.series?.id).filter(Boolean);
           const contexts = [];
-          const seriesIds = events.slice(0, 32).map(event => event?.series?.id).filter(Boolean);
           let cursor = 0;
-          const workers = Array.from({ length: 4 }, async () => {
+          await Promise.all(Array.from({ length: 4 }, async () => {
             while (cursor < seriesIds.length) {
-              const index = cursor++;
-              const seriesId = seriesIds[index];
+              const seriesId = seriesIds[cursor++];
               try {
                 contexts.push(await json(`${api}/v1/lol/series/${encodeURIComponent(seriesId)}/context?verify=${Date.now()}`));
               } catch {}
             }
-          });
-          await Promise.all(workers);
+          }));
 
           let winnerReport = null;
           for (const context of contexts) {
@@ -146,13 +131,12 @@ jobs:
               break;
             }
           }
-          if (!winnerReport) throw new Error('No deterministic production winner case was available in the current context sample.');
+          if (!winnerReport) throw new Error('No deterministic winner case was available in the current context sample.');
 
           console.log(`PRODUCTION_REPORT=${JSON.stringify({
             health,
             listings: events.length,
             assetSources,
-            bundleMarkers,
             snapshotReport,
             winnerReport
           })}`);

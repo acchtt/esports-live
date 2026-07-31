@@ -6,9 +6,13 @@ const INVENTORY_SLOTS = 7;
 
 const style = document.createElement('style');
 style.textContent = `
+  .team-card {
+    container-type: inline-size;
+  }
+
   .player-list.telemetry-player-list {
-    gap: 8px;
-    margin-top: 14px;
+    gap: 6px;
+    margin-top: 11px;
   }
 
   .telemetry-player-board {
@@ -18,39 +22,39 @@ style.textContent = `
       "inventory inventory";
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 9px 14px;
+    gap: 6px 12px;
     min-width: 0;
-    min-height: 78px;
-    padding: 10px 11px;
-    border: 1px solid rgba(148, 163, 184, 0.11);
-    border-radius: 11px;
-    background: linear-gradient(135deg, rgba(255,255,255,.027), rgba(255,255,255,.012));
+    min-height: 66px;
+    padding: 8px 9px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.18);
   }
 
   .team-card.blue .telemetry-player-board {
-    box-shadow: inset 2px 0 rgba(56, 189, 248, 0.28);
+    border-left-color: rgba(56, 189, 248, 0.3);
   }
 
   .team-card.red .telemetry-player-board {
-    box-shadow: inset -2px 0 rgba(251, 113, 133, 0.26);
+    border-right-color: rgba(251, 113, 133, 0.3);
   }
 
   .telemetry-player-profile {
     grid-area: profile;
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     min-width: 0;
   }
 
   .telemetry-champion {
     position: relative;
-    width: 42px;
-    height: 42px;
+    width: 36px;
+    height: 36px;
     overflow: hidden;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 9px;
     background: rgba(15, 23, 42, 0.92);
   }
 
@@ -66,9 +70,9 @@ style.textContent = `
     display: grid;
     place-items: center;
     color: #94a3b8;
-    font-size: .66rem;
+    font-size: .62rem;
     font-weight: 900;
-    letter-spacing: .04em;
+    letter-spacing: .03em;
   }
 
   .telemetry-champion img:not([hidden]) + .telemetry-champion-fallback {
@@ -89,43 +93,48 @@ style.textContent = `
 
   .telemetry-player-copy strong {
     color: #f1f5f9;
-    font-size: .76rem;
+    font-size: .74rem;
+    line-height: 1.2;
   }
 
   .telemetry-player-copy span {
     margin-top: 3px;
     color: #7f8da3;
-    font-size: .59rem;
+    font-size: .56rem;
     text-transform: capitalize;
   }
 
   .telemetry-level {
-    min-width: 34px;
-    padding: 5px 6px;
-    border: 1px solid rgba(148, 163, 184, 0.13);
-    border-radius: 8px;
-    color: #bfdbfe;
-    background: rgba(59, 130, 246, 0.055);
-    font-size: .58rem;
+    color: #93c5fd;
+    font-size: .53rem;
     font-weight: 850;
-    text-align: center;
     white-space: nowrap;
   }
 
   .telemetry-player-stats {
     grid-area: stats;
     display: grid;
-    grid-template-columns: repeat(3, minmax(52px, 1fr));
-    gap: 5px;
+    grid-template-columns: minmax(72px, auto) repeat(2, minmax(38px, auto));
+    align-items: center;
+    gap: 0;
   }
 
   .telemetry-player-stat {
     min-width: 0;
-    padding: 6px 7px;
-    border: 1px solid rgba(148, 163, 184, 0.09);
-    border-radius: 8px;
-    background: rgba(2, 6, 23, 0.22);
+    padding: 0 9px;
     text-align: right;
+  }
+
+  .telemetry-player-stat:first-child {
+    padding-left: 0;
+  }
+
+  .telemetry-player-stat:last-child {
+    padding-right: 0;
+  }
+
+  .telemetry-player-stat + .telemetry-player-stat {
+    border-left: 1px solid rgba(148, 163, 184, 0.09);
   }
 
   .telemetry-player-stat span,
@@ -136,54 +145,57 @@ style.textContent = `
 
   .telemetry-player-stat span {
     color: #64748b;
-    font-size: .48rem;
+    font-size: .44rem;
     font-weight: 850;
     letter-spacing: .07em;
   }
 
   .telemetry-player-stat strong {
-    margin-top: 3px;
-    color: #cbd5e1;
-    font-size: .66rem;
+    margin-top: 2px;
+    color: #d6deeb;
+    font-size: .63rem;
   }
 
   .telemetry-inventory {
     grid-area: inventory;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 5px;
+    gap: 4px;
     min-width: 0;
-    padding-top: 8px;
-    border-top: 1px solid rgba(148, 163, 184, 0.08);
+    min-height: 22px;
+    padding-left: 44px;
   }
 
   .telemetry-inventory-label {
-    margin-right: auto;
-    color: #64748b;
-    font-size: .5rem;
+    margin-right: 2px;
+    color: #58677d;
+    font-size: .45rem;
     font-weight: 850;
     letter-spacing: .08em;
   }
 
   .telemetry-item-slot {
     position: relative;
-    width: 27px;
-    height: 27px;
-    flex: 0 0 27px;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
     overflow: hidden;
-    border: 1px solid rgba(148, 163, 184, 0.13);
-    border-radius: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 5px;
     background: rgba(2, 6, 23, 0.42);
+  }
+
+  .telemetry-item-slot.empty {
+    opacity: .34;
   }
 
   .telemetry-item-slot.empty::after,
   .telemetry-item-slot.image-missing::after {
     content: '';
     position: absolute;
-    inset: 8px;
+    inset: 7px;
     border: 1px solid rgba(100, 116, 139, 0.2);
-    border-radius: 3px;
+    border-radius: 2px;
   }
 
   .telemetry-item-slot img {
@@ -192,46 +204,46 @@ style.textContent = `
     object-fit: cover;
   }
 
-  @media (max-width: 1160px) {
+  @container (max-width: 390px) {
     .telemetry-player-board {
       grid-template-areas:
         "profile"
         "stats"
         "inventory";
       grid-template-columns: minmax(0, 1fr);
+      gap: 7px;
     }
 
-    .telemetry-player-stat { text-align: left; }
-    .telemetry-inventory { justify-content: flex-start; }
-  }
-
-  @media (max-width: 860px) {
-    .telemetry-player-board {
-      grid-template-areas:
-        "profile stats"
-        "inventory inventory";
-      grid-template-columns: minmax(0, 1fr) auto;
+    .telemetry-player-stats {
+      justify-content: start;
     }
 
-    .telemetry-player-stat { text-align: right; }
-    .telemetry-inventory { justify-content: flex-end; }
+    .telemetry-player-stat {
+      text-align: left;
+    }
+
+    .telemetry-inventory {
+      padding-left: 0;
+    }
   }
 
   @media (max-width: 620px) {
     .telemetry-player-board {
-      grid-template-areas:
-        "profile"
-        "stats"
-        "inventory";
-      grid-template-columns: minmax(0, 1fr);
-      padding: 9px;
+      padding: 8px;
     }
 
-    .telemetry-player-profile { grid-template-columns: 38px minmax(0, 1fr) auto; }
-    .telemetry-champion { width: 38px; height: 38px; }
-    .telemetry-player-stat { text-align: left; }
-    .telemetry-inventory { justify-content: flex-start; overflow-x: auto; }
-    .telemetry-inventory-label { display: none; }
+    .telemetry-player-profile {
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+    }
+
+    .telemetry-champion {
+      width: 34px;
+      height: 34px;
+    }
+
+    .telemetry-inventory {
+      overflow-x: auto;
+    }
   }
 `;
 document.head.append(style);
@@ -250,10 +262,13 @@ function formatNumber(value: number | null): string {
 }
 
 function dataDragonPatch(value: string | null): string | null {
-  if (!value) return null;
-  const parts = value.split('.').filter(Boolean);
-  if (parts.length < 2) return null;
-  return parts.length >= 3 ? parts.slice(0, 3).join('.') : `${parts[0]}.${parts[1]}.1`;
+  const match = value?.match(/^(\d+)\.(\d+)/);
+  return match ? `${match[1]}.${match[2]}.1` : null;
+}
+
+function patchLabel(value: string | null): string {
+  const match = value?.match(/^(\d+)\.(\d+)/);
+  return match ? `Patch ${match[1]}.${match[2]}` : 'Patch unavailable';
 }
 
 function championKey(value: string | null): string | null {
@@ -261,9 +276,15 @@ function championKey(value: string | null): string | null {
   const compact = value.replace(/[^a-z0-9]/gi, '');
   if (!compact || /^\d+$/.test(compact)) return null;
   const aliases: Record<string, string> = {
-    Wukong: 'MonkeyKing',
+    BelVeth: 'Belveth',
+    ChoGath: 'Chogath',
+    KaiSa: 'Kaisa',
+    KhaZix: 'Khazix',
+    LeBlanc: 'Leblanc',
     NunuWillump: 'Nunu',
-    RenataGlasc: 'Renata'
+    RenataGlasc: 'Renata',
+    VelKoz: 'Velkoz',
+    Wukong: 'MonkeyKing'
   };
   return aliases[compact] ?? compact;
 }
@@ -303,7 +324,7 @@ function inventoryMarkup(player: LolPlayerState, patch: string | null): string {
         <img class="telemetry-image" src="${escapeHtml(url)}" alt="Item ${escapeHtml(itemId)}" />
       </span>`;
   }).join('');
-  return `<div class="telemetry-inventory"><span class="telemetry-inventory-label">ITEMS</span>${slots}</div>`;
+  return `<div class="telemetry-inventory"><span class="telemetry-inventory-label">BUILD</span>${slots}</div>`;
 }
 
 function statMarkup(label: string, value: string): string {
@@ -319,7 +340,7 @@ function playerMarkup(player: LolPlayerState, patch: string | null): string {
         ${championMarkup(player, patch)}
         <div class="telemetry-player-copy">
           <strong>${escapeHtml(player.handle ?? 'Unknown player')}</strong>
-          <span>${escapeHtml(champion)} · ${escapeHtml(role)}</span>
+          <span>${escapeHtml(role)} · ${escapeHtml(champion)}</span>
         </div>
         <span class="telemetry-level">LV ${escapeHtml(formatNumber(player.level))}</span>
       </div>
@@ -356,6 +377,8 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
   const patch = dataDragonPatch(snapshot.stats.patch);
   renderTeam(snapshot.stats.blue, patch);
   renderTeam(snapshot.stats.red, patch);
+  const patchElement = document.querySelector<HTMLElement>('.scoreboard .clock > span');
+  if (patchElement) patchElement.textContent = patchLabel(snapshot.stats.patch);
   bindImageFallbacks();
 }
 
@@ -370,6 +393,14 @@ window.addEventListener('esports-live:snapshot', event => {
   renderSnapshot((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
 });
 
-const controlObserver = new MutationObserver(renameHistoryControl);
+const controlObserver = new MutationObserver(mutations => {
+  const needsRename = mutations.some(mutation =>
+    [...mutation.addedNodes].some(node =>
+      node instanceof Element
+      && (node.matches('[data-mode="results"]') || Boolean(node.querySelector('[data-mode="results"]')))
+    )
+  );
+  if (needsRename) renameHistoryControl();
+});
 controlObserver.observe(document.body, { childList: true, subtree: true });
 renameHistoryControl();

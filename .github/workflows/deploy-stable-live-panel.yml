@@ -1,0 +1,94 @@
+name: Deploy Stable Live Panel
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/deploy-stable-live-panel.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WEB_BASE_URL: https://esports-live.pages.dev
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Validate exact main
+        run: |
+          test "$(git rev-parse HEAD)" = "b967a3c07bee47a52421dfca9d147fd79d61734d"
+          npm install
+          npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages application with retry
+        shell: bash
+        run: |
+          for attempt in {1..8}; do
+            echo "Pages deployment attempt ${attempt}/8"
+            if npx wrangler pages deploy apps/web/dist \
+              --project-name esports-live \
+              --branch main \
+              --commit-hash "$(git rev-parse HEAD)" \
+              --commit-message "Remove telemetry banner and keep live panel mounted" \
+              --commit-dirty=true; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 8 ]; then
+              sleep $((attempt * 15))
+            fi
+          done
+          exit 1
+      - name: Verify production bundle
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const base = process.env.WEB_BASE_URL;
+          const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+          async function get(url) {
+            try {
+              const response = await fetch(url, { headers: { 'cache-control': 'no-cache' } });
+              return { ok: response.ok, status: response.status, text: await response.text() };
+            } catch (error) {
+              return { ok: false, status: 0, text: String(error) };
+            }
+          }
+          let report = null;
+          for (let attempt = 1; attempt <= 18; attempt += 1) {
+            const bust = Date.now();
+            const html = await get(`${base}?verify=${bust}`);
+            const scripts = [...html.text.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+              .map(match => new URL(match[1], base).toString());
+            const bundles = await Promise.all(scripts.map(source => get(`${source}${source.includes('?') ? '&' : '?'}verify=${bust}`)));
+            const js = bundles.map(item => item.text).join('\n');
+            const bannerRemoved = !html.text.includes('id="quality-banner"')
+              && !js.includes('Stale historical context')
+              && !js.includes('Verified live telemetry');
+            const stablePanelLogic = js.includes('Waiting for verified gameplay')
+              && js.includes('Live feed unavailable');
+            report = {
+              checkedAt: new Date().toISOString(),
+              attempt,
+              htmlStatus: html.status,
+              scriptCount: scripts.length,
+              bannerRemoved,
+              stablePanelLogic
+            };
+            console.log(`STABLE_PANEL_RELEASE_REPORT=${JSON.stringify(report)}`);
+            if (html.ok && bannerRemoved && stablePanelLogic) process.exit(0);
+            await wait(10_000);
+          }
+          console.error(`FINAL_STABLE_PANEL_RELEASE_REPORT=${JSON.stringify(report)}`);
+          process.exit(1);
+          NODE

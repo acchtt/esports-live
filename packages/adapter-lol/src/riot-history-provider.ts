@@ -16,9 +16,15 @@ import type { RiotLolProviderOptions } from './riot-provider.ts';
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_RECENT_SERIES = 500;
+const BASE_CONTEXT_TTL_MS = 5 * 60 * 1_000;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+interface BaseContextCacheEntry {
+  expiresAt: number;
+  value: LolProviderSeriesContext;
+}
 
 const object = (value: unknown): Json => (
   value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Json : {}
@@ -159,10 +165,9 @@ function gameHistory(
   rawGame: Json,
   fallbackIndex: number
 ): SeriesGameHistoryRef {
-  const normalizedGame = series.games.find(game => (
-    game.id === firstString(rawGame, ['id', 'gameId'])
-    || game.number === (firstNumber(rawGame, ['number', 'gameNumber']) ?? fallbackIndex + 1)
-  ));
+  const number = firstNumber(rawGame, ['number', 'gameNumber']) ?? fallbackIndex + 1;
+  const rawId = firstString(rawGame, ['id', 'gameId']);
+  const normalizedGame = series.games.find(game => game.id === rawId || game.number === number);
   const resolveTeam = matchTeamResolver(series, match);
   const rawTeams = array(rawGame.teams).map(object);
   let blueTeam: TeamRef | null = null;
@@ -175,14 +180,13 @@ function gameHistory(
     if (side === 'red') redTeam = resolved;
   });
 
-  const state = rawGame.state === undefined
-    ? normalizedGame?.state ?? 'unknown'
-    : rawGameState(rawGame.state);
+  const parsedState = rawGameState(rawGame.state);
+  const state = parsedState === 'unknown' ? normalizedGame?.state ?? 'unknown' : parsedState;
   const winnerId = gameWinnerId(rawGame);
 
   return {
-    id: firstString(rawGame, ['id', 'gameId']) ?? normalizedGame?.id ?? `game-${fallbackIndex + 1}`,
-    number: firstNumber(rawGame, ['number', 'gameNumber']) ?? normalizedGame?.number ?? fallbackIndex + 1,
+    id: rawId ?? normalizedGame?.id ?? `game-${fallbackIndex + 1}`,
+    number: normalizedGame?.number ?? number,
     state,
     blueTeam,
     redTeam,
@@ -259,8 +263,11 @@ export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): L
   if (!apiKey) throw new Error('A Riot LoL Esports API key is required.');
   const fetcher = options.fetcher ?? fetch;
   const locale = options.locale ?? 'en-US';
+  const now = options.now ?? (() => new Date());
   const resolved = createRiotLolResolvedProvider({ ...options, fetcher });
   const recentSeries = new Map<string, LolProviderSeries>();
+  const baseContextCache = new Map<string, BaseContextCacheEntry>();
+  const baseContextInFlight = new Map<string, Promise<LolProviderSeriesContext>>();
 
   const remember = (entries: readonly LolProviderScheduleEntry[]): void => {
     if (recentSeries.size + entries.length > MAX_RECENT_SERIES) recentSeries.clear();
@@ -271,6 +278,27 @@ export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): L
     const entries = await resolved.getSchedule();
     remember(entries);
     return entries;
+  };
+
+  const loadBaseContext = async (seriesId: string): Promise<LolProviderSeriesContext> => {
+    const cached = baseContextCache.get(seriesId);
+    if (cached && cached.expiresAt > now().getTime()) return cached.value;
+    const pending = baseContextInFlight.get(seriesId);
+    if (pending) return pending;
+
+    const request = resolved.getSeriesContext!(seriesId)
+      .then(value => {
+        baseContextCache.set(seriesId, {
+          value,
+          expiresAt: now().getTime() + BASE_CONTEXT_TTL_MS
+        });
+        return value;
+      })
+      .finally(() => {
+        if (baseContextInFlight.get(seriesId) === request) baseContextInFlight.delete(seriesId);
+      });
+    baseContextInFlight.set(seriesId, request);
+    return request;
   };
 
   const details = async (seriesId: string): Promise<unknown> => {
@@ -295,13 +323,15 @@ export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): L
       }
 
       const [context, detailsPayload] = await Promise.all([
-        resolved.getSeriesContext!(seriesId),
+        loadBaseContext(seriesId),
         details(seriesId).catch(() => null)
       ]);
-      if (!series || !detailsPayload) return context;
+      const observedAt = now().toISOString();
+      if (!series || !detailsPayload) return { ...context, observedAt };
 
       return {
         ...context,
+        observedAt,
         history: parseRiotSeriesHistory(series, detailsPayload)
       };
     }

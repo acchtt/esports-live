@@ -1,0 +1,53 @@
+name: Merge Live Scoreboard Header Once
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/merge-live-scoreboard-header
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Merge duplicated scoreboard sections
+        run: python scripts/merge-live-scoreboard-header.py
+      - run: npm install
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Validate merged header markers
+        shell: bash
+        run: |
+          grep -R 'role-match-header' apps/web/dist/assets/*.js
+          grep -R 'role-match-team-metrics' apps/web/dist/assets/*.js
+          grep -R 'role-match-clock' apps/web/dist/assets/*.js
+          grep -R 'merged-live-match-header' apps/web/src/styles.css
+          grep -R 'role-player-portrait' apps/web/dist/assets/*.js
+          grep -R 'role-player-items' apps/web/dist/assets/*.js
+          ! grep -R '<div class="scoreboard">' apps/web/src/main.ts
+          ! grep -R 'role-team-summary-grid' apps/web/src/main.ts
+      - name: Commit source-only result
+        shell: bash
+        run: |
+          rm -f .github/workflows/merge-live-scoreboard-header-once.yml
+          rm -f scripts/merge-live-scoreboard-header.py
+          rm -f package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Merge live scoreboard summary sections"
+          git push origin HEAD:fix/merge-live-scoreboard-header

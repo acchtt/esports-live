@@ -1,0 +1,184 @@
+name: Deploy Verify Development Rosters PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-verify-development-rosters-pr.yml
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run check
+      - name: Deploy clean main API Worker
+        run: npm run deploy:api
+      - name: Verify development roster isolation
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const base = process.env.API_BASE_URL;
+
+          async function getJson(url) {
+            try {
+              const response = await fetch(url, {
+                headers: {
+                  accept: 'application/json',
+                  'cache-control': 'no-cache'
+                }
+              });
+              const text = await response.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: response.ok, status: response.status, body };
+            } catch (error) {
+              return { ok: false, status: 0, body: { message: String(error) } };
+            }
+          }
+
+          function normalized(value) {
+            return String(value ?? '')
+              .normalize('NFKD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, ' ')
+              .trim();
+          }
+
+          function tiers(...values) {
+            const text = normalized(values.filter(Boolean).join(' '));
+            const result = new Set();
+            if (/(?:^| )(?:academy|academia|akademi)(?: |$)/.test(text)) result.add('academy');
+            if (/(?:^| )challengers?(?: |$)/.test(text)) result.add('challenger');
+            if (/(?:^| )youth(?: |$)/.test(text)) result.add('youth');
+            if (/(?:^| )(?:junior|juniors|jr)(?: |$)/.test(text)) result.add('junior');
+            if (/(?:^| )(?:reserve|reserves|secondary|b team)(?: |$)/.test(text)) result.add('reserve');
+            return result;
+          }
+
+          function intersects(left, right) {
+            return [...left].some(value => right.has(value));
+          }
+
+          let finalReport = null;
+          for (let propagationAttempt = 1; propagationAttempt <= 24; propagationAttempt += 1) {
+            const health = await getJson(`${base}/health?probe=${Date.now()}`);
+            const schedule = await getJson(`${base}/v1/lol/schedule?limit=80&probe=${Date.now()}`);
+            const allEvents = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+            const events = allEvents.filter(event => {
+              const competitionId = normalized(event?.series?.competition?.id);
+              const competitionName = normalized(event?.series?.competition?.name);
+              return competitionId.includes('lck challengers league')
+                || competitionId.includes('lck_challengers_league')
+                || competitionName.includes('lck challengers');
+            });
+
+            const checked = [];
+            const violations = [];
+            let developmentTeams = 0;
+            let resolvedDevelopmentRosters = 0;
+
+            for (const event of events.slice(0, 10)) {
+              const series = event?.series;
+              if (!series?.id) continue;
+              const contextResult = await getJson(
+                `${base}/v1/lol/series/${encodeURIComponent(series.id)}/context?probe=${Date.now()}`
+              );
+              const scheduledTeams = Array.isArray(series.teams) ? series.teams : [];
+              const rosters = Array.isArray(contextResult.body?.rosters) ? contextResult.body.rosters : [];
+
+              const item = {
+                seriesId: series.id,
+                competition: series.competition?.name ?? null,
+                scheduledTeams: scheduledTeams.map(team => ({
+                  name: team.name ?? null,
+                  code: team.code ?? null,
+                  tiers: [...tiers(team.name, team.slug)]
+                })),
+                rosterTeams: rosters.map(roster => ({
+                  id: roster.team?.id ?? null,
+                  name: roster.team?.name ?? null,
+                  code: roster.team?.code ?? null,
+                  tiers: [...tiers(roster.team?.name, roster.team?.slug)],
+                  playerCount: Array.isArray(roster.players) ? roster.players.length : 0
+                })),
+                complete: contextResult.body?.complete ?? false,
+                reasonCodes: Array.isArray(contextResult.body?.reasons)
+                  ? contextResult.body.reasons.map(reason => reason.code)
+                  : []
+              };
+              checked.push(item);
+
+              for (let index = 0; index < scheduledTeams.length; index += 1) {
+                const scheduled = scheduledTeams[index];
+                const expectedTiers = tiers(scheduled?.name, scheduled?.slug);
+                if (!expectedTiers.size) continue;
+                developmentTeams += 1;
+
+                const scheduledCode = normalized(scheduled?.code);
+                const roster = rosters.find(candidate => (
+                  scheduledCode && normalized(candidate?.team?.code) === scheduledCode
+                )) ?? rosters[index];
+                if (!roster) continue;
+
+                resolvedDevelopmentRosters += 1;
+                const rosterTiers = tiers(roster.team?.name, roster.team?.slug);
+                if (!intersects(expectedTiers, rosterTiers)) {
+                  violations.push({
+                    seriesId: series.id,
+                    scheduledTeam: scheduled?.name ?? null,
+                    scheduledCode: scheduled?.code ?? null,
+                    rosterTeam: roster.team?.name ?? null,
+                    rosterCode: roster.team?.code ?? null,
+                    rosterId: roster.team?.id ?? null
+                  });
+                }
+              }
+            }
+
+            finalReport = {
+              checkedAt: new Date().toISOString(),
+              propagationAttempt,
+              healthStatus: health.status,
+              adapters: health.body?.adapters ?? [],
+              scheduleStatus: schedule.status,
+              totalScheduleEvents: allEvents.length,
+              developmentSeriesCount: events.length,
+              developmentTeams,
+              resolvedDevelopmentRosters,
+              violations,
+              checked
+            };
+            console.log(`DEVELOPMENT_ROSTER_REPORT=${JSON.stringify(finalReport)}`);
+
+            const ready = health.ok
+              && health.body?.adapters?.includes('lol')
+              && schedule.ok
+              && events.length > 0
+              && developmentTeams > 0
+              && resolvedDevelopmentRosters >= 2
+              && violations.length === 0;
+            if (ready) process.exit(0);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+
+          console.error(`FINAL_DEVELOPMENT_ROSTER_REPORT=${JSON.stringify(finalReport)}`);
+          process.exit(1);
+          NODE

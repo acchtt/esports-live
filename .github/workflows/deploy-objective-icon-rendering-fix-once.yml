@@ -1,0 +1,168 @@
+name: Deploy Objective Icon Rendering Fix Once
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/deploy-objective-icon-rendering-fix-once.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-objective-icon-rendering-fix
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 31fc7df729fcb103f35fb574f3d68f58fa7f9b88
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install pillow
+      - run: npm install
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npx wrangler pages deploy apps/web/dist --project-name esports-live --branch main --commit-hash 31fc7df729fcb103f35fb574f3d68f58fa7f9b88 --commit-message "Fix broken objective icon extraction and delivery"; then exit 0; fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+      - name: Verify decoded production objective icons
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import hashlib
+          import io
+          import json
+          import re
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          from PIL import Image, ImageDraw
+
+          web = 'https://esports-live.pages.dev'
+          source_root = Path('apps/web/src/assets/objectives')
+          dist_root = Path('apps/web/dist')
+          names = ['tower', 'dragon', 'baron', 'herald', 'inhibitor']
+
+          def fetch(url: str) -> tuple[bytes, str]:
+              request = urllib.request.Request(url, headers={'Cache-Control': 'no-cache', 'User-Agent': 'objective-icon-verifier'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return response.read(), response.headers.get_content_type()
+
+          def pixel_hash(data: bytes) -> tuple[str, Image.Image]:
+              with Image.open(io.BytesIO(data)) as image:
+                  image.load()
+                  rgba = image.convert('RGBA')
+              assert rgba.size == (64, 64), rgba.size
+              return hashlib.sha256(rgba.tobytes()).hexdigest(), rgba
+
+          expected: dict[str, str] = {}
+          source_images: dict[str, Image.Image] = {}
+          for name in names:
+              data = (source_root / f'{name}.png').read_bytes()
+              digest, image = pixel_hash(data)
+              expected[digest] = name
+              source_images[name] = image
+
+          local_html = (dist_root / 'index.html').read_text(encoding='utf-8')
+          expected_js = re.search(r'<script[^>]+src="([^"]+\.js)"', local_html).group(1)
+          expected_css = re.search(r'<link[^>]+href="([^"]+\.css)"', local_html).group(1)
+
+          html = ''
+          bundle = ''
+          css = ''
+          for attempt in range(30):
+              try:
+                  html = fetch(f'{web}/?release={time.time_ns()}')[0].decode('utf-8')
+                  if expected_js not in html or expected_css not in html:
+                      raise RuntimeError('new entry assets are not active yet')
+                  bundle_bytes, js_type = fetch(f'{web}{expected_js}?release={time.time_ns()}')
+                  css_bytes, css_type = fetch(f'{web}{expected_css}?release={time.time_ns()}')
+                  if 'javascript' not in js_type and 'ecmascript' not in js_type:
+                      raise RuntimeError(f'unexpected JS type: {js_type}')
+                  if css_type != 'text/css':
+                      raise RuntimeError(f'unexpected CSS type: {css_type}')
+                  bundle = bundle_bytes.decode('utf-8')
+                  css = css_bytes.decode('utf-8')
+                  break
+              except Exception as error:
+                  if attempt == 29:
+                      raise
+                  print(f'production wait {attempt + 1}: {error}')
+                  time.sleep(4)
+
+          assert '"/objectives/' not in bundle
+          assert 'max-width:23px' in css
+          assert 'object-position:center' in css
+
+          candidates: list[tuple[str, bytes]] = []
+          for index, payload in enumerate(re.findall(r'data:image/png;base64,([A-Za-z0-9+/=]+)', bundle)):
+              candidates.append((f'inlined-{index}', base64.b64decode(payload)))
+
+          for local_asset in (dist_root / 'assets').glob('*.png'):
+              data, content_type = fetch(f'{web}/assets/{local_asset.name}?release={time.time_ns()}')
+              assert content_type == 'image/png', (local_asset.name, content_type)
+              candidates.append((local_asset.name, data))
+
+          matched: dict[str, tuple[str, Image.Image]] = {}
+          for origin, data in candidates:
+              try:
+                  digest, image = pixel_hash(data)
+              except Exception:
+                  continue
+              name = expected.get(digest)
+              if name:
+                  matched[name] = (origin, image)
+
+          assert set(matched) == set(names), {'matched': sorted(matched), 'expected': names}
+
+          canvas = Image.new('RGB', (5 * 170, 180), '#08101f')
+          draw = ImageDraw.Draw(canvas)
+          for index, name in enumerate(names):
+              origin, image = matched[name]
+              preview = image.resize((112, 112), Image.Resampling.NEAREST)
+              x = index * 170 + 29
+              canvas.paste(preview, (x, 16), preview)
+              draw.text((index * 170 + 12, 140), name, fill='white')
+              draw.text((index * 170 + 12, 157), origin[:23], fill='#91a4bf')
+          canvas.save('production-objective-icons.png')
+
+          report = {
+              'expected_js': expected_js,
+              'expected_css': expected_css,
+              'matched': {name: origin for name, (origin, _) in matched.items()},
+              'absolute_public_paths_removed': True,
+              'object_fit_css_active': True,
+          }
+          Path('production-objective-report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+          print(f'PRODUCTION_OBJECTIVE_ICON_REPORT={json.dumps(report)}')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-objective-icon-verification
+          path: |
+            production-objective-icons.png
+            production-objective-report.json
+          retention-days: 1

@@ -72,7 +72,7 @@ jobs:
             bundle = asset.text;
             const ready = /javascript|ecmascript/i.test(contentType)
               && bundle.includes('telemetry-player-board')
-              && bundle.includes('container-type:inline-size')
+              && bundle.includes('container-type: inline-size')
               && bundle.includes('BUILD')
               && bundle.includes('BelVeth');
             if (ready) break;
@@ -83,7 +83,7 @@ jobs:
           if (!/javascript|ecmascript/i.test(contentType)) throw new Error(`Asset did not return JavaScript: ${contentType}`);
           const markers = {
             compactBoard: bundle.includes('telemetry-player-board'),
-            containerResponsive: bundle.includes('container-type:inline-size'),
+            containerResponsive: bundle.includes('container-type: inline-size'),
             compactInventory: bundle.includes('BUILD'),
             championAliases: bundle.includes('BelVeth')
           };

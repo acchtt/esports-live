@@ -98,14 +98,26 @@ function windowPayload() {
 }
 
 function detailsPayload() {
+  const older = new Date(Date.parse(SOURCE) - 10_000).toISOString();
   return {
-    frames: [{
-      rfc460Timestamp: SOURCE,
-      participants: Array.from({ length: 10 }, (_, index) => ({
-        ...participant(index + 1),
-        items: [{ itemID: 1001 }, { itemID: 2003 }]
-      }))
-    }]
+    frames: [
+      {
+        rfc460Timestamp: older,
+        participants: Array.from({ length: 10 }, (_, index) => ({
+          ...participant(index + 1),
+          kills: 1,
+          items: [{ itemID: 1001 }]
+        }))
+      },
+      {
+        rfc460Timestamp: SOURCE,
+        participants: Array.from({ length: 10 }, (_, index) => ({
+          ...participant(index + 1),
+          kills: 4,
+          items: [{ itemID: 3006 }, { itemID: 3363 }]
+        }))
+      }
+    ]
   };
 }
 
@@ -162,7 +174,8 @@ test('Riot provider emits a complete normalized gameplay snapshot', async () => 
   assert.equal(snapshot.game.state, 'live');
   assert.equal(snapshot.stats?.gameClockSeconds, 590);
   assert.equal(snapshot.stats?.blue.gold, 30000);
-  assert.deepEqual(snapshot.stats?.blue.players[0]?.items, ['1001', '2003']);
+  assert.deepEqual(snapshot.stats?.blue.players[0]?.items, ['3006', '3363']);
+  assert.equal(snapshot.stats?.blue.players[0]?.kills, 4);
   assert.equal(snapshot.quality.freshness, 'fresh');
   assert.equal(snapshot.quality.complete, true);
   assert.equal(snapshot.quality.safeForLiveAnalysis, true);
@@ -182,4 +195,54 @@ test('missing Riot detail frames remain visible but unsafe', async () => {
   assert.equal(snapshot.quality.complete, false);
   assert.equal(snapshot.quality.safeForLiveAnalysis, false);
   assert.ok(snapshot.quality.reasons.some(reason => reason.field === 'blue.players.0.items'));
+});
+
+test('aligns team and participant frames before normalization', async () => {
+  const older = new Date(Date.parse(SOURCE) - 10_000).toISOString();
+  const requested: URL[] = [];
+  const customFetcher = async (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(String(input));
+    requested.push(url);
+    if (url.pathname.endsWith('/getEventDetails')) return json(eventPayload());
+    if (url.pathname.includes('/window/game-1')) {
+      const payload = windowPayload();
+      const newestFrame = payload.frames[0]!;
+      payload.frames = [
+        {
+          ...structuredClone(newestFrame),
+          rfc460Timestamp: older,
+          blueTeam: { ...structuredClone(newestFrame.blueTeam), totalGold: 29000 },
+          redTeam: { ...structuredClone(newestFrame.redTeam), totalGold: 28000 }
+        },
+        newestFrame
+      ];
+      return json(payload);
+    }
+    if (url.pathname.includes('/details/game-1')) {
+      return json({
+        frames: [{
+          rfc460Timestamp: older,
+          participants: Array.from({ length: 10 }, (_, index) => ({
+            ...participant(index + 1),
+            items: [{ itemID: 3006 }]
+          }))
+        }]
+      });
+    }
+    return json({ error: 'unexpected_url', url: url.toString() }, 500);
+  };
+
+  const adapter = new LolAdapter(createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: customFetcher,
+    now: () => new Date(NOW)
+  }));
+  const snapshot = await adapter.getLiveSnapshot('game-1');
+
+  assert.equal(snapshot.quality.sourceTimestamp, older);
+  assert.equal(snapshot.stats?.blue.gold, 29000);
+  assert.deepEqual(snapshot.stats?.blue.players[0]?.items, ['3006']);
+  const detailRequest = requested.find(url => url.pathname.includes('/details/game-1'));
+  assert.equal(detailRequest?.searchParams.get('startingTime'), '2026-07-31T08:08:50.000Z');
+  assert.equal(detailRequest?.searchParams.has('participantIds'), false);
 });

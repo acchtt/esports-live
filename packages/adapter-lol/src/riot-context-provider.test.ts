@@ -152,6 +152,39 @@ test('getLive upgrades a delayed schedule state without replacing game data', as
   assert.equal(schedule[0]?.series.games[0]?.state, 'unstarted');
 });
 
+test('getLive supplies game IDs when the base schedule omits them', async () => {
+  const baseEvent = scheduleEvent();
+  baseEvent.match.games = [];
+  const liveEvent = scheduleEvent('inProgress');
+  liveEvent.match.games = [
+    { id: 'game-1', number: 1, state: 'completed' },
+    { id: 'game-2', number: 2, state: 'inProgress' },
+    { id: 'game-3', number: 3, state: 'unstarted' }
+  ];
+  const provider = createRiotLolContextProvider({
+    apiKey: 'test-key',
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getSchedule')) {
+        return json({ data: { schedule: { events: [baseEvent] } } });
+      }
+      if (url.pathname.endsWith('/getLive')) {
+        return json({ data: { schedule: { events: [liveEvent] } } });
+      }
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule[0]?.series.state, 'live');
+  assert.deepEqual(schedule[0]?.series.games.map(game => [game.id, game.state]), [
+    ['game-1', 'completed'],
+    ['game-2', 'live'],
+    ['game-3', 'unstarted']
+  ]);
+});
+
 test('getLive failure leaves the base schedule available', async () => {
   const provider = createRiotLolContextProvider({
     apiKey: 'test-key',

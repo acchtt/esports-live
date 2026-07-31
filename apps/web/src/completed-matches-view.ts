@@ -26,9 +26,9 @@ const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, 
 const RESULTS_REFRESH_MS = 2 * 60 * 1_000;
 const CONTEXT_CACHE_MS = 5 * 60 * 1_000;
 const RESULT_LIMIT = 12;
-const CANDIDATE_LIMIT = 24;
+const CANDIDATE_LIMIT = 16;
 const LOOKBACK_MS = 14 * 24 * 60 * 60 * 1_000;
-const MAX_CONTEXT_CONCURRENCY = 3;
+const MAX_CONTEXT_CONCURRENCY = 4;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -282,7 +282,10 @@ function candidateEvents(events: readonly ScheduleEvent[]): ScheduleEvent[] {
       const start = Date.parse(event.series.scheduledStart);
       return Number.isFinite(start) && start <= now && start >= now - LOOKBACK_MS;
     })
-    .sort((left, right) => Date.parse(right.series.scheduledStart) - Date.parse(left.series.scheduledStart))
+    .sort((left, right) => (
+      Number(right.series.state === 'completed') - Number(left.series.state === 'completed')
+      || Date.parse(right.series.scheduledStart) - Date.parse(left.series.scheduledStart)
+    ))
     .slice(0, CANDIDATE_LIMIT);
 }
 
@@ -392,18 +395,36 @@ async function loadCompletedMatches(): Promise<void> {
     try {
       const schedule = await api<ScheduleResponse>('/v1/lol/schedule?limit=80');
       const candidates = candidateEvents(schedule.events);
+      completedMatches = [];
+      let initialSelectionMade = false;
       const resolved = await mapWithConcurrency(candidates, MAX_CONTEXT_CONCURRENCY, async event => {
         try {
           const context = await contextFor(event.series.id);
-          return context.history && isEnded(event, context.history)
+          const match = context.history && isEnded(event, context.history)
             ? { event, context, history: context.history } satisfies CompletedMatch
             : null;
+          if (match) {
+            completedMatches = [...completedMatches, match]
+              .sort((left, right) => (
+                Date.parse(right.event.series.scheduledStart) - Date.parse(left.event.series.scheduledStart)
+              ))
+              .slice(0, RESULT_LIMIT);
+            renderList();
+            if (!selectedSeriesId && !initialSelectionMade && completedMatches[0]) {
+              initialSelectionMade = true;
+              selectCompleted(completedMatches[0].event.series.id);
+            }
+          }
+          return match;
         } catch {
           return null;
         }
       });
       completedMatches = resolved
         .filter((match): match is CompletedMatch => match !== null)
+        .sort((left, right) => (
+          Date.parse(right.event.series.scheduledStart) - Date.parse(left.event.series.scheduledStart)
+        ))
         .slice(0, RESULT_LIMIT);
       if (selectedSeriesId && !completedMatches.some(match => match.event.series.id === selectedSeriesId)) {
         selectedSeriesId = null;

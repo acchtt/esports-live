@@ -142,11 +142,14 @@ function mergeLiveSignals(
     const signaledState = rawSeriesState(liveEvent.state ?? object(liveEvent.match).state);
     if (signaledState !== 'live' && signaledState !== 'paused') return entry;
 
-    const signaledGames = new Map(eventGames(liveEvent).map(game => [game.id, game] as const));
-    const games = entry.series.games.map(game => {
-      const signal = signaledGames.get(game.id);
-      return signal && signal.state !== 'unknown' ? { ...game, state: signal.state } : game;
-    });
+    const gamesById = new Map(entry.series.games.map(game => [game.id, game] as const));
+    for (const signal of eventGames(liveEvent)) {
+      const existing = gamesById.get(signal.id);
+      gamesById.set(signal.id, existing
+        ? { ...existing, state: signal.state !== 'unknown' ? signal.state : existing.state }
+        : signal);
+    }
+    const games = [...gamesById.values()].sort((left, right) => left.number - right.number);
 
     return {
       ...entry,

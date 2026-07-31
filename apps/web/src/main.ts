@@ -17,6 +17,7 @@ interface ScheduleResponse {
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const SNAPSHOT_POLL_MS = 3_000;
 const SCHEDULE_POLL_MS = 15_000;
+const ACTIVE_SCHEDULE_GRACE_MS = 6 * 60 * 60 * 1_000;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -96,6 +97,13 @@ function bestGame(event: ScheduleEvent): SeriesGameRef | null {
 
 function selectedGame(event: ScheduleEvent): SeriesGameRef | null {
   return event.series.games.find(game => game.id === selectedGameId) ?? null;
+}
+
+function isActiveListing(event: ScheduleEvent): boolean {
+  if (event.series.state === 'live' || event.series.state === 'paused') return true;
+  if (event.series.state !== 'scheduled') return false;
+  const start = Date.parse(event.series.scheduledStart);
+  return !Number.isFinite(start) || start >= Date.now() - ACTIVE_SCHEDULE_GRACE_MS;
 }
 
 function stateLabel(event: ScheduleEvent): string {
@@ -347,7 +355,7 @@ async function refreshSchedule(): Promise<void> {
   refreshButton.disabled = true;
   try {
     const payload = await api<ScheduleResponse>('/v1/lol/schedule?states=live,paused,scheduled');
-    events = [...payload.events].sort((left, right) => {
+    events = payload.events.filter(isActiveListing).sort((left, right) => {
       const liveDifference = Number(right.series.state === 'live') - Number(left.series.state === 'live');
       return liveDifference || Date.parse(left.series.scheduledStart) - Date.parse(right.series.scheduledStart);
     });

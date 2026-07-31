@@ -1,4 +1,4 @@
-name: Deploy Series History Summary Once
+name: Verify Series History Summary Once
 
 on:
   pull_request:
@@ -6,12 +6,8 @@ on:
 permissions:
   contents: read
 
-env:
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
 jobs:
-  deploy-and-verify:
+  verify-production:
     if: github.head_ref == 'ops/deploy-series-history-summary'
     runs-on: ubuntu-latest
     steps:
@@ -21,48 +17,25 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - run: npm install --no-package-lock
-      - run: npm run check
-      - name: Build web application
-        run: npm run build:web
-        env:
-          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
-      - name: Deploy Pages
-        shell: bash
-        run: |
-          for attempt in 1 2 3 4 5; do
-            if npx wrangler pages deploy apps/web/dist --project-name esports-live --branch main --commit-hash 2a1ac777eb11e87c4601a732815a97ba94cbe784 --commit-message "Merge completed series history summary"; then exit 0; fi
-            sleep $((attempt * 20))
-          done
-          exit 1
-      - name: Verify production bundle markers
+      - name: Verify production bundle selectors
         shell: bash
         run: |
           node --input-type=module - <<'NODE'
-          import fs from 'node:fs';
           const web = 'https://esports-live.pages.dev';
-          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-          const localHtml = fs.readFileSync('apps/web/dist/index.html', 'utf8');
-          const expectedJs = localHtml.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
-          if (!expectedJs) throw new Error('Built JavaScript entry is missing.');
-          let assetInfo = null;
-          for (let attempt = 1; attempt <= 30; attempt += 1) {
-            const html = await fetch(`${web}/?release=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text()).catch(() => '');
-            if (!html.includes(expectedJs)) { await sleep(4000); continue; }
-            const bundle = await fetch(`${new URL(expectedJs, web)}?release=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text()).catch(() => '');
-            const markers = {
-              mergedHeader: bundle.includes('history-summary-active'),
-              scoreChip: bundle.includes('history-header-score'),
-              clickableCards: bundle.includes('data-history-game-id'),
-              navigationBinding: bundle.includes('bindHistoryGameNavigation'),
-              duplicateHeadingRemoved: !bundle.includes('series-history-heading'),
-              duplicateScoreRemoved: !bundle.includes('series-score-value')
-            };
-            if (Object.values(markers).every(Boolean)) { assetInfo = { expectedJs, markers }; break; }
-            await sleep(4000);
-          }
-          if (!assetInfo) throw new Error('Production series-history bundle markers were not verified.');
-          console.log(`PRODUCTION_SERIES_HISTORY_ASSETS=${JSON.stringify(assetInfo)}`);
+          const html = await fetch(`${web}/?verify=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text());
+          const jsPath = html.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          if (!jsPath) throw new Error('Production JavaScript entry is missing.');
+          const bundle = await fetch(`${new URL(jsPath, web)}?verify=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text());
+          const markers = {
+            mergedHeader: bundle.includes('history-summary-active'),
+            scoreChip: bundle.includes('history-header-score'),
+            clickableCards: bundle.includes('data-history-game-id'),
+            activeNavigation: bundle.includes('.game-button.active'),
+            duplicateHeadingRemoved: !bundle.includes('series-history-heading'),
+            duplicateScoreRemoved: !bundle.includes('series-score-value')
+          };
+          if (Object.values(markers).some(value => !value)) throw new Error(`Production markers missing: ${JSON.stringify(markers)}`);
+          console.log(`PRODUCTION_SERIES_HISTORY_ASSETS=${JSON.stringify({ jsPath, markers })}`);
           NODE
       - name: Install browser verifier
         run: |
@@ -98,14 +71,8 @@ jobs:
             ]
           };
           const scheduleEvent = { series, provider, observedAt: now };
-          const context = {
-            schemaVersion: '1.0', esport: 'lol', seriesId: series.id, provider, observedAt: now,
-            rosters: [], standings: [], history, complete: true, reasons: []
-          };
-          const snapshot = game => ({
-            schemaVersion: '1.0', esport: 'lol', provider, series, game, stats: null,
-            quality: { freshness: 'unavailable', sourceTimestamp: null, observedAt: now, ageSeconds: null, complete: false, advancing: null, safeForLiveAnalysis: false, reasons: [{ code: 'fixture', message: 'Completed fixture' }] }
-          });
+          const context = { schemaVersion: '1.0', esport: 'lol', seriesId: series.id, provider, observedAt: now, rosters: [], standings: [], history, complete: true, reasons: [] };
+          const snapshot = game => ({ schemaVersion: '1.0', esport: 'lol', provider, series, game, stats: null, quality: { freshness: 'unavailable', sourceTimestamp: null, observedAt: now, ageSeconds: null, complete: false, advancing: null, safeForLiveAnalysis: false, reasons: [{ code: 'fixture', message: 'Completed fixture' }] } });
 
           const browser = await chromium.launch({ headless: true });
           const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
@@ -127,7 +94,7 @@ jobs:
 
           await page.goto(`https://esports-live.pages.dev/?verification=${Date.now()}`, { waitUntil: 'networkidle' });
           await page.locator('.analysis-header.history-summary-active').waitFor({ state: 'visible', timeout: 30000 });
-          await page.locator('.history-game').first().waitFor({ state: 'visible', timeout: 30000 });
+          await page.locator('button.history-game').first().waitFor({ state: 'visible', timeout: 30000 });
 
           const counts = {
             mergedHeaders: await page.locator('.analysis-header.history-summary-active').count(),
@@ -137,9 +104,7 @@ jobs:
             duplicateScores: await page.locator('.series-score').count()
           };
           const expected = { mergedHeaders: 1, scoreChips: 1, historyCards: 3, duplicateHeadings: 0, duplicateScores: 0 };
-          for (const [key, value] of Object.entries(expected)) {
-            if (counts[key] !== value) throw new Error(`${key}: expected ${value}, received ${counts[key]}`);
-          }
+          for (const [key, value] of Object.entries(expected)) if (counts[key] !== value) throw new Error(`${key}: expected ${value}, received ${counts[key]}`);
 
           const selectorDisplay = await page.locator('#game-selector').evaluate(element => getComputedStyle(element).display);
           if (selectorDisplay !== 'none') throw new Error(`Redundant game selector remains visible: ${selectorDisplay}`);

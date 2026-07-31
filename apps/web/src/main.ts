@@ -206,15 +206,15 @@ function renderSeriesHeader(event: ScheduleEvent): void {
 
 type ObjectiveKind = 'towers' | 'dragons' | 'barons' | 'heralds' | 'inhibitors';
 
-function objectiveIcon(kind: ObjectiveKind): string {
-  const icons: Record<ObjectiveKind, string> = {
-    towers: '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h3v3h4V3h3v5l-2 2v8h2v3H7v-3h2v-8L7 8V3Zm4 8v7h2v-7h-2Z" fill="currentColor"/></svg>',
-    dragons: '<svg viewBox="0 0 24 24" focusable="false"><path d="M3 14c3-5 7-8 11-8l-1-3 6 4-3 3c2 1 4 3 5 6-3-2-6-2-8-1-2 1-4 3-8 4l2-5-4 0Zm8-4-2 2 4 1 2-3-4 0Z" fill="currentColor"/></svg>',
-    barons: '<svg viewBox="0 0 24 24" focusable="false"><path d="m5 4 4 4 3-6 3 6 4-4-2 7 3 4-4 6H8l-4-6 3-4-2-7Zm7 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" fill="currentColor"/></svg>',
-    heralds: '<svg viewBox="0 0 24 24" focusable="false"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12Zm10-3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" fill="currentColor"/></svg>',
-    inhibitors: '<svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 6 5-2 10-4 5-4-5L6 7l6-5Zm0 4-2 3 2 8 2-8-2-3Z" fill="currentColor"/></svg>'
+function objectiveAsset(kind: ObjectiveKind, side: LolTeamState['side']): string {
+  const assets: Record<ObjectiveKind, string> = {
+    towers: `/objectives/tower-${side}.png`,
+    dragons: '/objectives/dragon.png',
+    barons: '/objectives/baron.png',
+    heralds: '/objectives/herald.png',
+    inhibitors: `/objectives/inhibitor-${side}.png`
   };
-  return `<span class="objective-icon objective-icon-${kind}" aria-hidden="true">${icons[kind]}</span>`;
+  return assets[kind];
 }
 
 function objectiveMarkup(team: LolTeamState): string {
@@ -228,7 +228,7 @@ function objectiveMarkup(team: LolTeamState): string {
     const title = detail ? `${label}: ${formatted} · ${detail}` : `${label}: ${formatted}`;
     return `
       <div class="objective-stat" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
-        ${objectiveIcon(kind)}
+        <img class="objective-icon" src="${escapeHtml(objectiveAsset(kind, team.side))}" alt="" aria-hidden="true" />
         <strong>${formatted}</strong>
         <span class="sr-only">${escapeHtml(label)}</span>
       </div>`;
@@ -275,11 +275,13 @@ function teamMarkup(team: LolTeamState, opponentGold: number | null, imageUrl?: 
         ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="" />` : '<span class="team-placeholder"></span>'}
         <div><small>${team.side.toUpperCase()} SIDE</small><h3>${escapeHtml(team.name)}</h3></div>
       </div>
-      <div class="team-primary live-team-primary">
+      <div class="team-overview">
+        <div class="team-primary live-team-primary">
         <div><span>Total gold</span><strong>${formatNumber(team.gold)}</strong></div>
         <div class="gold-difference ${goldDifferenceClass}"><span>Gold lead</span><strong>${formatSigned(goldDifference)}</strong></div>
+        </div>
+        ${objectiveMarkup(team)}
       </div>
-      ${objectiveMarkup(team)}
       <div class="player-list">${playerRows(team)}</div>
     </section>`;
 }

@@ -79,12 +79,10 @@ jobs:
               return hashlib.sha256(rgba.tobytes()).hexdigest(), rgba
 
           expected: dict[str, str] = {}
-          source_images: dict[str, Image.Image] = {}
           for name in names:
               data = (source_root / f'{name}.png').read_bytes()
-              digest, image = pixel_hash(data)
+              digest, _ = pixel_hash(data)
               expected[digest] = name
-              source_images[name] = image
 
           local_html = (dist_root / 'index.html').read_text(encoding='utf-8')
           expected_js = re.search(r'<script[^>]+src="([^"]+\.js)"', local_html).group(1)
@@ -110,7 +108,7 @@ jobs:
               except Exception as error:
                   if attempt == 29:
                       raise
-                  print(f'production wait {attempt + 1}: {error}')
+                  print(f'entry propagation wait {attempt + 1}: {error}')
                   time.sleep(4)
 
           assert '"/objectives/' not in bundle
@@ -122,8 +120,16 @@ jobs:
               candidates.append((f'inlined-{index}', base64.b64decode(payload)))
 
           for local_asset in (dist_root / 'assets').glob('*.png'):
-              data, content_type = fetch(f'{web}/assets/{local_asset.name}?release={time.time_ns()}')
-              assert content_type == 'image/png', (local_asset.name, content_type)
+              data = b''
+              content_type = ''
+              for attempt in range(30):
+                  data, content_type = fetch(f'{web}/assets/{local_asset.name}?release={time.time_ns()}')
+                  if content_type == 'image/png':
+                      break
+                  if attempt == 29:
+                      raise RuntimeError(f'{local_asset.name} stayed unavailable as PNG: {content_type}')
+                  print(f'asset propagation wait {attempt + 1}: {local_asset.name} -> {content_type}')
+                  time.sleep(4)
               candidates.append((local_asset.name, data))
 
           matched: dict[str, tuple[str, Image.Image]] = {}

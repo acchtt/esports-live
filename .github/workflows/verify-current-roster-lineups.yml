@@ -109,13 +109,25 @@ jobs:
             }
           }
 
+          const requiredVerified = [
+            /T1 Esports Academy/i,
+            /DK Challengers/i,
+            /HLE Challengers/i,
+            /FEARX Youth/i
+          ];
+          const missingVerified = requiredVerified.flatMap(pattern => {
+            const roster = reports.flatMap(report => report.rosters).find(item => pattern.test(item.team));
+            return roster?.count === 5 ? [] : [{ teamPattern: pattern.source, roster: roster ?? null }];
+          });
+
           console.log(`CURRENT_ROSTER_VERIFY=${JSON.stringify({
             checkedAt: new Date().toISOString(),
             scheduleCount: schedule.length,
             seriesChecked: reports.length,
             invalid,
             crossTier,
+            missingVerified,
             reports
           })}`);
-          if (invalid.length || crossTier.length) process.exit(1);
+          if (invalid.length || crossTier.length || missingVerified.length) process.exit(1);
           NODE

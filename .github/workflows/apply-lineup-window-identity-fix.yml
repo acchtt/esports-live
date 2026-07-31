@@ -1,0 +1,41 @@
+name: Apply Lineup Window Identity Fix
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/apply-lineup-window-identity-fix.yml
+      - scripts/apply-lineup-window-identity-fix.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Apply lineup identity correction
+        run: python scripts/apply-lineup-window-identity-fix.py
+      - name: Validate implementation
+        run: |
+          npm install
+          npm run check
+          npm run build:web
+      - name: Commit generated correction
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Lineup identity correction already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/adapter-lol/src/riot-resolved-provider.ts packages/adapter-lol/src/riot-resolved-provider.test.ts
+          git commit -m "Match verified lineup players by Riot player ID"
+          git push origin HEAD:${{ github.head_ref }}

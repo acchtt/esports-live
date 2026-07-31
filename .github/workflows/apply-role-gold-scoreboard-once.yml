@@ -21,6 +21,18 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+      - name: Fix strict null narrowing in generator
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-role-gold-scoreboard.py')
+          text = path.read_text(encoding='utf-8')
+          old = "${difference > 0 ? 'Blue' : 'Red'} ${ROLE_LABELS[role]} leads by ${magnitude.toLocaleString()} gold`;"
+          new = "${difference > 0 ? 'Blue' : 'Red'} ${ROLE_LABELS[role]} leads by ${Math.abs(difference).toLocaleString()} gold`;"
+          if old not in text:
+              raise SystemExit('Expected role lead title was not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Apply scoreboard redesign
         run: python scripts/apply-role-gold-scoreboard.py
       - name: Install dependencies

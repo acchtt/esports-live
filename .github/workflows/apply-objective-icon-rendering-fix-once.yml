@@ -82,10 +82,13 @@ jobs:
                       emitted.append(path.name)
 
           assert decoded + len(emitted) >= 5, {'inlined': decoded, 'emitted': emitted}
+          assert '"/objectives/' not in bundle
+
+          css = ''.join(path.read_text(encoding='utf-8') for path in Path('apps/web/dist/assets').glob('*.css'))
+          assert 'max-width:23px' in css
+          assert 'object-position:center' in css
           print('built objective assets', {'inlined': decoded, 'emitted': emitted})
           PY
-          ! grep -R '"/objectives/' apps/web/dist/assets/*.js
-          grep -R 'fingerprinted-objective-icon-fix' apps/web/dist/assets/*.css
       - name: Commit source-only fix
         shell: bash
         run: |

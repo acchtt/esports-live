@@ -45,9 +45,10 @@ style.textContent = `
     width: 34px;
     height: 34px;
     overflow: hidden;
-    border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 8px;
-    background: rgba(15, 23, 42, 0.92);
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    box-shadow: none;
   }
 
   .telemetry-champion img {

@@ -5,6 +5,7 @@ import {
   type ProviderRef,
   type ScheduleEvent,
   type ScheduleQuery,
+  type SeriesContext,
   type SeriesRef
 } from '@esports-live/core';
 import type { LolProviderClient, LolProviderSeries } from './provider.ts';
@@ -39,21 +40,48 @@ function withinRange(value: string, from?: string, to?: string): boolean {
   return true;
 }
 
+function competitionFilter(query: ScheduleQuery): ReadonlySet<string> {
+  const ids = [
+    ...(query.competitionIds ?? []),
+    ...(query.competitionId ? [query.competitionId] : [])
+  ];
+  return new Set(ids);
+}
+
 export class LolAdapter implements EsportAdapter<LolStats> {
   readonly esport = 'lol' as const;
   readonly providerId: string;
+  readonly getSeriesContext?: (seriesId: string) => Promise<SeriesContext>;
   readonly #provider: LolProviderClient;
 
   constructor(provider: LolProviderClient) {
     this.#provider = provider;
     this.providerId = provider.id;
+
+    if (provider.getSeriesContext) {
+      this.getSeriesContext = async (seriesId: string): Promise<SeriesContext> => {
+        const context = await provider.getSeriesContext!(seriesId);
+        return {
+          schemaVersion: '1.0',
+          esport: 'lol',
+          seriesId: context.seriesId,
+          provider: providerRef(provider),
+          observedAt: context.observedAt,
+          rosters: context.rosters,
+          standings: context.standings,
+          complete: context.complete,
+          reasons: context.reasons ?? []
+        };
+      };
+    }
   }
 
   async getSchedule(query: ScheduleQuery = {}): Promise<readonly ScheduleEvent[]> {
     const entries = await this.#provider.getSchedule();
+    const competitions = competitionFilter(query);
     return entries
       .filter(entry => withinRange(entry.series.scheduledStart, query.from, query.to))
-      .filter(entry => !query.competitionId || entry.series.competition.id === query.competitionId)
+      .filter(entry => competitions.size === 0 || competitions.has(entry.series.competition.id))
       .filter(entry => !query.states?.length || query.states.includes(entry.series.state))
       .map(entry => ({
         series: seriesRef(entry.series),

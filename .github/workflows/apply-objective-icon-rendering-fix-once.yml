@@ -42,7 +42,13 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          from __future__ import annotations
+
+          import base64
+          import io
+          import re
           from pathlib import Path
+
           from PIL import Image
 
           source = Path('apps/web/src/assets/objectives')
@@ -58,16 +64,25 @@ jobs:
                   assert bbox[0] >= 6 and bbox[1] >= 6 and bbox[2] <= 58 and bbox[3] <= 58, (name, bbox)
                   print(f'{name}: bbox={bbox} bytes={path.stat().st_size}')
 
-          built = list(Path('apps/web/dist/assets').glob('*.png'))
-          assert len(built) >= 5, [path.name for path in built]
+          bundle = ''.join(path.read_text(encoding='utf-8') for path in Path('apps/web/dist/assets').glob('*.js'))
+          encoded = re.findall(r'data:image/png;base64,([A-Za-z0-9+/=]+)', bundle)
           decoded = 0
-          for path in built:
-              with Image.open(path) as image:
+          for index, payload in enumerate(encoded):
+              with Image.open(io.BytesIO(base64.b64decode(payload))) as image:
                   image.load()
                   if image.size == (64, 64):
                       decoded += 1
-          assert decoded >= 5, decoded
-          print('built objective PNGs', [path.name for path in built])
+                      print(f'inlined-{index}: size={image.size}')
+
+          emitted = []
+          for path in Path('apps/web/dist/assets').glob('*.png'):
+              with Image.open(path) as image:
+                  image.load()
+                  if image.size == (64, 64):
+                      emitted.append(path.name)
+
+          assert decoded + len(emitted) >= 5, {'inlined': decoded, 'emitted': emitted}
+          print('built objective assets', {'inlined': decoded, 'emitted': emitted})
           PY
           ! grep -R '"/objectives/' apps/web/dist/assets/*.js
           grep -R 'fingerprinted-objective-icon-fix' apps/web/dist/assets/*.css

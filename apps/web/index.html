@@ -10,6 +10,7 @@
       #completed-match-list[hidden],
       .analysis-header[hidden],
       #series-history[hidden],
+      #quality-banner[hidden],
       #game-content[hidden],
       #completed-match-detail[hidden] {
         display: none !important;
@@ -68,6 +69,7 @@
           </div>
 
           <section id="series-history" class="series-history" aria-live="polite" hidden></section>
+          <div id="quality-banner" hidden aria-hidden="true"></div>
           <div id="game-content" class="game-content">
             <div class="analysis-empty">
               <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
@@ -105,6 +107,7 @@
     </div>
     <script type="module" src="/src/snapshot-consistency.ts"></script>
     <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/player-board-view.ts"></script>
     <script type="module" src="/src/prematch-view.ts"></script>
     <script type="module" src="/src/series-history-view.ts"></script>
     <script type="module" src="/src/completed-matches-view.ts"></script>

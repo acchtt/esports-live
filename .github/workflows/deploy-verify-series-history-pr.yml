@@ -1,0 +1,172 @@
+name: Deploy Verify Series History PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-verify-series-history-pr.yml
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run check
+      - name: Deploy API Worker
+        run: npm run deploy:api
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+      - name: Deploy Pages application
+        run: >-
+          npx wrangler pages deploy apps/web/dist
+          --project-name esports-live
+          --branch main
+          --commit-hash "$(git rev-parse HEAD)"
+          --commit-message "Deploy BO2 BO3 BO5 series history"
+      - name: Verify production series history
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const base = process.env.API_BASE_URL;
+
+          async function get(url) {
+            try {
+              const response = await fetch(url, {
+                headers: { accept: 'application/json', 'cache-control': 'no-cache' }
+              });
+              const text = await response.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: response.ok, status: response.status, body, text };
+            } catch (error) {
+              return { ok: false, status: 0, body: { message: String(error) }, text: '' };
+            }
+          }
+
+          function validTeamReference(team, teamIds) {
+            return team === null || (typeof team?.id === 'string' && teamIds.has(team.id));
+          }
+
+          let finalReport = null;
+          for (let attempt = 1; attempt <= 24; attempt += 1) {
+            const health = await get(`${base}/health?probe=${Date.now()}`);
+            const schedule = await get(`${base}/v1/lol/schedule?limit=80&probe=${Date.now()}`);
+            const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
+            const prioritized = [...events].sort((left, right) => {
+              const stateRank = state => state === 'live' ? 0 : state === 'completed' ? 1 : state === 'paused' ? 2 : 3;
+              return stateRank(left?.series?.state) - stateRank(right?.series?.state);
+            });
+
+            const selected = [];
+            for (const format of [2, 3, 5]) {
+              const event = prioritized.find(item => item?.series?.bestOf === format);
+              if (event) selected.push(event);
+            }
+            for (const event of prioritized) {
+              if (selected.length >= 6) break;
+              if (!selected.some(item => item?.series?.id === event?.series?.id)) selected.push(event);
+            }
+
+            const histories = [];
+            const violations = [];
+            for (const event of selected) {
+              const series = event?.series;
+              if (!series?.id || !Array.isArray(series.teams) || series.teams.length !== 2) continue;
+              const result = await get(
+                `${base}/v1/lol/series/${encodeURIComponent(series.id)}/context?probe=${Date.now()}`
+              );
+              const history = result.body?.history ?? null;
+              const teamIds = new Set(series.teams.map(team => team.id));
+              const games = Array.isArray(history?.games) ? history.games : [];
+              const item = {
+                seriesId: series.id,
+                competition: series.competition?.name ?? null,
+                teams: series.teams.map(team => team.name),
+                state: series.state,
+                scheduleBestOf: series.bestOf,
+                historyBestOf: history?.bestOf ?? null,
+                winsRequired: history?.winsRequired ?? null,
+                drawPossible: history?.drawPossible ?? null,
+                score: Array.isArray(history?.score) ? history.score.map(row => row.wins) : null,
+                gameCount: games.length,
+                completedGames: games.filter(game => game.state === 'completed').length,
+                winnersAvailable: games.filter(game => game.winner).length,
+                sidesAvailable: games.filter(game => game.blueTeam && game.redTeam).length,
+                durationsAvailable: games.filter(game => Number.isFinite(game.durationSeconds)).length,
+                status: result.status
+              };
+              histories.push(item);
+
+              if (!history) continue;
+              if (history.winsRequired !== Math.floor(history.bestOf / 2) + 1) {
+                violations.push({ seriesId: series.id, issue: 'wins_required' });
+              }
+              if (history.drawPossible !== (history.bestOf % 2 === 0)) {
+                violations.push({ seriesId: series.id, issue: 'draw_rule' });
+              }
+              if (history.bestOf === 2 && (!history.drawPossible || history.winsRequired !== 2)) {
+                violations.push({ seriesId: series.id, issue: 'bo2_rule' });
+              }
+              if (!Array.isArray(history.score) || history.score.length !== 2
+                || history.score.some(row => !validTeamReference(row.team, teamIds))) {
+                violations.push({ seriesId: series.id, issue: 'score_team_reference' });
+              }
+              for (const game of games) {
+                if (!validTeamReference(game.blueTeam, teamIds)
+                  || !validTeamReference(game.redTeam, teamIds)
+                  || !validTeamReference(game.winner, teamIds)) {
+                  violations.push({ seriesId: series.id, game: game.number, issue: 'game_team_reference' });
+                }
+              }
+            }
+
+            const web = await get(`https://esports-live.pages.dev?probe=${Date.now()}`);
+            finalReport = {
+              checkedAt: new Date().toISOString(),
+              propagationAttempt: attempt,
+              healthStatus: health.status,
+              adapters: health.body?.adapters ?? [],
+              scheduleStatus: schedule.status,
+              scheduleCount: events.length,
+              formatsAvailable: [...new Set(events.map(event => event?.series?.bestOf).filter(Boolean))].sort(),
+              contextsWithHistory: histories.filter(item => item.historyBestOf !== null).length,
+              histories,
+              violations,
+              webStatus: web.status,
+              historyPanelPresent: /id=["']series-history["']/.test(web.text)
+            };
+            console.log(`SERIES_HISTORY_REPORT=${JSON.stringify(finalReport)}`);
+
+            const ready = health.ok
+              && health.body?.adapters?.includes('lol')
+              && schedule.ok
+              && events.length > 0
+              && histories.some(item => item.historyBestOf !== null && item.gameCount > 0)
+              && violations.length === 0
+              && web.ok
+              && finalReport.historyPanelPresent;
+            if (ready) process.exit(0);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+
+          console.error(`FINAL_SERIES_HISTORY_REPORT=${JSON.stringify(finalReport)}`);
+          process.exit(1);
+          NODE

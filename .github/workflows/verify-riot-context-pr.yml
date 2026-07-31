@@ -28,6 +28,18 @@ jobs:
       - run: npm run check
       - name: Deploy API Worker
         run: npm run deploy:api
+      - name: Probe Riot team compatibility
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if curl --fail --silent "$API_BASE_URL/_diagnostics/riot-team-lookup-20260731" > /tmp/riot-team-diagnostic.json; then break; fi
+            sleep 5
+          done
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('/tmp/riot-team-diagnostic.json', 'utf8'));
+          console.log(`TEAM_DIAGNOSTIC=${JSON.stringify(report)}`);
+          NODE
       - name: Probe production context
         shell: bash
         run: |
@@ -44,12 +56,6 @@ jobs:
             } catch (error) {
               return { ok: false, status: 0, body: { message: String(error) } };
             }
-          }
-
-          for (let attempt = 0; attempt < 12; attempt += 1) {
-            const health = await getJson(`${base}/health`);
-            if (health.ok && health.body?.adapters?.includes('lol')) break;
-            await new Promise(resolve => setTimeout(resolve, 5000));
           }
 
           const health = await getJson(`${base}/health`);

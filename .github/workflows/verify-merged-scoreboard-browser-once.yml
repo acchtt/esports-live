@@ -1,0 +1,167 @@
+name: Verify Merged Scoreboard Browser Once
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 60852b505e6530b444a706370266326a806fe7c0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Verify production bundle and CSS selectors
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          const web = 'https://esports-live.pages.dev';
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          let assetInfo = null;
+          for (let attempt = 1; attempt <= 20; attempt += 1) {
+            const html = await fetch(`${web}/?verify=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text());
+            const jsPath = html.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+            const cssPaths = [...html.matchAll(/<link[^>]+href="([^"]+\.css)"/g)].map(match => match[1]);
+            if (!jsPath || cssPaths.length < 1) throw new Error('Production entry assets are missing.');
+            const [bundle, ...styles] = await Promise.all([
+              fetch(`${new URL(jsPath, web)}?verify=${Date.now()}`).then(r => r.text()),
+              ...cssPaths.map(path => fetch(`${new URL(path, web)}?verify=${Date.now()}`).then(r => r.text()))
+            ]);
+            const css = styles.join('\n');
+            const markers = {
+              mergedHeader: bundle.includes('role-match-header'),
+              teamMetrics: bundle.includes('role-match-team-metrics'),
+              matchClock: bundle.includes('role-match-clock'),
+              championPortraits: bundle.includes('role-player-portrait'),
+              inventories: bundle.includes('role-player-items'),
+              mergedHeaderCss: css.includes('.role-match-header{'),
+              itemCss: css.includes('.role-player-items') || bundle.includes('.role-player-items'),
+              legacyStandaloneMarkupRemoved: !bundle.includes('<div class="scoreboard">'),
+              legacyRoleSummaryRemoved: !bundle.includes('role-team-summary-grid')
+            };
+            if (Object.values(markers).every(Boolean)) {
+              assetInfo = { jsPath, cssPaths, markers };
+              break;
+            }
+            await sleep(4000);
+          }
+          if (!assetInfo) throw new Error('Merged scoreboard production assets were not verified.');
+          console.log(`PRODUCTION_MERGED_SCOREBOARD_ASSETS=${JSON.stringify(assetInfo)}`);
+          NODE
+      - name: Install browser verifier
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Render merged scoreboard fixture
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import { chromium } from 'playwright';
+
+          const now = new Date().toISOString();
+          const teams = [
+            { id: 'blue', name: 'Movistar KOI', code: 'MKOI' },
+            { id: 'red', name: 'Shifters', code: 'SHFT' }
+          ];
+          const series = {
+            id: 'fixture-series', esport: 'lol',
+            competition: { id: 'lec', name: 'LEC', region: 'EU', stage: 'Week 2' },
+            teams, bestOf: 3, state: 'live', scheduledStart: now,
+            games: [{ id: 'fixture-game-1', number: 1, state: 'live' }]
+          };
+          const build = ['1055', '3006', '3031', '3094', '3036', '3072', '3363'];
+          const player = (id, handle, championId, role, kills, deaths, assists, cs, gold) => ({
+            id, handle, championId, role, level: 15, kills, deaths, assists,
+            creepScore: cs, totalGold: gold, items: build
+          });
+          const snapshot = {
+            schemaVersion: '1.0', esport: 'lol', provider: { id: 'fixture', name: 'Production verifier' },
+            series, game: series.games[0],
+            stats: {
+              gameClockSeconds: 1944, patch: '16.15.1',
+              blue: {
+                id: 'blue', name: 'Movistar KOI', side: 'blue', gold: 61474, kills: 14,
+                objectives: { towers: 4, inhibitors: 0, dragons: ['cloud', 'ocean'], barons: 0, heralds: 1 },
+                players: [
+                  player('b1', 'Myrwn', 'Ambessa', 'TOP', 1, 3, 2, 214, 11820),
+                  player('b2', 'Elyoya', 'Vi', 'JUNGLE', 4, 1, 8, 176, 12640),
+                  player('b3', 'Jojopyun', 'Viktor', 'MIDDLE', 3, 2, 5, 248, 13450),
+                  player('b4', 'Supa', 'Ziggs', 'BOTTOM', 5, 1, 4, 286, 15120),
+                  player('b5', 'Alvaro', 'Shen', 'UTILITY', 1, 4, 9, 42, 8444)
+                ]
+              },
+              red: {
+                id: 'red', name: 'Shifters', side: 'red', gold: 59288, kills: 11,
+                objectives: { towers: 3, inhibitors: 0, dragons: ['infernal'], barons: 1, heralds: 0 },
+                players: [
+                  player('r1', 'Rooster', 'Gnar', 'TOP', 2, 2, 4, 209, 11240),
+                  player('r2', 'Sheo', 'Olaf', 'JUNGLE', 3, 3, 5, 169, 11980),
+                  player('r3', 'nuc', 'Cassiopeia', 'MID', 4, 2, 3, 253, 13740),
+                  player('r4', 'Paduck', 'Vladimir', 'ADC', 2, 3, 4, 272, 14020),
+                  player('r5', 'Stend', 'Rell', 'SUPPORT', 0, 4, 8, 38, 8308)
+                ]
+              }
+            },
+            quality: {
+              freshness: 'fresh', sourceTimestamp: now, observedAt: now, ageSeconds: 2,
+              complete: true, advancing: true, safeForLiveAnalysis: true, reasons: []
+            }
+          };
+
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 1200 }, deviceScaleFactor: 1 });
+          await page.route('https://esports-live-api.acchtt.workers.dev/**', async route => {
+            const url = new URL(route.request().url());
+            const json = value => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+            if (url.pathname === '/health') return json({ ok: true, service: 'fixture', schemaVersion: '1.0', adapters: ['lol'] });
+            if (url.pathname === '/v1/lol/schedule') {
+              if (url.searchParams.get('states')?.includes('completed')) return json({ esport: 'lol', events: [] });
+              return json({ esport: 'lol', events: [{ series, provider: snapshot.provider, observedAt: now }] });
+            }
+            if (url.pathname.includes('/live')) return json(snapshot);
+            if (url.pathname.includes('/context')) return json({ schemaVersion: '1.0', esport: 'lol', seriesId: series.id, provider: snapshot.provider, observedAt: now, rosters: [], standings: [], complete: false, reasons: [] });
+            return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Fixture route unavailable' }) });
+          });
+
+          await page.goto(`https://esports-live.pages.dev/?verification=${Date.now()}`, { waitUntil: 'networkidle' });
+          await page.locator('.role-scoreboard-board').waitFor({ state: 'visible', timeout: 30000 });
+          await page.waitForTimeout(1500);
+
+          const counts = {
+            mergedHeader: await page.locator('.role-match-header').count(),
+            teamHeaders: await page.locator('.role-match-team').count(),
+            centralClock: await page.locator('.role-match-clock').count(),
+            legacyScoreboards: await page.locator('.scoreboard').count(),
+            legacyRoleSummaries: await page.locator('.role-team-summary-grid').count(),
+            roleRows: await page.locator('.role-matchup-row').count(),
+            portraits: await page.locator('.role-player-portrait .telemetry-champion').count(),
+            itemSlots: await page.locator('.role-player-items .telemetry-item-slot').count()
+          };
+          const expected = {
+            mergedHeader: 1, teamHeaders: 2, centralClock: 1,
+            legacyScoreboards: 0, legacyRoleSummaries: 0,
+            roleRows: 5, portraits: 10, itemSlots: 70
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (counts[key] !== value) throw new Error(`${key}: expected ${value}, received ${counts[key]}`);
+          }
+
+          const boardText = (await page.locator('.role-scoreboard-board').innerText()).toUpperCase();
+          for (const label of ['MOVISTAR KOI', 'SHIFTERS', 'KILLS', 'TOTAL GOLD', 'TELEMETRY TIME', 'GOLD LEAD']) {
+            if (!boardText.includes(label)) throw new Error(`Missing merged header label: ${label}`);
+          }
+
+          await page.locator('.analysis-panel').screenshot({ path: 'production-merged-scoreboard.png' });
+          console.log(`PRODUCTION_MERGED_SCOREBOARD_RENDERED=${JSON.stringify(counts)}`);
+          await browser.close();
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-merged-scoreboard-verification-corrected
+          path: production-merged-scoreboard.png
+          retention-days: 1

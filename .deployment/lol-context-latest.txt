@@ -1,0 +1,5 @@
+status=success
+source_commit=b9848366924588ab03d436d185666501af2dbd51
+deployed_at=2026-07-31T02:44:51Z
+api=https://esports-live-api.acchtt.workers.dev
+web=https://esports-live.pages.dev

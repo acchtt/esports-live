@@ -40,12 +40,13 @@ jobs:
           --project-name esports-live
           --branch main
           --commit-hash "$(git rev-parse HEAD)"
-          --commit-message "Deploy BO2 BO3 BO5 series history"
+          --commit-message "Deploy stabilized BO2 BO3 BO5 series history"
       - name: Verify production series history
         shell: bash
         run: |
           node - <<'NODE'
           const base = process.env.API_BASE_URL;
+          const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
           async function get(url) {
             try {
@@ -65,28 +66,33 @@ jobs:
             return team === null || (typeof team?.id === 'string' && teamIds.has(team.id));
           }
 
+          function chooseCandidates(events) {
+            const stateRank = state => state === 'live' ? 0 : state === 'paused' ? 1 : state === 'scheduled' ? 2 : 3;
+            const prioritized = [...events].sort((left, right) => (
+              stateRank(left?.series?.state) - stateRank(right?.series?.state)
+            ));
+            const selected = [];
+            for (const format of [2, 3, 5]) {
+              for (const event of prioritized.filter(item => item?.series?.bestOf === format).slice(0, 2)) {
+                selected.push(event);
+              }
+            }
+            for (const event of prioritized) {
+              if (selected.length >= 8) break;
+              if (!selected.some(item => item?.series?.id === event?.series?.id)) selected.push(event);
+            }
+            return selected;
+          }
+
           let finalReport = null;
           for (let attempt = 1; attempt <= 24; attempt += 1) {
             const health = await get(`${base}/health?probe=${Date.now()}`);
             const schedule = await get(`${base}/v1/lol/schedule?limit=80&probe=${Date.now()}`);
             const events = Array.isArray(schedule.body?.events) ? schedule.body.events : [];
-            const prioritized = [...events].sort((left, right) => {
-              const stateRank = state => state === 'live' ? 0 : state === 'completed' ? 1 : state === 'paused' ? 2 : 3;
-              return stateRank(left?.series?.state) - stateRank(right?.series?.state);
-            });
-
-            const selected = [];
-            for (const format of [2, 3, 5]) {
-              const event = prioritized.find(item => item?.series?.bestOf === format);
-              if (event) selected.push(event);
-            }
-            for (const event of prioritized) {
-              if (selected.length >= 6) break;
-              if (!selected.some(item => item?.series?.id === event?.series?.id)) selected.push(event);
-            }
-
+            const selected = chooseCandidates(events);
             const histories = [];
             const violations = [];
+
             for (const event of selected) {
               const series = event?.series;
               if (!series?.id || !Array.isArray(series.teams) || series.teams.length !== 2) continue;
@@ -111,34 +117,41 @@ jobs:
                 winnersAvailable: games.filter(game => game.winner).length,
                 sidesAvailable: games.filter(game => game.blueTeam && game.redTeam).length,
                 durationsAvailable: games.filter(game => Number.isFinite(game.durationSeconds)).length,
+                reasonCodes: Array.isArray(result.body?.reasons)
+                  ? result.body.reasons.map(reason => reason.code)
+                  : [],
                 status: result.status
               };
               histories.push(item);
 
-              if (!history) continue;
-              if (history.winsRequired !== Math.floor(history.bestOf / 2) + 1) {
-                violations.push({ seriesId: series.id, issue: 'wins_required' });
-              }
-              if (history.drawPossible !== (history.bestOf % 2 === 0)) {
-                violations.push({ seriesId: series.id, issue: 'draw_rule' });
-              }
-              if (history.bestOf === 2 && (!history.drawPossible || history.winsRequired !== 2)) {
-                violations.push({ seriesId: series.id, issue: 'bo2_rule' });
-              }
-              if (!Array.isArray(history.score) || history.score.length !== 2
-                || history.score.some(row => !validTeamReference(row.team, teamIds))) {
-                violations.push({ seriesId: series.id, issue: 'score_team_reference' });
-              }
-              for (const game of games) {
-                if (!validTeamReference(game.blueTeam, teamIds)
-                  || !validTeamReference(game.redTeam, teamIds)
-                  || !validTeamReference(game.winner, teamIds)) {
-                  violations.push({ seriesId: series.id, game: game.number, issue: 'game_team_reference' });
+              if (history) {
+                if (history.winsRequired !== Math.floor(history.bestOf / 2) + 1) {
+                  violations.push({ seriesId: series.id, issue: 'wins_required' });
+                }
+                if (history.drawPossible !== (history.bestOf % 2 === 0)) {
+                  violations.push({ seriesId: series.id, issue: 'draw_rule' });
+                }
+                if (history.bestOf === 2 && (!history.drawPossible || history.winsRequired !== 2)) {
+                  violations.push({ seriesId: series.id, issue: 'bo2_rule' });
+                }
+                if (!Array.isArray(history.score) || history.score.length !== 2
+                  || history.score.some(row => !validTeamReference(row.team, teamIds))) {
+                  violations.push({ seriesId: series.id, issue: 'score_team_reference' });
+                }
+                for (const game of games) {
+                  if (!validTeamReference(game.blueTeam, teamIds)
+                    || !validTeamReference(game.redTeam, teamIds)
+                    || !validTeamReference(game.winner, teamIds)) {
+                    violations.push({ seriesId: series.id, game: game.number, issue: 'game_team_reference' });
+                  }
                 }
               }
+              await wait(350);
             }
 
             const web = await get(`https://esports-live.pages.dev?probe=${Date.now()}`);
+            const contextsWithHistory = histories.filter(item => item.historyBestOf !== null).length;
+            const multiGameHistoryPresent = histories.some(item => item.historyBestOf === 3 || item.historyBestOf === 5);
             finalReport = {
               checkedAt: new Date().toISOString(),
               propagationAttempt: attempt,
@@ -147,7 +160,8 @@ jobs:
               scheduleStatus: schedule.status,
               scheduleCount: events.length,
               formatsAvailable: [...new Set(events.map(event => event?.series?.bestOf).filter(Boolean))].sort(),
-              contextsWithHistory: histories.filter(item => item.historyBestOf !== null).length,
+              contextsWithHistory,
+              multiGameHistoryPresent,
               histories,
               violations,
               webStatus: web.status,
@@ -159,12 +173,13 @@ jobs:
               && health.body?.adapters?.includes('lol')
               && schedule.ok
               && events.length > 0
-              && histories.some(item => item.historyBestOf !== null && item.gameCount > 0)
+              && contextsWithHistory >= 2
+              && multiGameHistoryPresent
               && violations.length === 0
               && web.ok
               && finalReport.historyPanelPresent;
             if (ready) process.exit(0);
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await wait(5000);
           }
 
           console.error(`FINAL_SERIES_HISTORY_REPORT=${JSON.stringify(finalReport)}`);

@@ -45,10 +45,7 @@ let lastSourceTimestamp: string | null = null;
 let renderedGameId: string | null = null;
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
 let scheduleTimer: ReturnType<typeof setInterval> | null = null;
-let liveClockTimer: ReturnType<typeof setInterval> | null = null;
 let liveClockBaseSeconds: number | null = null;
-let liveClockBaseAt = 0;
-let liveClockAdvancing = false;
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -92,40 +89,25 @@ function formatSigned(value: number | null): string {
   return `${value > 0 ? '+' : ''}${value.toLocaleString()}`;
 }
 
-function sumPlayerField(team: LolTeamState, field: 'creepScore' | 'level'): number | null {
-  const values = team.players.map(player => player[field]);
-  if (!values.length || values.some(value => value === null)) return null;
-  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+function publicPatchLabel(value: string | null): string {
+  const match = value?.match(/^(\d+)\.(\d+)/);
+  return match ? `Patch ${match[1]}.${match[2]}` : 'Patch unavailable';
 }
 
 function clearLiveClock(): void {
-  if (liveClockTimer !== null) clearInterval(liveClockTimer);
-  liveClockTimer = null;
   liveClockBaseSeconds = null;
-  liveClockBaseAt = 0;
-  liveClockAdvancing = false;
 }
 
 function updateLiveClock(): void {
   const element = document.querySelector<HTMLElement>('#live-game-clock');
   if (!element || liveClockBaseSeconds === null) return;
-  const elapsed = liveClockAdvancing ? Math.max(0, Math.floor((Date.now() - liveClockBaseAt) / 1000)) : 0;
-  element.textContent = formatClock(liveClockBaseSeconds + elapsed);
+  element.textContent = formatClock(liveClockBaseSeconds);
 }
 
 function startLiveClock(snapshot: LiveSnapshot<LolStats>): void {
   clearLiveClock();
-  const seconds = snapshot.stats?.gameClockSeconds ?? null;
-  if (seconds === null) return;
-  const sourceMs = snapshot.quality.sourceTimestamp ? Date.parse(snapshot.quality.sourceTimestamp) : Number.NaN;
-  const sourceAgeSeconds = Number.isFinite(sourceMs)
-    ? Math.max(0, Math.min(15, Math.floor((Date.now() - sourceMs) / 1000)))
-    : 0;
-  liveClockBaseSeconds = seconds + (snapshot.game.state === 'live' ? sourceAgeSeconds : 0);
-  liveClockBaseAt = Date.now();
-  liveClockAdvancing = snapshot.game.state === 'live' && currentEvent()?.series.state === 'live';
+  liveClockBaseSeconds = snapshot.stats?.gameClockSeconds ?? null;
   updateLiveClock();
-  if (liveClockAdvancing) liveClockTimer = setInterval(updateLiveClock, 1_000);
 }
 
 function currentEvent(): ScheduleEvent | null {
@@ -222,18 +204,42 @@ function renderSeriesHeader(event: ScheduleEvent): void {
   renderGameSelector(event);
 }
 
+type ObjectiveKind = 'towers' | 'dragons' | 'barons' | 'heralds' | 'inhibitors';
+
+function objectiveIcon(kind: ObjectiveKind): string {
+  const icons: Record<ObjectiveKind, string> = {
+    towers: '<svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h3v3h4V3h3v5l-2 2v8h2v3H7v-3h2v-8L7 8V3Zm4 8v7h2v-7h-2Z" fill="currentColor"/></svg>',
+    dragons: '<svg viewBox="0 0 24 24" focusable="false"><path d="M3 14c3-5 7-8 11-8l-1-3 6 4-3 3c2 1 4 3 5 6-3-2-6-2-8-1-2 1-4 3-8 4l2-5-4 0Zm8-4-2 2 4 1 2-3-4 0Z" fill="currentColor"/></svg>',
+    barons: '<svg viewBox="0 0 24 24" focusable="false"><path d="m5 4 4 4 3-6 3 6 4-4-2 7 3 4-4 6H8l-4-6 3-4-2-7Zm7 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" fill="currentColor"/></svg>',
+    heralds: '<svg viewBox="0 0 24 24" focusable="false"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12Zm10-3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" fill="currentColor"/></svg>',
+    inhibitors: '<svg viewBox="0 0 24 24" focusable="false"><path d="m12 2 6 5-2 10-4 5-4-5L6 7l6-5Zm0 4-2 3 2 8 2-8-2-3Z" fill="currentColor"/></svg>'
+  };
+  return `<span class="objective-icon objective-icon-${kind}" aria-hidden="true">${icons[kind]}</span>`;
+}
+
 function objectiveMarkup(team: LolTeamState): string {
   const objectives = team.objectives;
+  const dragonCount = objectives.dragons === null ? null : objectives.dragons.length;
   const dragonList = objectives.dragons?.length
-    ? objectives.dragons.map(dragon => String(dragon).replaceAll('_', ' ')).join(' · ')
+    ? objectives.dragons.map(dragon => String(dragon).replaceAll('_', ' ')).join(', ')
     : null;
+  const cell = (kind: ObjectiveKind, label: string, value: number | null, detail?: string | null): string => {
+    const formatted = formatNumber(value);
+    const title = detail ? `${label}: ${formatted} · ${detail}` : `${label}: ${formatted}`;
+    return `
+      <div class="objective-stat" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
+        ${objectiveIcon(kind)}
+        <strong>${formatted}</strong>
+        <span class="sr-only">${escapeHtml(label)}</span>
+      </div>`;
+  };
   return `
     <div class="objective-grid">
-      <div><span>Towers</span><strong>${formatNumber(objectives.towers)}</strong></div>
-      <div class="objective-dragons"><span>Dragons</span><strong>${objectives.dragons === null ? '—' : objectives.dragons.length}</strong>${dragonList ? `<small>${escapeHtml(dragonList)}</small>` : ''}</div>
-      <div><span>Barons</span><strong>${formatNumber(objectives.barons)}</strong></div>
-      <div><span>Heralds</span><strong>${formatNumber(objectives.heralds)}</strong></div>
-      <div><span>Inhibitors</span><strong>${formatNumber(objectives.inhibitors)}</strong></div>
+      ${cell('towers', 'Towers', objectives.towers)}
+      ${cell('dragons', 'Dragons', dragonCount, dragonList)}
+      ${cell('barons', 'Barons', objectives.barons)}
+      ${cell('heralds', 'Heralds', objectives.heralds)}
+      ${cell('inhibitors', 'Inhibitors', objectives.inhibitors)}
     </div>`;
 }
 
@@ -256,8 +262,13 @@ function playerRows(team: LolTeamState): string {
 
 function teamMarkup(team: LolTeamState, opponentGold: number | null, imageUrl?: string): string {
   const goldDifference = team.gold === null || opponentGold === null ? null : team.gold - opponentGold;
-  const totalCs = sumPlayerField(team, 'creepScore');
-  const totalLevel = sumPlayerField(team, 'level');
+  const goldDifferenceClass = goldDifference === null
+    ? 'unknown'
+    : goldDifference > 0
+      ? 'positive'
+      : goldDifference < 0
+        ? 'negative'
+        : 'even';
   return `
     <section class="team-card ${team.side}">
       <div class="team-heading">
@@ -266,9 +277,7 @@ function teamMarkup(team: LolTeamState, opponentGold: number | null, imageUrl?: 
       </div>
       <div class="team-primary live-team-primary">
         <div><span>Total gold</span><strong>${formatNumber(team.gold)}</strong></div>
-        <div><span>Gold diff</span><strong>${formatSigned(goldDifference)}</strong></div>
-        <div><span>Total CS</span><strong>${formatNumber(totalCs)}</strong></div>
-        <div><span>Total level</span><strong>${formatNumber(totalLevel)}</strong></div>
+        <div class="gold-difference ${goldDifferenceClass}"><span>Gold lead</span><strong>${formatSigned(goldDifference)}</strong></div>
       </div>
       ${objectiveMarkup(team)}
       <div class="player-list">${playerRows(team)}</div>
@@ -297,14 +306,29 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
   const goldDifference = stats.blue.gold === null || stats.red.gold === null
     ? null
     : stats.blue.gold - stats.red.gold;
-  const goldLeader = goldDifference === null || goldDifference === 0
-    ? 'Gold even'
-    : `${goldDifference > 0 ? stats.blue.name : stats.red.name} ${formatSigned(Math.abs(goldDifference))}`;
+  const goldLeadClass = goldDifference === null
+    ? 'unknown'
+    : goldDifference > 0
+      ? 'blue'
+      : goldDifference < 0
+        ? 'red'
+        : 'even';
+  const goldLeader = goldDifference === null
+    ? 'Gold unavailable'
+    : goldDifference === 0
+      ? 'Gold even'
+      : `Gold lead · ${goldDifference > 0 ? stats.blue.name : stats.red.name} ${formatSigned(Math.abs(goldDifference))}`;
+
   gameContent.innerHTML = `
     <div class="scoreboard">
-      <div><span>${escapeHtml(stats.blue.name)}</span><strong>${formatNumber(stats.blue.kills)}</strong></div>
-      <div class="clock"><small>GAME ${snapshot.game.number}</small><strong id="live-game-clock">${formatClock(stats.gameClockSeconds)}</strong><span>${escapeHtml(stats.patch ?? 'Patch unavailable')}</span><em>${escapeHtml(goldLeader)}</em></div>
-      <div class="right"><strong>${formatNumber(stats.red.kills)}</strong><span>${escapeHtml(stats.red.name)}</span></div>
+      <div class="score-team blue"><span>${escapeHtml(stats.blue.name)}</span><strong>${formatNumber(stats.blue.kills)}</strong></div>
+      <div class="clock">
+        <small>GAME ${snapshot.game.number} · TELEMETRY TIME</small>
+        <strong id="live-game-clock" title="Game time of this telemetry snapshot">${formatClock(stats.gameClockSeconds)}</strong>
+        <span class="patch-label">${escapeHtml(publicPatchLabel(stats.patch ?? null))}</span>
+        <em class="gold-lead ${goldLeadClass}">${escapeHtml(goldLeader)}</em>
+      </div>
+      <div class="score-team red right"><strong>${formatNumber(stats.red.kills)}</strong><span>${escapeHtml(stats.red.name)}</span></div>
     </div>
     <div class="team-grid">
       ${teamMarkup(stats.blue, stats.red.gold, blueRef?.imageUrl)}

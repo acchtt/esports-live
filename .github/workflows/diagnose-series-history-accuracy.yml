@@ -23,6 +23,7 @@ jobs:
           const obj = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
           const arr = value => Array.isArray(value) ? value : [];
           const pick = (source, keys) => Object.fromEntries(keys.filter(key => source[key] !== undefined).map(key => [key, source[key]]));
+          const round = ms => new Date(Math.floor(ms / 10_000) * 10_000).toISOString();
           const games = [
             { id: '115548147900684638', start: Date.parse('2026-07-31T10:28:34.552Z') },
             { id: '115548147900684639', start: Date.parse('2026-07-31T11:31:14.506Z') },
@@ -33,13 +34,12 @@ jobs:
             const text = await response.text();
             let body = null;
             try { body = text ? JSON.parse(text) : null; } catch {}
-            return { status: response.status, body };
+            return { status: response.status, body, text: body ? null : text.slice(0, 200) };
           }
           for (const game of games) {
             for (const minutes of [20, 30, 35, 40, 45, 50, 55, 60]) {
-              const time = new Date(game.start + minutes * 60_000).toISOString();
               const url = new URL(`${liveBase}/window/${game.id}`);
-              url.searchParams.set('startingTime', time);
+              url.searchParams.set('startingTime', round(game.start + minutes * 60_000));
               const result = await getJson(url);
               const payload = obj(result.body);
               const frames = arr(payload.frames ?? obj(payload.window).frames ?? obj(payload.data).frames).map(obj);
@@ -50,6 +50,7 @@ jobs:
                 gameId: game.id,
                 minutes,
                 status: result.status,
+                error: result.text,
                 frameCount: frames.length,
                 frameKeys: Object.keys(frame).sort(),
                 frame: pick(frame, ['rfc460Timestamp', 'timestamp', 'gameState', 'state', 'winningTeam', 'winnerTeamId', 'winningTeamId', 'winnerId', 'gameClockSeconds', 'gameTimeSeconds']),

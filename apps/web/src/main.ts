@@ -1,5 +1,5 @@
 import type { LiveSnapshot, ScheduleEvent, SeriesGameRef } from '@esports-live/core';
-import type { LolStats, LolTeamState } from '@esports-live/adapter-lol';
+import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapter-lol';
 import './styles.css';
 
 interface HealthResponse {
@@ -244,37 +244,119 @@ function objectiveMarkup(team: LolTeamState): string {
     </div>`;
 }
 
-function playerRows(team: LolTeamState): string {
-  if (!team.players.length) return '<div class="players-empty">Player telemetry unavailable</div>';
-  return team.players.map(player => {
-    const items = player.items?.length ? player.items.join(' · ') : 'Items unavailable';
-    const role = player.role ? ` · ${player.role}` : '';
+type CanonicalRole = 'top' | 'jungle' | 'mid' | 'bottom' | 'support';
+
+const ROLE_ORDER: readonly CanonicalRole[] = ['top', 'jungle', 'mid', 'bottom', 'support'];
+const ROLE_LABELS: Record<CanonicalRole, string> = {
+  top: 'Top',
+  jungle: 'Jungle',
+  mid: 'Mid',
+  bottom: 'Bottom',
+  support: 'Support'
+};
+
+function canonicalRole(value: string | null): CanonicalRole | null {
+  const normalized = value?.trim().toLowerCase().replaceAll('_', ' ').replaceAll('-', ' ') ?? '';
+  if (!normalized) return null;
+  if (normalized.includes('top')) return 'top';
+  if (normalized.includes('jung')) return 'jungle';
+  if (normalized.includes('mid')) return 'mid';
+  if (normalized.includes('bot') || normalized.includes('adc') || normalized.includes('carry')) return 'bottom';
+  if (normalized.includes('sup') || normalized.includes('utility')) return 'support';
+  return null;
+}
+
+function orderedPlayers(team: LolTeamState): readonly (LolPlayerState | null)[] {
+  const assigned = new Map<CanonicalRole, LolPlayerState>();
+  const unassigned: LolPlayerState[] = [];
+  for (const player of team.players) {
+    const role = canonicalRole(player.role);
+    if (role && !assigned.has(role)) assigned.set(role, player);
+    else unassigned.push(player);
+  }
+  return ROLE_ORDER.map(role => assigned.get(role) ?? unassigned.shift() ?? null);
+}
+
+function playerKda(player: LolPlayerState | null): string {
+  if (!player) return '—/—/—';
+  return `${formatNumber(player.kills)}/${formatNumber(player.deaths)}/${formatNumber(player.assists)}`;
+}
+
+function playerIdentityMarkup(player: LolPlayerState | null, role: CanonicalRole, side: 'blue' | 'red'): string {
+  const name = player?.handle ?? 'Player unavailable';
+  const champion = player?.championId ?? 'Champion unavailable';
+  return `
+    <div class="role-player ${side}">
+      <div class="role-player-heading">
+        <span class="role-chip">${ROLE_LABELS[role]}</span>
+        <div class="role-player-name"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(champion)}</small></div>
+      </div>
+      <div class="role-player-stats">
+        <span><small>KDA</small><strong>${playerKda(player)}</strong></span>
+        <span><small>CS</small><strong>${formatNumber(player?.creepScore ?? null)}</strong></span>
+        <span><small>GOLD</small><strong>${formatNumber(player?.totalGold ?? null)}</strong></span>
+      </div>
+    </div>`;
+}
+
+function roleGoldDeltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | null, role: CanonicalRole): string {
+  const blueGold = blue?.totalGold ?? null;
+  const redGold = red?.totalGold ?? null;
+  const difference = blueGold === null || redGold === null ? null : blueGold - redGold;
+  const side = difference === null ? 'unknown' : difference > 0 ? 'blue' : difference < 0 ? 'red' : 'even';
+  const magnitude = difference === null ? null : Math.abs(difference);
+  const edge = magnitude === null ? 0 : Math.min(50, Math.round((magnitude / 2500) * 50));
+  const title = difference === null
+    ? `${ROLE_LABELS[role]} gold difference unavailable`
+    : difference === 0
+      ? `${ROLE_LABELS[role]} gold is even`
+      : `${difference > 0 ? 'Blue' : 'Red'} ${ROLE_LABELS[role]} leads by ${Math.abs(difference).toLocaleString()} gold`;
+  return `
+    <div class="role-gold-delta ${side}" style="--role-edge: ${edge}%" title="${escapeHtml(title)}">
+      <small>${ROLE_LABELS[role]} GOLD Δ</small>
+      <strong>${magnitude === null ? '—' : `+${magnitude.toLocaleString()}`}</strong>
+      <span class="role-edge-track" aria-hidden="true"><i></i></span>
+    </div>`;
+}
+
+function roleMatchupRows(blue: LolTeamState, red: LolTeamState): string {
+  const bluePlayers = orderedPlayers(blue);
+  const redPlayers = orderedPlayers(red);
+  return ROLE_ORDER.map((role, index) => {
+    const bluePlayer = bluePlayers[index] ?? null;
+    const redPlayer = redPlayers[index] ?? null;
     return `
-      <div class="player-row live-player-row">
-        <div class="player-identity"><strong>${escapeHtml(player.handle ?? 'Unknown player')}</strong><span>${escapeHtml(player.championId ?? 'Champion unavailable')}${escapeHtml(role)}</span></div>
-        <span>Lv ${formatNumber(player.level)}</span>
-        <span>${formatNumber(player.kills)}/${formatNumber(player.deaths)}/${formatNumber(player.assists)}</span>
-        <span>${formatNumber(player.creepScore)} CS</span>
-        <span>${formatNumber(player.totalGold)}g</span>
-        <small class="player-items">${escapeHtml(items)}</small>
+      <div class="role-matchup-row">
+        ${playerIdentityMarkup(bluePlayer, role, 'blue')}
+        ${roleGoldDeltaMarkup(bluePlayer, redPlayer, role)}
+        ${playerIdentityMarkup(redPlayer, role, 'red')}
       </div>`;
   }).join('');
 }
 
-function teamMarkup(team: LolTeamState, imageUrl?: string): string {
+function teamSummaryMarkup(team: LolTeamState, imageUrl?: string): string {
   return `
-    <section class="team-card ${team.side}">
-      <div class="team-heading">
-        ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="" />` : '<span class="team-placeholder"></span>'}
-        <div><small>${team.side.toUpperCase()} SIDE</small><h3>${escapeHtml(team.name)}</h3></div>
+    <div class="role-team-summary ${team.side}">
+      ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="" />` : '<span class="team-placeholder"></span>'}
+      <div class="role-team-name"><small>${team.side.toUpperCase()} SIDE</small><strong>${escapeHtml(team.name)}</strong></div>
+      <div class="role-team-gold"><small>TOTAL GOLD</small><strong>${formatNumber(team.gold)}</strong></div>
+    </div>`;
+}
+
+function roleScoreboardMarkup(blue: LolTeamState, red: LolTeamState, blueImageUrl?: string, redImageUrl?: string): string {
+  return `
+    <section class="role-scoreboard-board">
+      <div class="role-team-summary-grid">
+        ${teamSummaryMarkup(blue, blueImageUrl)}
+        <div class="role-summary-label"><strong>ROLE MATCHUPS</strong><span>Gold difference by position</span></div>
+        ${teamSummaryMarkup(red, redImageUrl)}
       </div>
-      <div class="team-overview">
-        <div class="team-primary live-team-primary">
-          <div><span>Total gold</span><strong>${formatNumber(team.gold)}</strong></div>
-        </div>
-        ${objectiveMarkup(team)}
+      <div class="role-objective-comparison">
+        <div class="role-objectives blue">${objectiveMarkup(blue)}</div>
+        <span>OBJECTIVES</span>
+        <div class="role-objectives red">${objectiveMarkup(red)}</div>
       </div>
-      <div class="player-list">${playerRows(team)}</div>
+      <div class="role-matchup-list">${roleMatchupRows(blue, red)}</div>
     </section>`;
 }
 
@@ -324,10 +406,7 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
       </div>
       <div class="score-team red right"><strong>${formatNumber(stats.red.kills)}</strong><span>${escapeHtml(stats.red.name)}</span></div>
     </div>
-    <div class="team-grid">
-      ${teamMarkup(stats.blue, blueRef?.imageUrl)}
-      ${teamMarkup(stats.red, redRef?.imageUrl)}
-    </div>`;
+    ${roleScoreboardMarkup(stats.blue, stats.red, blueRef?.imageUrl, redRef?.imageUrl)}`;
   startLiveClock(snapshot);
   window.dispatchEvent(new CustomEvent<LiveSnapshot<LolStats>>('esports-live:snapshot', { detail: snapshot }));
 }

@@ -1,0 +1,174 @@
+name: Deploy Verify Roster Lineups
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/deploy-verify-roster-lineups.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      WEB_BASE_URL: https://esports-live.pages.dev
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Install and validate exact main
+        run: |
+          test "$(git rev-parse HEAD)" = "bcf3f5f536ca299caf81f723b0af090f44cd7262"
+          npm install
+          npm run check
+      - name: Deploy API Worker
+        run: npm run deploy:api
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages application
+        run: >-
+          npx wrangler pages deploy apps/web/dist
+          --project-name esports-live
+          --branch main
+          --commit-hash "$(git rev-parse HEAD)"
+          --commit-message "Deploy verified five-player roster lineups"
+          --commit-dirty=true
+      - name: Verify production roster isolation
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const apiBase = process.env.API_BASE_URL;
+          const webBase = process.env.WEB_BASE_URL;
+          const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+          async function response(url) {
+            try {
+              const result = await fetch(url, {
+                headers: { accept: 'application/json,text/html,*/*', 'cache-control': 'no-cache' }
+              });
+              const text = await result.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: result.ok, status: result.status, text, body };
+            } catch (error) {
+              return { ok: false, status: 0, text: '', body: { message: String(error) } };
+            }
+          }
+
+          const expected = new Map([
+            ['T1 Esports Academy', ['Haetae', 'Painter', 'Guti', 'Cypher', 'Cloud']],
+            ['DK Challengers', ['Jaehyuk', 'Solid', 'Garden', 'Wayne', 'Loopy']],
+            ['HLE Challengers', ['Panther', 'Jackal', 'Cracker', 'Pyeonsik', 'Bluffing']],
+            ['BNK FEARX Youth', ['Kangin', 'Grizzly', 'MG', 'Slayer', 'Luon']]
+          ]);
+          const forbidden = new Set([
+            'Doran', 'Oner', 'Faker', 'Peyz', 'Keria',
+            'ShowMaker', 'Lucid', 'Siwoo',
+            'Kanavi', 'Gumayusi', 'Zeus', 'Zeka', 'Delight',
+            'Clear', 'Raptor', 'Taeyoon', 'VicLa', 'Kellin'
+          ]);
+          const canonicalRoles = ['top', 'jungle', 'mid', 'bottom', 'support'];
+          const seriesIds = ['116889604984157237', '116889604984222869'];
+          let finalReport = null;
+
+          for (let attempt = 1; attempt <= 12; attempt += 1) {
+            const bust = Date.now();
+            const [health, web, ...contexts] = await Promise.all([
+              response(`${apiBase}/health?verify=${bust}`),
+              response(`${webBase}?verify=${bust}`),
+              ...seriesIds.map(id => response(
+                `${apiBase}/v1/lol/series/${encodeURIComponent(id)}/context?verify=${bust}`
+              ))
+            ]);
+
+            const scriptSources = [...web.text.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+              .map(match => new URL(match[1], webBase).toString());
+            const scriptBodies = await Promise.all(scriptSources.map(async source => {
+              const result = await response(`${source}${source.includes('?') ? '&' : '?'}verify=${bust}`);
+              return result.text;
+            }));
+            const bundle = scriptBodies.join('\n');
+            const bundleReady = bundle.includes('Available five-player lineup')
+              && bundle.includes('Last verified gameplay lineup')
+              && bundle.includes('not confirmed starters');
+
+            const rosters = contexts.flatMap(context => (
+              Array.isArray(context.body?.rosters) ? context.body.rosters : []
+            ));
+            const rosterReports = rosters.map(roster => {
+              const handles = Array.isArray(roster?.players)
+                ? roster.players.map(player => player?.handle)
+                : [];
+              const roles = Array.isArray(roster?.players)
+                ? roster.players.map(player => String(player?.role ?? '').toLowerCase())
+                : [];
+              const wanted = expected.get(roster?.team?.name);
+              return {
+                team: roster?.team?.name ?? null,
+                count: handles.length,
+                handles,
+                roles,
+                expected: wanted ?? null,
+                exact: wanted
+                  ? JSON.stringify(handles) === JSON.stringify(wanted)
+                  : false,
+                canonical: JSON.stringify(roles) === JSON.stringify(canonicalRoles),
+                forbidden: handles.filter(handle => forbidden.has(handle))
+              };
+            });
+            const required = [...expected.keys()].map(team => (
+              rosterReports.find(roster => roster.team === team) ?? { team, missing: true }
+            ));
+            const contextReports = contexts.map((context, index) => ({
+              seriesId: seriesIds[index],
+              status: context.status,
+              complete: context.body?.complete ?? null,
+              reasonCodes: Array.isArray(context.body?.reasons)
+                ? context.body.reasons.map(reason => reason.code)
+                : []
+            }));
+            const rostersReady = required.every(roster => (
+              !roster.missing
+              && roster.count === 5
+              && roster.exact
+              && roster.canonical
+              && roster.forbidden.length === 0
+            ));
+
+            finalReport = {
+              checkedAt: new Date().toISOString(),
+              attempt,
+              healthStatus: health.status,
+              adapters: health.body?.adapters ?? [],
+              webStatus: web.status,
+              bundleReady,
+              contextReports,
+              rosters: required
+            };
+            console.log(`ROSTER_RELEASE_REPORT=${JSON.stringify(finalReport)}`);
+
+            if (
+              health.ok
+              && health.body?.adapters?.includes('lol')
+              && web.ok
+              && bundleReady
+              && contexts.every(context => context.ok)
+              && rostersReady
+            ) process.exit(0);
+
+            await wait(10_000);
+          }
+
+          console.error(`FINAL_ROSTER_RELEASE_REPORT=${JSON.stringify(finalReport)}`);
+          process.exit(1);
+          NODE

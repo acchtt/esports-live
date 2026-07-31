@@ -1,0 +1,32 @@
+name: Apply Development Roster Fix
+
+on:
+  push:
+    branches:
+      - fix/development-roster-isolation
+    paths:
+      - .github/workflows/apply-development-roster-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/development-roster-isolation
+      - name: Apply roster isolation patch
+        run: python .github/scripts/apply-development-roster-fix.py
+      - name: Commit generated changes
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add packages/adapter-lol/src/riot-resolved-provider.ts \
+                  packages/adapter-lol/src/riot-resolved-provider.test.ts \
+                  .github/scripts/apply-development-roster-fix.py \
+                  .github/workflows/apply-development-roster-fix.yml
+          git commit -m "Isolate development rosters from parent organizations"
+          git push origin HEAD:fix/development-roster-isolation

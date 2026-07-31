@@ -18,7 +18,7 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const registry = new AdapterRegistry();
   if (apiKey) {
     const riot = new LolAdapter(createRiotLolHistoryProvider({ apiKey }));
-    registry.register(new CachedAdapter(riot));
+    registry.register(new CachedAdapter(riot, { seriesContextTtlMs: 15_000 }));
   }
 
   cachedApiKey = apiKey;

@@ -20,16 +20,7 @@ jobs:
         with:
           node-version: 24
       - name: Apply reviewed migration
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          workflow = Path('.github/workflows/apply-live-accuracy-fix.yml').read_text().splitlines()
-          start = next(index for index, line in enumerate(workflow) if "python - <<'PY'" in line) + 1
-          end = next(index for index in range(start, len(workflow)) if workflow[index].strip() == 'PY')
-          extracted = [line[10:] if line.startswith('          ') else line for line in workflow[start:end]]
-          exec(compile('\n'.join(extracted), 'apply-live-accuracy-fix.py', 'exec'))
-          PY
+        run: python scripts/apply-live-accuracy-fix.py
       - name: Validate feature branch
         run: |
           npm install

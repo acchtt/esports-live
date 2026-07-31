@@ -49,3 +49,5 @@ jobs:
           git add packages/adapter-lol/src/riot-provider.ts packages/adapter-lol/src/riot-provider.test.ts
           git commit -m "Align Riot live window and detail frames"
           git push origin HEAD:fix/live-telemetry-and-results-data
+
+# Triggered after registration on the default branch.

@@ -1,11 +1,14 @@
 name: Refine Role Scoreboard Once
 
 on:
-  pull_request:
+  push:
+    branches:
+      - feature/role-gold-scoreboard
+    paths:
+      - .github/workflows/refine-role-scoreboard-once.yml
 
 permissions:
   contents: write
-  pull-requests: read
 
 jobs:
   refine:

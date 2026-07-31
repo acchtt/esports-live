@@ -16,7 +16,6 @@ import type { LolPlayerState, LolSide, LolStats, LolTeamState } from './types.ts
 
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const LIVE_BASE = 'https://feed.lolesports.com/livestats/v1';
-const PARTICIPANT_IDS = '1_2_3_4_5_6_7_8_9_10';
 const REQUEST_TIMEOUT_MS = 8_000;
 
 type Json = Record<string, unknown>;
@@ -35,6 +34,12 @@ interface Candidate {
   timestamp: string;
   timestampMs: number;
   gameplay: boolean;
+}
+
+interface TimedFrame {
+  frame: Json;
+  timestamp: string;
+  timestampMs: number;
 }
 
 const object = (value: unknown): Json => (
@@ -189,6 +194,19 @@ function frameTime(frame: Json): string | null {
   return value && parseTime(value) !== null ? value : null;
 }
 
+function newestTimedFrame(value: unknown, ceilingMs = Number.POSITIVE_INFINITY): TimedFrame | null {
+  let selected: TimedFrame | null = null;
+  for (const frame of frames(value)) {
+    const timestamp = frameTime(frame);
+    const timestampMs = timestamp ? parseTime(timestamp) : null;
+    if (!timestamp || timestampMs === null || timestampMs > ceilingMs) continue;
+    if (!selected || timestampMs > selected.timestampMs) {
+      selected = { frame, timestamp, timestampMs };
+    }
+  }
+  return selected;
+}
+
 function frameTeam(frame: Json, side: LolSide): Json {
   const direct = object(frame[side === 'blue' ? 'blueTeam' : 'redTeam']);
   if (Object.keys(direct).length) return direct;
@@ -210,6 +228,18 @@ function hasGameplay(frame: Json): boolean {
   const kills = (firstNumber(blue, ['totalKills', 'kills']) ?? 0)
     + (firstNumber(red, ['totalKills', 'kills']) ?? 0);
   return gold > 5_000 || cs > 0 || level > 1 || kills > 0;
+}
+
+function alignWindowCandidate(candidate: Candidate, detail: TimedFrame): Candidate {
+  const aligned = newestTimedFrame(candidate.payload, detail.timestampMs + 1_000);
+  if (!aligned || Math.abs(aligned.timestampMs - detail.timestampMs) > 15_000) return candidate;
+  return {
+    ...candidate,
+    frame: aligned.frame,
+    timestamp: aligned.timestamp,
+    timestampMs: aligned.timestampMs,
+    gameplay: hasGameplay(aligned.frame)
+  };
 }
 
 function windowCandidate(value: unknown): Candidate | null {
@@ -237,7 +267,11 @@ function participantId(value: Json, fallback: number): string {
 }
 
 function participantMap(value: unknown, metadata = false): Map<string, Json> {
-  const source = metadata ? array(object(value).participantMetadata) : array(frames(value)[0]?.participants);
+  const payload = object(value);
+  const directParticipants = array(payload.participants);
+  const source = metadata
+    ? array(payload.participantMetadata)
+    : directParticipants.length ? directParticipants : array(newestTimedFrame(value)?.frame.participants);
   return new Map(source.map((entry, index) => {
     const participant = object(entry);
     return [participantId(participant, index + 1), participant] as const;
@@ -453,14 +487,31 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
     return newest(candidates);
   };
 
-  const details = async (gameId: string, timestamp: string): Promise<unknown> => {
+  const details = async (gameId: string, timestamp: string): Promise<TimedFrame | null> => {
     const sourceMs = parseTime(timestamp);
     if (sourceMs === null) return null;
-    const probes = [...new Set([new Date(sourceMs).toISOString(), roundedIso(sourceMs), roundedIso(sourceMs - 10_000)])];
-    const results = await Promise.all(probes.map(startingTime => (
-      live(`details/${encodeURIComponent(gameId)}`, { startingTime, participantIds: PARTICIPANT_IDS }).catch(() => null)
+    const anchors = [...new Set([
+      roundedIso(sourceMs - 60_000),
+      roundedIso(sourceMs - 30_000),
+      roundedIso(sourceMs - 90_000),
+      roundedIso(sourceMs),
+      roundedIso(sourceMs - 10_000),
+      roundedIso(sourceMs - 120_000)
+    ])];
+
+    const primary = await live(`details/${encodeURIComponent(gameId)}`, {
+      startingTime: anchors[0]
+    }).catch(() => null);
+    const primaryFrame = newestTimedFrame(primary, sourceMs + 10_000);
+    if (primaryFrame) return primaryFrame;
+
+    const results = await Promise.all(anchors.slice(1).map(startingTime => (
+      live(`details/${encodeURIComponent(gameId)}`, { startingTime }).catch(() => null)
     )));
-    return results.find(result => frames(result).length > 0) ?? null;
+    return results
+      .map(result => newestTimedFrame(result, sourceMs + 10_000))
+      .filter((entry): entry is TimedFrame => entry !== null)
+      .sort((left, right) => right.timestampMs - left.timestampMs)[0] ?? null;
   };
 
   const eventDetails = async (matchId: string | null): Promise<Json> => {
@@ -499,7 +550,9 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
         };
       }
 
-      const metadata = object(candidate.payload.gameMetadata ?? candidate.frame.gameMetadata);
+      const detail = candidate.gameplay ? await details(gameId, candidate.timestamp) : null;
+      const effectiveCandidate = detail ? alignWindowCandidate(candidate, detail) : candidate;
+      const metadata = object(effectiveCandidate.payload.gameMetadata ?? effectiveCandidate.frame.gameMetadata);
       const matchId = firstString(candidate.payload, ['esportsMatchId']) ?? firstString(metadata, ['esportsMatchId']);
       const event = await eventDetails(matchId).catch(() => ({}));
       const baseSeries = normalizeSeries(event, observedAt, gameId);
@@ -507,21 +560,21 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
         ?? { id: gameId, number: baseSeries.games.length || 1, state: 'unknown' as const };
       const game: LolProviderGame = {
         ...existing,
-        state: candidate.gameplay && existing.state !== 'completed' ? 'live' : existing.state
+        state: effectiveCandidate.gameplay && existing.state !== 'completed' ? 'live' : existing.state
       };
       const series: LolProviderSeries = {
         ...baseSeries,
-        state: candidate.gameplay && baseSeries.state !== 'completed' ? 'live' : baseSeries.state,
+        state: effectiveCandidate.gameplay && baseSeries.state !== 'completed' ? 'live' : baseSeries.state,
         games: baseSeries.games.map(entry => entry.id === gameId ? game : entry)
       };
       const afterMs = parseTime(after);
-      const advancing = afterMs === null ? null : candidate.timestampMs > afterMs;
+      const advancing = afterMs === null ? null : effectiveCandidate.timestampMs > afterMs;
 
-      if (!candidate.gameplay) {
+      if (!effectiveCandidate.gameplay) {
         return {
           series,
           game: { ...game, state: game.state === 'completed' ? 'completed' : 'draft' },
-          sourceTimestamp: candidate.timestamp,
+          sourceTimestamp: effectiveCandidate.timestamp,
           observedAt,
           advancing,
           complete: false,
@@ -530,23 +583,22 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
         };
       }
 
-      const detailPayload = await details(gameId, candidate.timestamp);
-      const detailMap = participantMap(detailPayload);
+      const detailMap = participantMap(detail?.frame);
       const blueMetadata = object(metadata.blueTeamMetadata);
       const redMetadata = object(metadata.redTeamMetadata);
       const blueInfo = teamForSide(event, series, gameId, 'blue', firstString(blueMetadata, ['esportsTeamId']));
       const redInfo = teamForSide(event, series, gameId, 'red', firstString(redMetadata, ['esportsTeamId']));
       const stats: LolStats = {
-        gameClockSeconds: gameClock(candidate.frame, event, gameId, metadata, candidate.timestampMs),
+        gameClockSeconds: gameClock(effectiveCandidate.frame, event, gameId, metadata, effectiveCandidate.timestampMs),
         patch: firstString(metadata, ['patchVersion', 'gameVersion']),
-        blue: teamState('blue', candidate.frame, blueMetadata, detailMap, blueInfo),
-        red: teamState('red', candidate.frame, redMetadata, detailMap, redInfo)
+        blue: teamState('blue', effectiveCandidate.frame, blueMetadata, detailMap, blueInfo),
+        red: teamState('red', effectiveCandidate.frame, redMetadata, detailMap, redInfo)
       };
       const reasons = completenessReasons(stats);
       return {
         series,
         game,
-        sourceTimestamp: candidate.timestamp,
+        sourceTimestamp: effectiveCandidate.timestamp,
         observedAt,
         advancing,
         complete: reasons.length === 0,

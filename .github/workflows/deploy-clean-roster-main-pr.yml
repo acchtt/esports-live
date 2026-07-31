@@ -49,13 +49,16 @@ jobs:
           }
 
           let health = null;
-          for (let attempt = 0; attempt < 12; attempt += 1) {
+          let diagnostic = null;
+          for (let attempt = 0; attempt < 24; attempt += 1) {
             health = await get(`${base}/health`);
-            if (health.ok && health.body?.adapters?.includes('lol')) break;
+            diagnostic = await get(`${base}/_diagnostics/riot-team-lookup-20260731`);
+            if (health.ok
+              && health.body?.adapters?.includes('lol')
+              && diagnostic.status === 404) break;
             await new Promise(resolve => setTimeout(resolve, 5000));
           }
 
-          const diagnostic = await get(`${base}/_diagnostics/riot-team-lookup-20260731`);
           const first = await get(`${base}/v1/lol/schedule?limit=20`);
           const events = Array.isArray(first.body?.events) ? first.body.events : [];
           const cursor = first.body?.page?.nextCursor ?? null;
@@ -124,7 +127,7 @@ jobs:
             checkedAt: new Date().toISOString(),
             healthStatus: health?.status ?? null,
             adapters: health?.body?.adapters ?? [],
-            diagnosticStatus: diagnostic.status,
+            diagnosticStatus: diagnostic?.status ?? null,
             scheduleStatus: first.status,
             scheduleTotal: first.body?.page?.total ?? null,
             firstPageCount: events.length,
@@ -139,7 +142,7 @@ jobs:
           console.log(`CLEAN_MAIN_REPORT=${JSON.stringify(report)}`);
 
           if (!health?.ok || !health.body?.adapters?.includes('lol')) process.exit(1);
-          if (diagnostic.status !== 404) process.exit(1);
+          if (diagnostic?.status !== 404) process.exit(1);
           if (!first.ok || events.length !== 20 || !cursor) process.exit(1);
           if (!second.ok || !Array.isArray(second.body?.events) || second.body.events.length === 0) process.exit(1);
           if (!web.ok || !report.webHtmlPresent) process.exit(1);

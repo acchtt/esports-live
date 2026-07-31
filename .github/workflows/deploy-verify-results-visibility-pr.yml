@@ -1,0 +1,72 @@
+name: Deploy Verify Results Visibility PR
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-verify-results-visibility-pr.yml
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  WEB_BASE_URL: https://esports-live.pages.dev
+
+jobs:
+  deploy-and-verify:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages application
+        run: >-
+          npx wrangler pages deploy apps/web/dist
+          --project-name esports-live
+          --branch main
+          --commit-hash "$(git rev-parse HEAD)"
+          --commit-message "Deploy Results visibility fix"
+      - name: Verify production visibility rules
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const base = process.env.WEB_BASE_URL;
+          const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+          let report = null;
+          for (let attempt = 1; attempt <= 18; attempt += 1) {
+            const response = await fetch(`${base}?verify=${Date.now()}`, {
+              headers: { 'cache-control': 'no-cache' }
+            });
+            const html = await response.text();
+            report = {
+              attempt,
+              status: response.status,
+              scheduleHiddenRule: html.includes('#schedule-list[hidden]'),
+              analysisHiddenRule: html.includes('.analysis-header[hidden]'),
+              contentHiddenRule: html.includes('#game-content[hidden]'),
+              detailHiddenRule: html.includes('#completed-match-detail[hidden]')
+            };
+            console.log(`RESULTS_VISIBILITY_REPORT=${JSON.stringify(report)}`);
+            if (response.ok
+              && report.scheduleHiddenRule
+              && report.analysisHiddenRule
+              && report.contentHiddenRule
+              && report.detailHiddenRule) process.exit(0);
+            await wait(10_000);
+          }
+          console.error(`FINAL_RESULTS_VISIBILITY_REPORT=${JSON.stringify(report)}`);
+          process.exit(1);
+          NODE

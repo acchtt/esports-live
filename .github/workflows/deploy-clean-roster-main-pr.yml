@@ -1,0 +1,148 @@
+name: Deploy Clean Roster Main PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-clean-roster-main-pr.yml
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run check
+      - name: Deploy clean main API Worker
+        run: npm run deploy:api
+      - name: Verify clean production milestone
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const base = process.env.API_BASE_URL;
+
+          async function get(url) {
+            try {
+              const response = await fetch(url, { headers: { accept: 'application/json' } });
+              const text = await response.text();
+              let body = null;
+              try { body = text ? JSON.parse(text) : null; } catch {}
+              return { ok: response.ok, status: response.status, body, text };
+            } catch (error) {
+              return { ok: false, status: 0, body: { message: String(error) }, text: '' };
+            }
+          }
+
+          let health = null;
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            health = await get(`${base}/health`);
+            if (health.ok && health.body?.adapters?.includes('lol')) break;
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+
+          const diagnostic = await get(`${base}/_diagnostics/riot-team-lookup-20260731`);
+          const first = await get(`${base}/v1/lol/schedule?limit=20`);
+          const events = Array.isArray(first.body?.events) ? first.body.events : [];
+          const cursor = first.body?.page?.nextCursor ?? null;
+          const second = cursor
+            ? await get(`${base}/v1/lol/schedule?limit=20&cursor=${encodeURIComponent(cursor)}`)
+            : { ok: false, status: 0, body: null };
+
+          const priority = ['lck', 'lpl', 'lck_challengers_league'];
+          const ordered = [...events].sort((left, right) => {
+            const leftId = left?.series?.competition?.id ?? '';
+            const rightId = right?.series?.competition?.id ?? '';
+            const leftRank = priority.indexOf(leftId);
+            const rightRank = priority.indexOf(rightId);
+            return (leftRank === -1 ? 99 : leftRank) - (rightRank === -1 ? 99 : rightRank);
+          });
+
+          const attempts = [];
+          let best = null;
+          for (const event of ordered.slice(0, 20)) {
+            const series = event?.series;
+            if (!series?.id) continue;
+            const result = await get(`${base}/v1/lol/series/${encodeURIComponent(series.id)}/context`);
+            const context = result.body ?? {};
+            const rosterCount = Array.isArray(context.rosters) ? context.rosters.length : 0;
+            const rosters = Array.isArray(context.rosters)
+              ? context.rosters.map(roster => ({
+                  teamId: roster.team?.id ?? null,
+                  team: roster.team?.name ?? null,
+                  code: roster.team?.code ?? null,
+                  playerCount: Array.isArray(roster.players) ? roster.players.length : 0
+                }))
+              : [];
+            const standingsCount = Array.isArray(context.standings) ? context.standings.length : 0;
+            const rankedStandingsCount = Array.isArray(context.standings)
+              ? context.standings.filter(row => row.rank !== null).length
+              : 0;
+            const reasonCodes = Array.isArray(context.reasons)
+              ? context.reasons.map(reason => reason.code)
+              : [];
+            const item = {
+              seriesId: series.id,
+              competition: series.competition?.name ?? null,
+              competitionId: series.competition?.id ?? null,
+              teams: Array.isArray(series.teams) ? series.teams.map(team => team.name) : [],
+              status: result.status,
+              complete: context.complete ?? false,
+              rosterCount,
+              rosters,
+              standingsCount,
+              rankedStandingsCount,
+              reasonCodes
+            };
+            attempts.push(item);
+            const score = rosters.reduce((sum, roster) => sum + roster.playerCount, 0) * 100
+              + rosterCount * 20
+              + rankedStandingsCount * 2
+              + standingsCount;
+            if (!best || score > best.score) best = { ...item, score };
+            if (rosterCount >= 2
+              && rosters.every(roster => roster.playerCount >= 5)
+              && standingsCount > 0) break;
+          }
+
+          const web = await get('https://esports-live.pages.dev');
+          const report = {
+            checkedAt: new Date().toISOString(),
+            healthStatus: health?.status ?? null,
+            adapters: health?.body?.adapters ?? [],
+            diagnosticStatus: diagnostic.status,
+            scheduleStatus: first.status,
+            scheduleTotal: first.body?.page?.total ?? null,
+            firstPageCount: events.length,
+            nextCursorPresent: Boolean(cursor),
+            secondPageStatus: second.status,
+            secondPageCount: Array.isArray(second.body?.events) ? second.body.events.length : null,
+            webStatus: web.status,
+            webHtmlPresent: /Esports Live/i.test(web.text),
+            best,
+            attempts
+          };
+          console.log(`CLEAN_MAIN_REPORT=${JSON.stringify(report)}`);
+
+          if (!health?.ok || !health.body?.adapters?.includes('lol')) process.exit(1);
+          if (diagnostic.status !== 404) process.exit(1);
+          if (!first.ok || events.length !== 20 || !cursor) process.exit(1);
+          if (!second.ok || !Array.isArray(second.body?.events) || second.body.events.length === 0) process.exit(1);
+          if (!web.ok || !report.webHtmlPresent) process.exit(1);
+          if (!best || best.rosterCount < 2 || best.rosters.some(roster => roster.playerCount < 5)) process.exit(1);
+          if (best.standingsCount < 1) process.exit(1);
+          NODE

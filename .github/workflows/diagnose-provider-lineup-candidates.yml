@@ -1,0 +1,73 @@
+name: Diagnose Provider Lineup Candidates
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/diagnose-provider-lineup-candidates.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install
+      - name: Trace normalized games and resolved context
+        shell: bash
+        run: |
+          node --import tsx - <<'NODE'
+          import { createRiotLolHistoryProvider } from './packages/adapter-lol/src/riot-history-provider.ts';
+
+          const source = await fetch('https://raw.githubusercontent.com/Aureom/live-lol-esports/main/src/utils/LoLEsportsAPI.ts').then(response => response.text());
+          const apiKey = source.match(/API_KEY\s*=\s*["']([^"']+)["']/)?.[1];
+          if (!apiKey) throw new Error('API key unavailable');
+          console.log(`::add-mask::${apiKey}`);
+
+          const provider = createRiotLolHistoryProvider({ apiKey });
+          const schedule = await provider.getSchedule();
+          const ids = ['116889604984157237', '116889604984222869'];
+          const report = [];
+          for (const seriesId of ids) {
+            const entry = schedule.find(item => item.series.id === seriesId);
+            const games = entry?.series.games ?? [];
+            const windows = [];
+            for (const game of games) {
+              const response = await fetch(`https://feed.lolesports.com/livestats/v1/window/${game.id}`);
+              const body = await response.json().catch(() => null);
+              windows.push({
+                requestedGameId: game.id,
+                scheduleState: game.state,
+                status: response.status,
+                returnedGameId: body?.esportsGameId ?? null,
+                blueTeamId: body?.gameMetadata?.blueTeamMetadata?.esportsTeamId ?? null,
+                redTeamId: body?.gameMetadata?.redTeamMetadata?.esportsTeamId ?? null,
+                blueCount: body?.gameMetadata?.blueTeamMetadata?.participantMetadata?.length ?? null,
+                redCount: body?.gameMetadata?.redTeamMetadata?.participantMetadata?.length ?? null
+              });
+            }
+            const context = await provider.getSeriesContext?.(seriesId);
+            report.push({
+              seriesId,
+              scheduleEntry: entry ? {
+                state: entry.series.state,
+                start: entry.series.scheduledStart,
+                teams: entry.series.teams,
+                games: entry.series.games
+              } : null,
+              windows,
+              context: {
+                rosters: context?.rosters.map(roster => ({
+                  team: roster.team,
+                  players: roster.players
+                })) ?? [],
+                reasons: context?.reasons ?? []
+              }
+            });
+          }
+          console.log(`PROVIDER_LINEUP_CANDIDATES=${JSON.stringify(report)}`);
+          NODE

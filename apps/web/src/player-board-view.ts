@@ -331,6 +331,248 @@ style.textContent = `
       overflow-x: auto;
     }
   }
+/* player-board-readability */
+.telemetry-player-board {
+  grid-template-columns: 40px minmax(96px, 1fr) 42px 62px 42px 58px;
+  gap: 8px;
+  min-height: 74px;
+  padding: 10px 12px;
+  border-color: rgba(148, 163, 184, 0.17);
+  background: rgba(2, 6, 23, 0.34);
+}
+
+.telemetry-champion {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+}
+
+.telemetry-player-copy strong {
+  color: #f8fafc;
+  font-size: .82rem;
+}
+
+.telemetry-player-copy span {
+  color: #a4b0c1;
+  font-size: .6rem;
+}
+
+.telemetry-level {
+  color: #dbeafe;
+  font-size: .58rem;
+}
+
+.telemetry-player-stat span {
+  color: #94a3b8;
+  font-size: .48rem;
+}
+
+.telemetry-player-stat strong {
+  color: #f1f5f9;
+  font-size: .68rem;
+}
+
+.telemetry-inventory {
+  gap: 5px;
+  min-height: 26px;
+  padding-left: 48px;
+}
+
+.telemetry-inventory-label {
+  color: #94a3b8;
+  font-size: .5rem;
+}
+
+.telemetry-item-slot {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.role-matchup-row {
+  min-height: 106px;
+}
+
+.role-player,
+.role-player.red {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(176px, auto);
+  grid-template-areas:
+    "portrait heading stats"
+    "portrait items items";
+  gap: 9px 12px;
+  padding: 14px 18px;
+}
+
+.role-player.red {
+  grid-template-columns: minmax(176px, auto) minmax(0, 1fr) 44px;
+  grid-template-areas:
+    "stats heading portrait"
+    "items items portrait";
+}
+
+.role-player-portrait .telemetry-champion {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.role-player .role-player-heading {
+  gap: 10px;
+}
+
+.role-player .role-chip {
+  min-width: 58px;
+  min-height: 26px;
+  font-size: .54rem;
+}
+
+.role-player .role-player-name strong {
+  color: #f8fafc;
+  font-size: .9rem;
+  line-height: 1.25;
+}
+
+.role-player .role-player-name small {
+  display: block;
+  margin-top: 3px;
+  color: #a5b2c3;
+  font-size: .64rem;
+}
+
+.role-player .role-player-stats {
+  grid-template-columns: repeat(3, minmax(52px, auto));
+  gap: 6px;
+}
+
+.role-player .role-player-stats > span {
+  min-width: 52px;
+  padding: 6px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.44);
+}
+
+.role-player .role-player-stats small {
+  color: #94a3b8;
+  font-size: .5rem;
+}
+
+.role-player .role-player-stats strong {
+  margin-top: 3px;
+  color: #f1f5f9;
+  font-size: .72rem;
+}
+
+.role-player-items .telemetry-inventory {
+  gap: 5px;
+  min-height: 24px;
+}
+
+.role-player-items .telemetry-item-slot {
+  width: 23px;
+  height: 23px;
+  flex-basis: 23px;
+  border-radius: 5px;
+}
+
+.role-player-items .telemetry-inventory-label {
+  display: inline;
+  color: #8f9caf;
+  font-size: .46rem;
+}
+
+@container (max-width: 360px) {
+  .telemetry-player-board {
+    grid-template-areas:
+      "champion copy level"
+      "kda cs gold"
+      "inventory inventory inventory";
+    grid-template-columns: 40px minmax(0, 1fr) 42px;
+    gap: 8px;
+  }
+
+  .telemetry-player-stat {
+    text-align: left;
+  }
+
+  .telemetry-inventory {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 1320px) {
+  .role-player,
+  .role-player.red {
+    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-areas:
+      "portrait heading"
+      "stats stats"
+      "items items";
+    gap: 8px 10px;
+  }
+
+  .role-player.red {
+    grid-template-columns: minmax(0, 1fr) 40px;
+    grid-template-areas:
+      "heading portrait"
+      "stats stats"
+      "items items";
+  }
+
+  .role-player-portrait .telemetry-champion {
+    width: 40px;
+    height: 40px;
+  }
+
+  .role-player .role-player-stats {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .role-player,
+  .role-player.red {
+    padding: 12px 10px;
+  }
+
+  .role-player .role-chip {
+    min-width: 0;
+    font-size: .48rem;
+  }
+
+  .role-player .role-player-name strong {
+    font-size: .78rem;
+  }
+
+  .role-player .role-player-name small,
+  .role-player .role-player-stats > span:nth-child(2) {
+    display: block;
+  }
+
+  .role-player .role-player-stats {
+    gap: 4px;
+  }
+
+  .role-player .role-player-stats > span {
+    min-width: 0;
+    padding: 5px 4px;
+  }
+
+  .role-player .role-player-stats small {
+    font-size: .43rem;
+  }
+
+  .role-player .role-player-stats strong {
+    font-size: .62rem;
+  }
+
+  .role-player-items .telemetry-inventory-label {
+    display: none;
+  }
+}
+
 `;
 document.head.append(style);
 

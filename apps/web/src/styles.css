@@ -1582,3 +1582,89 @@ footer { display: flex; justify-content: space-between; gap: 20px; width: min(15
     text-overflow: ellipsis;
   }
 }
+
+/* readable-objective-text */
+.objective-grid > .objective-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  gap: 3px;
+  min-width: 0;
+  text-align: center;
+}
+
+.objective-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #aab6c6;
+  font-size: .55rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-overview .objective-grid > .objective-stat {
+  min-height: 50px;
+  padding: 7px 5px;
+}
+
+.team-overview .objective-label {
+  font-size: .5rem;
+}
+
+.role-objectives .objective-grid {
+  grid-template-columns: repeat(5, minmax(62px, 1fr));
+  gap: 6px;
+}
+
+.role-objectives .objective-grid > .objective-stat {
+  min-height: 44px;
+  padding: 6px 4px;
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.role-objectives .objective-label {
+  color: #9eacbd;
+  font-size: .5rem;
+}
+
+.role-objectives .objective-stat strong {
+  color: #f8fafc;
+  font-size: .84rem;
+}
+
+.role-gold-delta small {
+  color: #8998ab;
+  font-size: .48rem;
+}
+
+.role-gold-delta > strong {
+  font-size: .9rem;
+}
+
+@media (max-width: 720px) {
+  .role-objectives {
+    padding: 7px 5px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .role-objectives .objective-grid {
+    grid-template-columns: repeat(5, minmax(60px, 1fr));
+    min-width: 320px;
+  }
+
+  .role-objectives .objective-stat:nth-child(4),
+  .role-objectives .objective-stat:nth-child(5) {
+    display: grid;
+  }
+
+  .role-objective-comparison > span {
+    display: block;
+    font-size: .46rem;
+  }
+}

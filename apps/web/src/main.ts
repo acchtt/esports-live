@@ -233,43 +233,28 @@ function renderSeriesHeader(event: ScheduleEvent): void {
   renderGameSelector(event);
 }
 
-type ObjectiveKind = 'towers' | 'dragons' | 'barons' | 'heralds' | 'inhibitors';
-
-const OBJECTIVE_ASSETS: Record<ObjectiveKind, string> = {
-  towers: new URL('./assets/objectives/tower.png', import.meta.url).href,
-  dragons: new URL('./assets/objectives/dragon.png', import.meta.url).href,
-  barons: new URL('./assets/objectives/baron.png', import.meta.url).href,
-  heralds: new URL('./assets/objectives/herald.png', import.meta.url).href,
-  inhibitors: new URL('./assets/objectives/inhibitor.png', import.meta.url).href
-};
-
-function objectiveAsset(kind: ObjectiveKind): string {
-  return OBJECTIVE_ASSETS[kind];
-}
-
 function objectiveMarkup(team: LolTeamState): string {
   const objectives = team.objectives;
   const dragonCount = objectives.dragons === null ? null : objectives.dragons.length;
   const dragonList = objectives.dragons?.length
     ? objectives.dragons.map(dragon => String(dragon).replaceAll('_', ' ')).join(', ')
     : null;
-  const cell = (kind: ObjectiveKind, label: string, value: number | null, detail?: string | null): string => {
+  const cell = (label: string, value: number | null, detail?: string | null): string => {
     const formatted = formatNumber(value);
     const title = detail ? `${label}: ${formatted} · ${detail}` : `${label}: ${formatted}`;
     return `
       <div class="objective-stat" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
-        <img class="objective-icon" src="${escapeHtml(objectiveAsset(kind))}" alt="" width="24" height="24" decoding="async" aria-hidden="true" />
+        <span class="objective-label">${escapeHtml(label)}</span>
         <strong>${formatted}</strong>
-        <span class="sr-only">${escapeHtml(label)}</span>
       </div>`;
   };
   return `
     <div class="objective-grid">
-      ${cell('towers', 'Towers', objectives.towers)}
-      ${cell('dragons', 'Dragons', dragonCount, dragonList)}
-      ${cell('barons', 'Barons', objectives.barons)}
-      ${cell('heralds', 'Heralds', objectives.heralds)}
-      ${cell('inhibitors', 'Inhibitors', objectives.inhibitors)}
+      ${cell('Towers', objectives.towers)}
+      ${cell('Dragons', dragonCount, dragonList)}
+      ${cell('Barons', objectives.barons)}
+      ${cell('Heralds', objectives.heralds)}
+      ${cell('Inhibitors', objectives.inhibitors)}
     </div>`;
 }
 

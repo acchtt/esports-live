@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { SeriesHistoryRef, TeamRef } from '@esports-live/core';
 import type { LolProviderSnapshot } from './provider.ts';
-import { mergeMonotonicSnapshot, reconcileSeriesHistory } from './riot-consistent-provider.ts';
+import { mergeMonotonicSnapshot, mergeObservedSeriesHistory, reconcileSeriesHistory } from './riot-consistent-provider.ts';
 import type { LolPlayerState, LolStats, LolTeamState } from './types.ts';
 
 const left: TeamRef = { id: 'left', name: 'Left', code: 'L' };
@@ -117,4 +117,17 @@ test('the final clinching game resolves without guessing ambiguous earlier games
 test('a single completed game resolves from a 1-0 score', () => {
   const reconciled = reconcileSeriesHistory(history([0, 1], 1));
   assert.equal(reconciled.games[0]?.winner?.id, 'right');
+});
+
+
+test('official score transitions preserve every observed completed-game winner', () => {
+  const first = mergeObservedSeriesHistory(undefined, history([1, 0], 1));
+  const second = mergeObservedSeriesHistory(first, history([1, 1], 2));
+  const final = mergeObservedSeriesHistory(second, history([2, 1], 3));
+  assert.deepEqual(final.games.map(game => game.winner?.id), ['left', 'right', 'left']);
+});
+
+test('first-seen split series keeps ambiguous early winners unresolved', () => {
+  const merged = mergeObservedSeriesHistory(undefined, history([2, 1], 3));
+  assert.deepEqual(merged.games.map(game => game.winner?.id ?? null), [null, null, 'left']);
 });

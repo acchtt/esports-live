@@ -11,9 +11,6 @@ const CACHE_MS = 15 * 60 * 1_000;
 const MAX_CONCURRENCY = 3;
 type CanonicalRole = 'top' | 'jungle' | 'mid' | 'bottom' | 'support';
 const ROLE_ORDER: readonly CanonicalRole[] = ['top', 'jungle', 'mid', 'bottom', 'support'];
-const ROLE_LABELS: Record<CanonicalRole, string> = {
-  top: 'Top', jungle: 'Jungle', mid: 'Mid', bottom: 'Bottom', support: 'Support'
-};
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -240,7 +237,7 @@ style.textContent = `
   .completed-final-matchups .role-matchup-row {
     grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr);
     min-width: 800px;
-    min-height: 84px;
+    min-height: 94px;
     border-bottom-color: rgba(148, 163, 184, 0.12);
   }
   .completed-final-matchups .role-matchup-row:nth-child(even) .role-player.blue {
@@ -260,14 +257,14 @@ style.textContent = `
     grid-template-areas:
       "stats heading portrait"
       "items items portrait";
-    grid-template-columns: minmax(0, 1fr) minmax(116px, auto) 48px;
+    grid-template-columns: minmax(0, 1fr) minmax(118px, auto) 52px;
     background: linear-gradient(90deg, rgba(14, 165, 233, 0.08), rgba(14, 165, 233, 0.018));
   }
   .completed-final-matchups .role-player.red {
     grid-template-areas:
       "portrait heading stats"
       "portrait items items";
-    grid-template-columns: 48px minmax(116px, auto) minmax(0, 1fr);
+    grid-template-columns: 52px minmax(118px, auto) minmax(0, 1fr);
     background: linear-gradient(270deg, rgba(244, 63, 94, 0.08), rgba(244, 63, 94, 0.018));
   }
   .completed-final-matchups .role-player-heading {
@@ -289,12 +286,6 @@ style.textContent = `
     color: #90a0b5;
     font-size: 0.58rem;
   }
-  .completed-final-matchups .role-chip {
-    min-width: 38px;
-    min-height: 19px;
-    padding: 0 5px;
-    font-size: 0.48rem;
-  }
   .completed-final-matchups .role-player-stats,
   .completed-final-matchups .role-player.red .role-player-stats {
     grid-area: stats;
@@ -313,18 +304,17 @@ style.textContent = `
     background: transparent;
   }
   .completed-final-matchups .role-player-stats small {
-    color: #718197;
-    font-size: 0.5rem;
+    display: none;
   }
   .completed-final-matchups .role-player-stats strong {
-    margin-top: 2px;
+    margin-top: 0;
     color: #dce7f5;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
   }
   .completed-final-matchups .role-player-portrait { grid-area: portrait; }
   .completed-final-matchups .role-player-portrait .telemetry-champion {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
     border: 1px solid rgba(226, 232, 240, 0.16);
     border-radius: 8px;
   }
@@ -336,8 +326,8 @@ style.textContent = `
   }
   .completed-final-matchups .role-player-items { grid-area: items; min-width: 0; }
   .completed-final-matchups .role-player-items .telemetry-inventory {
-    gap: 3px;
-    min-height: 21px;
+    gap: 4px;
+    min-height: 28px;
     padding: 0;
     overflow: hidden;
   }
@@ -345,16 +335,17 @@ style.textContent = `
   .completed-final-matchups .role-player.red .telemetry-inventory { justify-content: flex-end; }
   .completed-final-matchups .role-player-items .telemetry-inventory-label { display: none; }
   .completed-final-matchups .role-player-items .telemetry-item-slot {
-    width: 22px;
-    height: 22px;
-    flex-basis: 22px;
-    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    border-radius: 5px;
   }
   .completed-final-matchups .role-gold-delta {
     gap: 7px;
     padding: 8px 7px;
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.72));
   }
+  .completed-final-matchups .role-gold-delta small { display: none !important; }
   .completed-final-matchups .role-gold-delta > strong {
     font-size: 0.82rem;
     white-space: nowrap;
@@ -492,20 +483,19 @@ function orderedPlayers(team: LolTeamState): readonly (LolPlayerState | null)[] 
   return ROLE_ORDER.map(role => assigned.get(role) ?? unassigned.shift() ?? null);
 }
 
-function playerIdentityMarkup(player: LolPlayerState | null, role: CanonicalRole, side: 'blue' | 'red'): string {
+function playerIdentityMarkup(player: LolPlayerState | null, side: 'blue' | 'red'): string {
   return `
     <div class="role-player ${side}">
       <div class="role-player-heading">
-        <span class="role-chip">${ROLE_LABELS[role]}</span>
         <div class="role-player-name">
           <strong>${escapeHtml(player?.handle ?? 'Player unavailable')}</strong>
           <small>${escapeHtml(player?.championId ?? 'Champion unavailable')}</small>
         </div>
       </div>
       <div class="role-player-stats">
-        <span><small>KDA</small><strong>${formatNumber(player?.kills ?? null)}/${formatNumber(player?.deaths ?? null)}/${formatNumber(player?.assists ?? null)}</strong></span>
-        <span><small>CS</small><strong>${formatNumber(player?.creepScore ?? null)}</strong></span>
-        <span><small>GOLD</small><strong>${formatNumber(player?.totalGold ?? null)}</strong></span>
+        <span aria-label="KDA"><strong>${formatNumber(player?.kills ?? null)}/${formatNumber(player?.deaths ?? null)}/${formatNumber(player?.assists ?? null)}</strong></span>
+        <span aria-label="Creep score"><strong>${formatNumber(player?.creepScore ?? null)}</strong></span>
+        <span aria-label="Gold"><strong>${formatNumber(player?.totalGold ?? null)}</strong></span>
       </div>
     </div>`;
 }
@@ -534,9 +524,9 @@ function roleMatchupRows(blue: LolTeamState, red: LolTeamState): string {
   const redPlayers = orderedPlayers(red);
   return ROLE_ORDER.map((role, index) => `
     <div class="role-matchup-row">
-      ${playerIdentityMarkup(bluePlayers[index] ?? null, role, 'blue')}
+      ${playerIdentityMarkup(bluePlayers[index] ?? null, 'blue')}
       ${roleGoldDeltaMarkup(bluePlayers[index] ?? null, redPlayers[index] ?? null)}
-      ${playerIdentityMarkup(redPlayers[index] ?? null, role, 'red')}
+      ${playerIdentityMarkup(redPlayers[index] ?? null, 'red')}
     </div>`).join('');
 }
 

@@ -1,4 +1,4 @@
-import type { LiveSnapshot, ScheduleEvent, SeriesGameRef } from '@esports-live/core';
+import type { LiveSnapshot, ScheduleEvent, SeriesContext, SeriesGameRef } from '@esports-live/core';
 import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapter-lol';
 import './styles.css';
 
@@ -19,6 +19,7 @@ const SNAPSHOT_POLL_MS = 3_000;
 const SCHEDULE_POLL_MS = 15_000;
 const ACTIVE_SCHEDULE_GRACE_MS = 6 * 60 * 60 * 1_000;
 const COMPLETED_SNAPSHOT_CACHE_MS = 30 * 60 * 1_000;
+const SERIES_CONTEXT_CACHE_MS = 45_000;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -49,6 +50,8 @@ let scheduleTimer: ReturnType<typeof setInterval> | null = null;
 let liveClockBaseSeconds: number | null = null;
 const completedSnapshotCache = new Map<string, { expiresAt: number; value: LiveSnapshot<LolStats> }>();
 const completedSnapshotRequests = new Map<string, Promise<LiveSnapshot<LolStats>>>();
+const seriesContextCache = new Map<string, { expiresAt: number; value: SeriesContext }>();
+const seriesContextRequests = new Map<string, Promise<SeriesContext>>();
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -66,6 +69,47 @@ async function api<T>(path: string): Promise<T> {
     throw new Error(body?.message ?? `API returned ${response.status}`);
   }
   return response.json() as Promise<T>;
+}
+
+async function seriesContextFor(seriesId: string): Promise<SeriesContext> {
+  const cached = seriesContextCache.get(seriesId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = seriesContextRequests.get(seriesId);
+  if (pending) return pending;
+  const request = api<SeriesContext>(
+    `/v1/lol/series/${encodeURIComponent(seriesId)}/context?live=${Date.now()}`
+  ).then(value => {
+    seriesContextCache.set(seriesId, {
+      value,
+      expiresAt: Date.now() + SERIES_CONTEXT_CACHE_MS
+    });
+    return value;
+  }).finally(() => seriesContextRequests.delete(seriesId));
+  seriesContextRequests.set(seriesId, request);
+  return request;
+}
+
+async function hydrateMissingGames(event: ScheduleEvent): Promise<ScheduleEvent> {
+  if (event.series.games.length || !['live', 'paused'].includes(event.series.state)) return event;
+  try {
+    const context = await seriesContextFor(event.series.id);
+    const history = context.history;
+    if (!history?.games.length) return event;
+    const [left, right] = history.score;
+    return {
+      ...event,
+      series: {
+        ...event.series,
+        teams: [left.team, right.team],
+        bestOf: history.bestOf,
+        games: history.games
+          .map(({ id, number, state }) => ({ id, number, state }))
+          .sort((a, b) => a.number - b.number)
+      }
+    };
+  } catch {
+    return event;
+  }
 }
 
 async function completedSnapshotFor(gameId: string): Promise<LiveSnapshot<LolStats>> {
@@ -213,6 +257,10 @@ function renderSchedule(): void {
 }
 
 function renderGameSelector(event: ScheduleEvent): void {
+  if (!event.series.games.length) {
+    gameSelector.innerHTML = '<span class="game-selector-empty">Game feed pending</span>';
+    return;
+  }
   gameSelector.innerHTML = event.series.games.map(game => `
     <button type="button" class="game-button ${game.id === selectedGameId ? 'active' : ''} ${game.state}"
       data-game-id="${escapeHtml(game.id)}">
@@ -458,6 +506,21 @@ function renderUpcoming(event: ScheduleEvent): void {
     </div>`;
 }
 
+function renderMissingGame(event: ScheduleEvent): void {
+  if (event.series.state !== 'live' && event.series.state !== 'paused') {
+    renderUpcoming(event);
+    return;
+  }
+  renderedGameId = null;
+  clearLiveClock();
+  gameContent.innerHTML = `
+    <div class="analysis-empty">
+      <span class="analysis-empty-icon" aria-hidden="true">↻</span>
+      <h3>Waiting for the game feed</h3>
+      <p>Riot has marked this series ${escapeHtml(event.series.state)} but has not published a usable game ID yet. The board will recover automatically.</p>
+    </div>`;
+}
+
 function clearSnapshotTimer(): void {
   if (snapshotTimer !== null) clearTimeout(snapshotTimer);
   snapshotTimer = null;
@@ -467,7 +530,11 @@ async function refreshSnapshot(): Promise<void> {
   clearSnapshotTimer();
   const event = currentEvent();
   const game = event ? selectedGame(event) : null;
-  if (!event || !game) return;
+  if (!event) return;
+  if (!game) {
+    renderMissingGame(event);
+    return;
+  }
 
   const requestedSeries = event.series.id;
   const requestedGame = game.id;
@@ -513,7 +580,7 @@ function selectSeries(seriesId: string): void {
   renderSchedule();
   renderSeriesHeader(event);
   if (selectedGameId) void refreshSnapshot();
-  else renderUpcoming(event);
+  else renderMissingGame(event);
 }
 
 function syncSelection(): void {
@@ -532,17 +599,18 @@ function syncSelection(): void {
   }
   renderSeriesHeader(event);
   if (selectedGameId) void refreshSnapshot();
-  else renderUpcoming(event);
+  else renderMissingGame(event);
 }
 
 async function refreshSchedule(): Promise<void> {
   refreshButton.disabled = true;
   try {
     const payload = await api<ScheduleResponse>('/v1/lol/schedule?states=live,paused,scheduled');
-    events = payload.events.filter(isActiveListing).sort((left, right) => {
+    const activeEvents = payload.events.filter(isActiveListing).sort((left, right) => {
       const liveDifference = Number(right.series.state === 'live') - Number(left.series.state === 'live');
       return liveDifference || Date.parse(left.series.scheduledStart) - Date.parse(right.series.scheduledStart);
     });
+    events = await Promise.all(activeEvents.map(hydrateMissingGames));
     renderSchedule();
     syncSelection();
     connectionDetail.textContent = `${events.filter(event => event.series.state === 'live').length} live · ${events.length} active listings`;

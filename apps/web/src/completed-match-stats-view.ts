@@ -244,8 +244,9 @@ style.textContent = `
   .completed-team-metric strong.red { color: #ffe2e7; text-align: left; }
   .completed-team-metric.gold-diff.blue strong { color: #7dd3fc; }
   .completed-team-metric.gold-diff.red strong { color: #fda4af; }
-  .completed-team-single-value {
+  .completed-team-metric .completed-team-single-value {
     display: block;
+    width: 100%;
     font-size: 1rem;
     line-height: 1.15;
     text-align: center;

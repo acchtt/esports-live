@@ -6,6 +6,12 @@ function requiredElement<T extends Element>(selector: string): T {
   return element;
 }
 
+function requiredChild<T extends Element>(parent: ParentNode, selector: string): T {
+  const element = parent.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing required child: ${selector}`);
+  return element;
+}
+
 const analysisPanel = requiredElement<HTMLElement>('.analysis-panel');
 const analysisHeader = requiredElement<HTMLElement>('.analysis-header');
 const selectedCompetition = requiredElement<HTMLElement>('#selected-competition');
@@ -177,11 +183,11 @@ hero.innerHTML = `
     <div class="completed-score-team"><strong>Team unavailable</strong><small></small></div>
   </div>`;
 
-const competitionNode = requiredElement<HTMLElement>('[data-live-competition]');
-const headingNode = requiredElement<HTMLElement>('[data-live-heading]');
-const metaNode = requiredElement<HTMLElement>('[data-live-meta]');
-const badgeNode = requiredElement<HTMLElement>('[data-live-status]');
-const scoreboardNode = requiredElement<HTMLElement>('[data-live-scoreboard]');
+const competitionNode = requiredChild<HTMLElement>(hero, '[data-live-competition]');
+const headingNode = requiredChild<HTMLElement>(hero, '[data-live-heading]');
+const metaNode = requiredChild<HTMLElement>(hero, '[data-live-meta]');
+const badgeNode = requiredChild<HTMLElement>(hero, '[data-live-status]');
+const scoreboardNode = requiredChild<HTMLElement>(hero, '[data-live-scoreboard]');
 
 const scoreboards = document.createElement('section');
 scoreboards.id = 'live-scoreboards';

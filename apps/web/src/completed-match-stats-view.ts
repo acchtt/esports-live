@@ -191,7 +191,7 @@ style.textContent = `
   }
   .completed-team-objectives {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     min-width: 800px;
     background: rgba(1, 5, 15, 0.56);
   }
@@ -605,7 +605,6 @@ function teamComparisonMarkup(blue: LolTeamState, red: LolTeamState): string {
       </div>
       <div class="completed-team-objectives">
         ${goldDifferenceMetric(blue.gold, red.gold)}
-        ${comparisonMetric('Grubs', blue.objectives.grubs ?? null, red.objectives.grubs ?? null)}
         ${comparisonMetric('Dragons', blue.objectives.dragons?.length ?? null, red.objectives.dragons?.length ?? null)}
         ${comparisonMetric('Barons', blue.objectives.barons, red.objectives.barons)}
         ${comparisonMetric('Inhibitors', blue.objectives.inhibitors, red.objectives.inhibitors)}

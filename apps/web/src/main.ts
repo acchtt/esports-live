@@ -302,7 +302,6 @@ function objectiveMarkup(team: LolTeamState): string {
       ${cell('Dragons', dragonCount, dragonList)}
       ${cell('Barons', objectives.barons)}
       ${cell('Heralds', objectives.heralds)}
-      ${cell('Grubs', objectives.grubs)}
       ${cell('Inhibitors', objectives.inhibitors)}
     </div>`;
 }

@@ -1,5 +1,0 @@
-Static validation notes:
-- The active live view now loads series-history-results-view.ts instead of series-history-view.ts.
-- The live parity overlay is no longer loaded.
-- The live renderer emits completed-section-heading, completed-games, completed-game, completed-game-top, completed-game-state, completed-side, and completed-result directly.
-- completed-matches-view.ts loads first and supplies the shared ended-match component styles.

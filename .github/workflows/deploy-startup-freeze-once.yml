@@ -1,0 +1,174 @@
+name: Deploy Startup Freeze Fix Once
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy-and-verify:
+    if: github.head_ref == 'ops/deploy-startup-freeze'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 098c08c8be2586eb835e50980e3af50d02c1a2d3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "${{ vars.VITE_API_BASE_URL }}" || { echo "Missing VITE_API_BASE_URL"; exit 1; }
+      - run: npm install --no-package-lock
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+      - name: Deploy Pages
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npx wrangler pages deploy apps/web/dist \
+              --project-name esports-live \
+              --branch main \
+              --commit-hash 098c08c8be2586eb835e50980e3af50d02c1a2d3 \
+              --commit-message "Stop eager startup preloads"; then
+              exit 0
+            fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+      - name: Verify production asset release
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const web = 'https://esports-live.pages.dev';
+          const localHtml = fs.readFileSync('apps/web/dist/index.html', 'utf8');
+          const expectedJs = localHtml.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          if (!expectedJs) throw new Error('Built JavaScript entry is missing.');
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          let verified = false;
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const html = await fetch(`${web}/?release=${Date.now()}`, {
+              headers: { 'cache-control': 'no-cache' }
+            }).then(response => response.text()).catch(() => '');
+            if (html.includes(expectedJs)) {
+              verified = true;
+              break;
+            }
+            await sleep(4000);
+          }
+          if (!verified) throw new Error(`Production did not expose ${expectedJs}.`);
+          console.log(`PRODUCTION_STARTUP_FREEZE_FIX_ASSET=${expectedJs}`);
+          NODE
+      - name: Install browser verifier
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Verify startup remains responsive
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import { chromium } from 'playwright';
+
+          const now = new Date().toISOString();
+          const blue = { id: 'blue', name: 'Blue Team', code: 'BLUE' };
+          const red = { id: 'red', name: 'Red Team', code: 'RED' };
+          const series = {
+            id: 'scheduled-series',
+            esport: 'lol',
+            competition: { id: 'lec', name: 'LEC', stage: 'Week 2' },
+            teams: [blue, red],
+            bestOf: 3,
+            state: 'scheduled',
+            scheduledStart: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            games: [
+              { id: 'g1', number: 1, state: 'unstarted' },
+              { id: 'g2', number: 2, state: 'unstarted' },
+              { id: 'g3', number: 3, state: 'unstarted' }
+            ]
+          };
+          const provider = { id: 'fixture', name: 'Production verifier' };
+          const requests = [];
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+
+          await page.route(/\/(?:health|v1\/lol\/)/, async route => {
+            const url = new URL(route.request().url());
+            requests.push(`${url.pathname}${url.search}`);
+            const json = value => route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify(value)
+            });
+            if (url.pathname === '/health') {
+              return json({ ok: true, service: 'fixture', schemaVersion: '1.0', adapters: ['lol'] });
+            }
+            if (url.pathname === '/v1/lol/schedule') {
+              if (url.searchParams.has('limit')) return json({ esport: 'lol', events: [] });
+              return json({ esport: 'lol', events: [{ series, provider, observedAt: now }] });
+            }
+            return route.fulfill({
+              status: 404,
+              contentType: 'application/json',
+              body: JSON.stringify({ message: 'Fixture route unavailable' })
+            });
+          });
+
+          const waitFor = async (predicate, label, timeout = 30000) => {
+            const started = Date.now();
+            while (Date.now() - started < timeout) {
+              if (predicate()) return;
+              await page.waitForTimeout(100);
+            }
+            throw new Error(`Timed out waiting for ${label}. Requests: ${JSON.stringify(requests)}`);
+          };
+
+          await page.goto(`https://esports-live.pages.dev/?verification=${Date.now()}`, {
+            waitUntil: 'domcontentloaded'
+          });
+          await waitFor(
+            () => requests.some(path => path.startsWith('/v1/lol/schedule?states=')),
+            'initial schedule'
+          );
+          await page.waitForTimeout(1800);
+
+          const eagerRequests = requests.filter(path =>
+            path.startsWith('/v1/lol/schedule?limit=80')
+            || path.includes('?prefetch=')
+            || path.includes('?final=')
+          );
+          if (eagerRequests.length) {
+            throw new Error(`Unexpected eager requests: ${JSON.stringify(eagerRequests)}`);
+          }
+
+          await page.locator('.schedule-mode[data-mode="results"]').click({ timeout: 10000 });
+          await waitFor(
+            () => requests.some(path => path.startsWith('/v1/lol/schedule?limit=80')),
+            'on-demand Results schedule'
+          );
+          const resultsHidden = await page.locator('#completed-match-list').evaluate(element => element.hidden);
+          const detailHidden = await page.locator('#completed-match-detail').evaluate(element => element.hidden);
+          if (resultsHidden || detailHidden) {
+            throw new Error(`Results mode visibility invalid: list=${resultsHidden}, detail=${detailHidden}`);
+          }
+
+          await page.screenshot({ path: 'production-startup-freeze-fix.png', fullPage: true });
+          console.log(`PRODUCTION_STARTUP_RESPONSIVE=${JSON.stringify({ requestCount: requests.length })}`);
+          await browser.close();
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-startup-freeze-fix-verification
+          path: production-startup-freeze-fix.png
+          retention-days: 1

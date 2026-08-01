@@ -1,4 +1,5 @@
 export * from './adapter.ts';
+export * from './leaguepedia-history-provider.ts';
 export * from './provider.ts';
 export * from './riot-consistent-provider.ts';
 export * from './riot-context-provider.ts';

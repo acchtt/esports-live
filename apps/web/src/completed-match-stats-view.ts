@@ -83,7 +83,33 @@ style.textContent = `
   }
   .completed-final-team.blue { border-color: rgba(56, 189, 248, 0.2); }
   .completed-final-team.red { border-color: rgba(251, 113, 133, 0.2); }
-  .completed-final-team h4 { margin: 0; overflow-wrap: anywhere; }
+  .completed-final-team h4 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0;
+  }
+  .completed-final-team h4 span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .completed-final-team h4 em {
+    flex: 0 0 auto;
+    padding: 3px 7px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.5rem;
+    font-style: normal;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .completed-final-team.blue h4 em { border-color: rgba(56, 189, 248, 0.24); color: #7dd3fc; }
+  .completed-final-team.red h4 em { border-color: rgba(251, 113, 133, 0.24); color: #fda4af; }
   .completed-final-primary,
   .completed-final-objectives {
     display: grid;
@@ -125,10 +151,151 @@ style.textContent = `
   }
   .completed-final-player small { color: var(--muted); }
   .completed-final-items { color: var(--muted); font-size: 0.58rem; }
+
+  /* Compact mirrored scoreboard inspired by the in-game broadcast layout. */
+  .completed-final-matchups {
+    overflow-x: auto;
+    border: 1px solid rgba(148, 163, 184, 0.13);
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.42);
+    scrollbar-color: rgba(56, 189, 248, 0.36) rgba(15, 23, 42, 0.7);
+    scrollbar-width: thin;
+  }
+  .completed-final-matchups .role-matchup-row {
+    grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr);
+    min-width: 760px;
+    min-height: 78px;
+    border-bottom-color: rgba(148, 163, 184, 0.12);
+  }
+  .completed-final-matchups .role-matchup-row:nth-child(even) .role-player.blue {
+    background-color: rgba(14, 165, 233, 0.025);
+  }
+  .completed-final-matchups .role-matchup-row:nth-child(even) .role-player.red {
+    background-color: rgba(244, 63, 94, 0.025);
+  }
+  .completed-final-matchups .role-player,
+  .completed-final-matchups .role-player.red {
+    align-items: center;
+    min-width: 0;
+    gap: 5px 9px;
+    padding: 9px 10px;
+  }
+  .completed-final-matchups .role-player.blue {
+    grid-template-areas:
+      "stats heading portrait"
+      "items items portrait";
+    grid-template-columns: minmax(0, 1fr) minmax(108px, auto) 46px;
+    background: linear-gradient(90deg, rgba(14, 165, 233, 0.08), rgba(14, 165, 233, 0.018));
+  }
+  .completed-final-matchups .role-player.red {
+    grid-template-areas:
+      "portrait heading stats"
+      "portrait items items";
+    grid-template-columns: 46px minmax(108px, auto) minmax(0, 1fr);
+    background: linear-gradient(270deg, rgba(244, 63, 94, 0.08), rgba(244, 63, 94, 0.018));
+  }
+  .completed-final-matchups .role-player-heading {
+    grid-area: heading;
+    gap: 7px;
+    min-width: 0;
+  }
+  .completed-final-matchups .role-player.red .role-player-heading {
+    grid-area: heading;
+  }
+  .completed-final-matchups .role-player-name { flex: 1 1 auto; }
+  .completed-final-matchups .role-player-name strong {
+    color: #f8fafc;
+    font-size: 0.78rem;
+    line-height: 1.15;
+  }
+  .completed-final-matchups .role-player-name small {
+    margin-top: 2px;
+    color: #90a0b5;
+    font-size: 0.54rem;
+  }
+  .completed-final-matchups .role-chip {
+    min-width: 38px;
+    min-height: 19px;
+    padding: 0 5px;
+    font-size: 0.44rem;
+  }
+  .completed-final-matchups .role-player-stats,
+  .completed-final-matchups .role-player.red .role-player-stats {
+    grid-area: stats;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(38px, 1fr));
+    gap: 3px;
+    width: 100%;
+    justify-content: stretch;
+    text-align: center;
+  }
+  .completed-final-matchups .role-player-stats > span {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .completed-final-matchups .role-player-stats small {
+    color: #718197;
+    font-size: 0.42rem;
+  }
+  .completed-final-matchups .role-player-stats strong {
+    margin-top: 2px;
+    color: #dce7f5;
+    font-size: 0.66rem;
+  }
+  .completed-final-matchups .role-player-portrait { grid-area: portrait; }
+  .completed-final-matchups .role-player-portrait .telemetry-champion {
+    width: 46px;
+    height: 46px;
+    border: 1px solid rgba(226, 232, 240, 0.16);
+    border-radius: 8px;
+  }
+  .completed-final-matchups .role-player.blue .role-player-portrait .telemetry-champion {
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.14);
+  }
+  .completed-final-matchups .role-player.red .role-player-portrait .telemetry-champion {
+    box-shadow: 0 0 0 1px rgba(251, 113, 133, 0.14);
+  }
+  .completed-final-matchups .role-player-items { grid-area: items; min-width: 0; }
+  .completed-final-matchups .role-player-items .telemetry-inventory {
+    gap: 3px;
+    min-height: 21px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .completed-final-matchups .role-player.blue .telemetry-inventory { justify-content: flex-start; }
+  .completed-final-matchups .role-player.red .telemetry-inventory { justify-content: flex-end; }
+  .completed-final-matchups .role-player-items .telemetry-inventory-label { display: none; }
+  .completed-final-matchups .role-player-items .telemetry-item-slot {
+    width: 21px;
+    height: 21px;
+    flex-basis: 21px;
+    border-radius: 4px;
+  }
+  .completed-final-matchups .role-gold-delta {
+    gap: 4px;
+    padding: 8px 7px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.72));
+  }
+  .completed-final-matchups .role-gold-delta small {
+    color: #8d9bb0;
+    font-size: 0.45rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .completed-final-matchups .role-gold-delta > strong {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+  .completed-final-matchups .role-edge-track { width: 76px; height: 4px; }
   @media (max-width: 760px) {
     .completed-final-team-grid { grid-template-columns: 1fr; }
     .completed-final-player { grid-template-columns: minmax(0, 1fr) auto; }
     .completed-final-items { grid-column: 1 / -1; }
+    .completed-final-game { padding: 12px; }
+    .completed-telemetry-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
   }
 `;
 document.head.append(style);
@@ -153,11 +320,11 @@ function formatClock(seconds: number | null): string {
 }
 
 function formatTimestamp(value: string | null): string {
-  if (!value) return 'Final source time unavailable';
+  if (!value) return 'End time unavailable';
   const date = new Date(value);
   return Number.isFinite(date.getTime())
-    ? `Final frame ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
-    : 'Final source time unavailable';
+    ? `Ended ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'End time unavailable';
 }
 
 async function api<T>(path: string): Promise<T> {
@@ -276,10 +443,15 @@ function roleGoldDeltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | 
   const side = difference === null ? 'unknown' : difference > 0 ? 'blue' : difference < 0 ? 'red' : 'even';
   const magnitude = difference === null ? null : Math.abs(difference);
   const edge = magnitude === null ? 0 : Math.min(50, Math.round((magnitude / 2500) * 50));
+  const lead = magnitude === null
+    ? 'No data'
+    : magnitude === 0
+      ? 'Even'
+      : `${difference! > 0 ? 'Blue' : 'Red'} +${magnitude.toLocaleString()}`;
   return `
     <div class="role-gold-delta ${side}" style="--role-edge: ${edge}%">
-      <small>${ROLE_LABELS[role]} GOLD DELTA</small>
-      <strong>${magnitude === null ? '—' : `+${magnitude.toLocaleString()}`}</strong>
+      <small>${ROLE_LABELS[role]} gold</small>
+      <strong>${lead}</strong>
       <span class="role-edge-track" aria-hidden="true"><i></i></span>
     </div>`;
 }
@@ -299,7 +471,7 @@ function teamMarkup(team: LolTeamState): string {
   const objectives = team.objectives;
   return `
     <section class="completed-final-team ${escapeHtml(team.side)}">
-      <h4>${escapeHtml(team.name)} · ${escapeHtml(team.side.toUpperCase())}</h4>
+      <h4><span>${escapeHtml(team.name)}</span><em>${escapeHtml(team.side)} side</em></h4>
       <div class="completed-final-primary">
         <div><span>Gold</span><strong>${formatNumber(team.gold)}</strong></div>
         <div><span>Kills</span><strong>${formatNumber(team.kills)}</strong></div>
@@ -326,7 +498,7 @@ function gameMarkup(
       </article>`;
   }
   const stats = snapshot.stats;
-  const winner = history.winner?.name ? `Winner · ${history.winner.name}` : 'Winner not published by Riot';
+  const winner = history.winner?.name ? `${history.winner.name} won` : 'Winner unavailable';
   const duration = history.durationSeconds ?? stats.gameClockSeconds;
   return `
     <article class="completed-final-game" data-final-game-id="${escapeHtml(snapshot.game.id)}">
@@ -354,8 +526,8 @@ async function loadSelectedSeries(seriesId: string): Promise<void> {
   const generation = ++requestGeneration;
   const host = telemetryHost();
   host.innerHTML = `
-    <div class="completed-telemetry-heading"><h3>Final game telemetry</h3><span>Riot live-feed archive</span></div>
-    <div class="completed-telemetry-loading">Loading final team and player data…</div>`;
+    <div class="completed-telemetry-heading"><h3>Final scoreboard</h3><span>Official Riot match archive</span></div>
+    <div class="completed-telemetry-loading">Loading the final scoreboard…</div>`;
   try {
     const context = await contextFor(seriesId);
     const games = context.history?.games.filter(game => game.state === 'completed') ?? [];
@@ -377,7 +549,7 @@ async function loadSelectedSeries(seriesId: string): Promise<void> {
     });
     if (generation !== requestGeneration || selectedSeriesId !== seriesId) return;
     host.innerHTML = `
-      <div class="completed-telemetry-heading"><h3>Final game telemetry</h3><span>Historical frames are intentionally marked stale</span></div>
+      <div class="completed-telemetry-heading"><h3>Final scoreboard</h3><span>Archived result · not live telemetry</span></div>
       ${rows.map(row => gameMarkup(row.game, row.snapshot, row.error)).join('')}`;
     const gamesById = new Map(
       [...host.querySelectorAll<HTMLElement>('[data-final-game-id]')]

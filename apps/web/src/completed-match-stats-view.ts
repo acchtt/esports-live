@@ -152,6 +152,82 @@ style.textContent = `
   .completed-final-player small { color: var(--muted); }
   .completed-final-items { color: var(--muted); font-size: 0.58rem; }
 
+  .completed-team-comparison {
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 15px;
+    background:
+      linear-gradient(90deg, rgba(14, 165, 233, 0.055), transparent 38%),
+      linear-gradient(270deg, rgba(244, 63, 94, 0.05), transparent 38%),
+      rgba(2, 6, 23, 0.24);
+  }
+  .completed-team-comparison-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.11);
+  }
+  .completed-team-comparison-header > span {
+    color: #78879c;
+    font-size: 0.56rem;
+    font-weight: 850;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .completed-comparison-team { min-width: 0; }
+  .completed-comparison-team.red { text-align: right; }
+  .completed-comparison-team strong {
+    display: block;
+    overflow: hidden;
+    color: #f8fafc;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .completed-comparison-team em {
+    display: block;
+    margin-bottom: 3px;
+    color: #7dd3fc;
+    font-size: 0.52rem;
+    font-style: normal;
+    font-weight: 850;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .completed-comparison-team.red em { color: #fda4af; }
+  .completed-team-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: rgba(148, 163, 184, 0.09);
+  }
+  .completed-team-metric {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px 14px;
+    background: rgba(8, 15, 29, 0.96);
+  }
+  .completed-team-metric span {
+    color: #8290a5;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .completed-team-metric strong {
+    min-width: 0;
+    color: #dff5ff;
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .completed-team-metric strong.red { color: #ffe2e7; text-align: left; }
+
   /* Compact mirrored scoreboard inspired by the in-game broadcast layout. */
   .completed-final-matchups {
     overflow-x: auto;
@@ -162,9 +238,9 @@ style.textContent = `
     scrollbar-width: thin;
   }
   .completed-final-matchups .role-matchup-row {
-    grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr);
-    min-width: 760px;
-    min-height: 78px;
+    grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr);
+    min-width: 800px;
+    min-height: 84px;
     border-bottom-color: rgba(148, 163, 184, 0.12);
   }
   .completed-final-matchups .role-matchup-row:nth-child(even) .role-player.blue {
@@ -184,14 +260,14 @@ style.textContent = `
     grid-template-areas:
       "stats heading portrait"
       "items items portrait";
-    grid-template-columns: minmax(0, 1fr) minmax(108px, auto) 46px;
+    grid-template-columns: minmax(0, 1fr) minmax(116px, auto) 48px;
     background: linear-gradient(90deg, rgba(14, 165, 233, 0.08), rgba(14, 165, 233, 0.018));
   }
   .completed-final-matchups .role-player.red {
     grid-template-areas:
       "portrait heading stats"
       "portrait items items";
-    grid-template-columns: 46px minmax(108px, auto) minmax(0, 1fr);
+    grid-template-columns: 48px minmax(116px, auto) minmax(0, 1fr);
     background: linear-gradient(270deg, rgba(244, 63, 94, 0.08), rgba(244, 63, 94, 0.018));
   }
   .completed-final-matchups .role-player-heading {
@@ -205,19 +281,19 @@ style.textContent = `
   .completed-final-matchups .role-player-name { flex: 1 1 auto; }
   .completed-final-matchups .role-player-name strong {
     color: #f8fafc;
-    font-size: 0.78rem;
+    font-size: 0.86rem;
     line-height: 1.15;
   }
   .completed-final-matchups .role-player-name small {
     margin-top: 2px;
     color: #90a0b5;
-    font-size: 0.54rem;
+    font-size: 0.58rem;
   }
   .completed-final-matchups .role-chip {
     min-width: 38px;
     min-height: 19px;
     padding: 0 5px;
-    font-size: 0.44rem;
+    font-size: 0.48rem;
   }
   .completed-final-matchups .role-player-stats,
   .completed-final-matchups .role-player.red .role-player-stats {
@@ -238,17 +314,17 @@ style.textContent = `
   }
   .completed-final-matchups .role-player-stats small {
     color: #718197;
-    font-size: 0.42rem;
+    font-size: 0.5rem;
   }
   .completed-final-matchups .role-player-stats strong {
     margin-top: 2px;
     color: #dce7f5;
-    font-size: 0.66rem;
+    font-size: 0.72rem;
   }
   .completed-final-matchups .role-player-portrait { grid-area: portrait; }
   .completed-final-matchups .role-player-portrait .telemetry-champion {
-    width: 46px;
-    height: 46px;
+    width: 48px;
+    height: 48px;
     border: 1px solid rgba(226, 232, 240, 0.16);
     border-radius: 8px;
   }
@@ -269,24 +345,18 @@ style.textContent = `
   .completed-final-matchups .role-player.red .telemetry-inventory { justify-content: flex-end; }
   .completed-final-matchups .role-player-items .telemetry-inventory-label { display: none; }
   .completed-final-matchups .role-player-items .telemetry-item-slot {
-    width: 21px;
-    height: 21px;
-    flex-basis: 21px;
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
     border-radius: 4px;
   }
   .completed-final-matchups .role-gold-delta {
-    gap: 4px;
+    gap: 7px;
     padding: 8px 7px;
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.72));
   }
-  .completed-final-matchups .role-gold-delta small {
-    color: #8d9bb0;
-    font-size: 0.45rem;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
   .completed-final-matchups .role-gold-delta > strong {
-    font-size: 0.75rem;
+    font-size: 0.82rem;
     white-space: nowrap;
   }
   .completed-final-matchups .role-edge-track { width: 76px; height: 4px; }
@@ -296,6 +366,10 @@ style.textContent = `
     .completed-final-items { grid-column: 1 / -1; }
     .completed-final-game { padding: 12px; }
     .completed-telemetry-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+    .completed-team-comparison-header { gap: 8px; padding: 12px; }
+    .completed-team-comparison-header > span { display: none; }
+    .completed-team-comparison-header { grid-template-columns: 1fr 1fr; }
+    .completed-team-metrics { grid-template-columns: 1fr; }
   }
 `;
 document.head.append(style);
@@ -436,7 +510,7 @@ function playerIdentityMarkup(player: LolPlayerState | null, role: CanonicalRole
     </div>`;
 }
 
-function roleGoldDeltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | null, role: CanonicalRole): string {
+function roleGoldDeltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | null): string {
   const blueGold = blue?.totalGold ?? null;
   const redGold = red?.totalGold ?? null;
   const difference = blueGold === null || redGold === null ? null : blueGold - redGold;
@@ -450,7 +524,6 @@ function roleGoldDeltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | 
       : `${difference! > 0 ? 'Blue' : 'Red'} +${magnitude.toLocaleString()}`;
   return `
     <div class="role-gold-delta ${side}" style="--role-edge: ${edge}%">
-      <small>${ROLE_LABELS[role]} gold</small>
       <strong>${lead}</strong>
       <span class="role-edge-track" aria-hidden="true"><i></i></span>
     </div>`;
@@ -462,25 +535,35 @@ function roleMatchupRows(blue: LolTeamState, red: LolTeamState): string {
   return ROLE_ORDER.map((role, index) => `
     <div class="role-matchup-row">
       ${playerIdentityMarkup(bluePlayers[index] ?? null, role, 'blue')}
-      ${roleGoldDeltaMarkup(bluePlayers[index] ?? null, redPlayers[index] ?? null, role)}
+      ${roleGoldDeltaMarkup(bluePlayers[index] ?? null, redPlayers[index] ?? null)}
       ${playerIdentityMarkup(redPlayers[index] ?? null, role, 'red')}
     </div>`).join('');
 }
 
-function teamMarkup(team: LolTeamState): string {
-  const objectives = team.objectives;
+function comparisonMetric(label: string, blueValue: number | string | null, redValue: number | string | null): string {
   return `
-    <section class="completed-final-team ${escapeHtml(team.side)}">
-      <h4><span>${escapeHtml(team.name)}</span><em>${escapeHtml(team.side)} side</em></h4>
-      <div class="completed-final-primary">
-        <div><span>Gold</span><strong>${formatNumber(team.gold)}</strong></div>
-        <div><span>Kills</span><strong>${formatNumber(team.kills)}</strong></div>
+    <div class="completed-team-metric">
+      <strong>${escapeHtml(typeof blueValue === 'number' ? blueValue.toLocaleString() : blueValue ?? '—')}</strong>
+      <span>${escapeHtml(label)}</span>
+      <strong class="red">${escapeHtml(typeof redValue === 'number' ? redValue.toLocaleString() : redValue ?? '—')}</strong>
+    </div>`;
+}
+
+function teamComparisonMarkup(blue: LolTeamState, red: LolTeamState): string {
+  return `
+    <section class="completed-team-comparison">
+      <div class="completed-team-comparison-header">
+        <div class="completed-comparison-team blue"><em>Blue side</em><strong>${escapeHtml(blue.name)}</strong></div>
+        <span>Team totals</span>
+        <div class="completed-comparison-team red"><em>Red side</em><strong>${escapeHtml(red.name)}</strong></div>
       </div>
-      <div class="completed-final-objectives">
-        <div><span>Towers</span><strong>${formatNumber(objectives.towers)}</strong></div>
-        <div><span>Dragons</span><strong>${objectives.dragons === null ? '—' : objectives.dragons.length}</strong></div>
-        <div><span>Barons</span><strong>${formatNumber(objectives.barons)}</strong></div>
-        <div><span>Inhibitors</span><strong>${formatNumber(objectives.inhibitors)}</strong></div>
+      <div class="completed-team-metrics">
+        ${comparisonMetric('Gold', blue.gold, red.gold)}
+        ${comparisonMetric('Kills', blue.kills, red.kills)}
+        ${comparisonMetric('Towers', blue.objectives.towers, red.objectives.towers)}
+        ${comparisonMetric('Dragons', blue.objectives.dragons?.length ?? null, red.objectives.dragons?.length ?? null)}
+        ${comparisonMetric('Barons', blue.objectives.barons, red.objectives.barons)}
+        ${comparisonMetric('Inhibitors', blue.objectives.inhibitors, red.objectives.inhibitors)}
       </div>
     </section>`;
 }
@@ -506,7 +589,7 @@ function gameMarkup(
         <strong>Game ${escapeHtml(history.number)} · ${escapeHtml(winner)}</strong>
         <span>${escapeHtml(formatClock(duration))} · ${escapeHtml(formatTimestamp(snapshot.quality.sourceTimestamp))}</span>
       </div>
-      <div class="completed-final-team-grid">${teamMarkup(stats.blue)}${teamMarkup(stats.red)}</div>
+      ${teamComparisonMarkup(stats.blue, stats.red)}
       <div class="role-matchup-list completed-final-matchups">${roleMatchupRows(stats.blue, stats.red)}</div>
     </article>`;
 }
@@ -526,7 +609,7 @@ async function loadSelectedSeries(seriesId: string): Promise<void> {
   const generation = ++requestGeneration;
   const host = telemetryHost();
   host.innerHTML = `
-    <div class="completed-telemetry-heading"><h3>Final scoreboard</h3><span>Official Riot match archive</span></div>
+    <div class="completed-telemetry-heading"><h3>Game scoreboards</h3><span>Select a completed game</span></div>
     <div class="completed-telemetry-loading">Loading the final scoreboard…</div>`;
   try {
     const context = await contextFor(seriesId);
@@ -549,7 +632,7 @@ async function loadSelectedSeries(seriesId: string): Promise<void> {
     });
     if (generation !== requestGeneration || selectedSeriesId !== seriesId) return;
     host.innerHTML = `
-      <div class="completed-telemetry-heading"><h3>Final scoreboard</h3><span>Archived result · not live telemetry</span></div>
+      <div class="completed-telemetry-heading"><h3>Game scoreboards</h3><span>Select a completed game</span></div>
       ${rows.map(row => gameMarkup(row.game, row.snapshot, row.error)).join('')}`;
     const gamesById = new Map(
       [...host.querySelectorAll<HTMLElement>('[data-final-game-id]')]

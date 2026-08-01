@@ -9,9 +9,12 @@ let versionPromise: Promise<string | null> | null = null;
 
 const style = document.createElement('style');
 style.textContent = `
-.completed-game-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
-.completed-game-tab{min-height:38px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;color:var(--muted);background:rgba(255,255,255,.018);cursor:pointer;font-size:.68rem;font-weight:850}
-.completed-game-tab.active{border-color:rgba(56,189,248,.38);color:#e0f7ff;background:rgba(56,189,248,.08)}
+.completed-game-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;padding:5px;border:1px solid rgba(148,163,184,.14);border-radius:13px;background:rgba(2,6,23,.32)}
+.completed-game-tab{display:grid;gap:3px;min-height:48px;padding:8px 12px;border:1px solid transparent;border-radius:9px;color:#93a2b7;background:transparent;cursor:pointer;text-align:left}
+.completed-game-tab strong{color:#cbd5e1;font-size:.76rem}
+.completed-game-tab small{overflow:hidden;font-size:.62rem;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+.completed-game-tab.active{border-color:rgba(56,189,248,.34);color:#a9e8ff;background:rgba(56,189,248,.1);box-shadow:0 5px 18px rgba(2,132,199,.08)}
+.completed-game-tab.active strong{color:#f0f9ff}
 .completed-final-game[data-board-hidden="true"]{display:none!important}
 .completed-final-player.history-player-board{display:grid;grid-template-areas:"profile stats" "profile items";grid-template-columns:minmax(0,1fr) minmax(176px,auto);gap:9px 12px;align-items:center;min-height:106px;padding:14px 18px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:linear-gradient(135deg,rgba(15,23,42,.78),rgba(15,23,42,.44));font-size:.68rem}
 .completed-final-team.blue .history-player-board{border-left:2px solid rgba(56,189,248,.45)}
@@ -155,9 +158,10 @@ function installTabs(host: HTMLElement): void {
   const signature = JSON.stringify(entries);
   if (tabs.dataset.signature !== signature) {
     tabs.dataset.signature = signature;
-    tabs.innerHTML = entries.map(({number,label}) =>
-      `<button type="button" class="completed-game-tab" data-final-game-tab="${esc(number)}">${esc(label)}</button>`
-    ).join('');
+    tabs.innerHTML = entries.map(({number,label}) => {
+      const summary = label.replace(new RegExp(`^Game\\s+${number}\\s*[·-]?\\s*`, 'i'), '') || 'Final scoreboard';
+      return `<button type="button" class="completed-game-tab" data-final-game-tab="${esc(number)}"><strong>Game ${esc(number)}</strong><small>${esc(summary)}</small></button>`;
+    }).join('');
   }
   applySelection(host,selected);
 }

@@ -1,0 +1,137 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "${{ vars.VITE_API_BASE_URL }}" || { echo "Missing VITE_API_BASE_URL"; exit 1; }
+
+      - name: Install dependencies
+        run: npm install --no-package-lock
+
+      - name: Validate repository
+        run: npm run check
+
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: Deploy API Worker
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npm run deploy:api; then
+              exit 0
+            fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: Verify API Worker
+        shell: bash
+        env:
+          API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          node --input-type=module - <<'NODE'
+          const base = process.env.API_BASE_URL?.replace(/\/$/, '');
+          if (!base) throw new Error('VITE_API_BASE_URL is missing.');
+          const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+          let last = 'no response';
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            try {
+              const response = await fetch(`${base}/health?release=${Date.now()}`, {
+                headers: { 'cache-control': 'no-cache' }
+              });
+              const body = await response.text();
+              last = `HTTP ${response.status}: ${body.slice(0, 300)}`;
+              if (response.ok) {
+                const parsed = JSON.parse(body);
+                if (parsed?.ok === true && Array.isArray(parsed.adapters) && parsed.adapters.includes('lol')) {
+                  console.log(`PRODUCTION_API_VERIFIED=${JSON.stringify({ base, service: parsed.service, adapters: parsed.adapters })}`);
+                  process.exit(0);
+                }
+              }
+            } catch (error) {
+              last = error instanceof Error ? error.message : String(error);
+            }
+            await sleep(4000);
+          }
+          throw new Error(`Production API verification failed: ${last}`);
+          NODE
+
+      - name: Deploy Pages
+        shell: bash
+        run: |
+          message="$(git log -1 --pretty=%s)"
+          for attempt in 1 2 3 4 5; do
+            if npx wrangler pages deploy apps/web/dist \
+              --project-name esports-live \
+              --branch main \
+              --commit-hash "$GITHUB_SHA" \
+              --commit-message "$message"; then
+              exit 0
+            fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: Verify Pages release
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const web = 'https://esports-live.pages.dev';
+          const localHtml = fs.readFileSync('apps/web/dist/index.html', 'utf8');
+          const expectedJs = localHtml.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          const expectedCss = [...localHtml.matchAll(/<link[^>]+href="([^"]+\.css)"/g)].map(match => match[1]);
+          if (!expectedJs) throw new Error('Built JavaScript entry is missing.');
+          const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+          let lastHtml = '';
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            try {
+              const response = await fetch(`${web}/?release=${Date.now()}`, {
+                headers: { 'cache-control': 'no-cache' }
+              });
+              lastHtml = response.ok ? await response.text() : '';
+              if (
+                response.ok
+                && lastHtml.includes(expectedJs)
+                && expectedCss.every(asset => lastHtml.includes(asset))
+              ) {
+                console.log(`PRODUCTION_WEB_VERIFIED=${JSON.stringify({ expectedJs, expectedCss })}`);
+                process.exit(0);
+              }
+            } catch {}
+            await sleep(4000);
+          }
+          throw new Error(`Production did not expose ${expectedJs}. Last HTML: ${lastHtml.slice(0, 300)}`);
+          NODE

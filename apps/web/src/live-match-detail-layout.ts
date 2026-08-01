@@ -6,6 +6,12 @@ function requiredElement<T extends Element>(selector: string): T {
   return element;
 }
 
+function requiredChild<T extends Element>(parent: ParentNode, selector: string): T {
+  const element = parent.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing required child: ${selector}`);
+  return element;
+}
+
 const analysisPanel = requiredElement<HTMLElement>('.analysis-panel');
 const analysisHeader = requiredElement<HTMLElement>('.analysis-header');
 const selectedCompetition = requiredElement<HTMLElement>('#selected-competition');
@@ -27,26 +33,18 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", '&#039;');
 }
 
+function setClass(element: Element, className: string, enabled: boolean): void {
+  if (element.classList.contains(className) !== enabled) element.classList.toggle(className, enabled);
+}
+
 const style = document.createElement('style');
 style.textContent = `
-  .analysis-panel.live-detail-layout {
-    min-width: 0;
-  }
-  .analysis-panel.live-detail-layout.live-detail-ready > .analysis-header {
-    display: none !important;
-  }
-  .analysis-panel.live-detail-layout:not(.live-detail-ready) > #live-match-detail {
-    display: none;
-  }
-  body[data-view-mode="match-history"] #live-match-detail {
-    display: none !important;
-  }
-  #live-match-detail {
-    min-width: 0;
-  }
-  #live-match-detail .completed-detail-header h2 {
-    text-transform: none;
-  }
+  .analysis-panel.live-detail-layout { min-width: 0; }
+  .analysis-panel.live-detail-layout.live-detail-ready > .analysis-header { display: none !important; }
+  .analysis-panel.live-detail-layout:not(.live-detail-ready) > #live-match-detail { display: none; }
+  body[data-view-mode="match-history"] #live-match-detail { display: none !important; }
+  #live-match-detail { min-width: 0; }
+  #live-match-detail .completed-detail-header h2 { text-transform: none; }
   #live-match-detail .completed-final-badge.live {
     border-color: rgba(52, 211, 153, 0.3);
     color: #6ee7b7;
@@ -63,9 +61,7 @@ style.textContent = `
     color: #7dd3fc;
     background: rgba(56, 189, 248, 0.065);
   }
-  #live-match-detail .completed-score-team small:empty {
-    min-height: 0.85em;
-  }
+  #live-match-detail .completed-score-team small:empty { min-height: 0.85em; }
   #live-match-detail #series-history.live-series-results,
   #live-match-detail #series-history.completed-games-panel {
     margin: 0;
@@ -79,15 +75,9 @@ style.textContent = `
     background: linear-gradient(145deg, rgba(56, 189, 248, 0.075), rgba(56, 189, 248, 0.025));
     box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.09);
   }
-  #live-scoreboards {
-    min-width: 0;
-  }
-  #live-scoreboards .completed-telemetry-heading {
-    align-items: end;
-  }
-  #live-scoreboards .completed-telemetry-heading h3 {
-    font-size: 1rem;
-  }
+  #live-scoreboards { min-width: 0; }
+  #live-scoreboards .completed-telemetry-heading { align-items: end; }
+  #live-scoreboards .completed-telemetry-heading h3 { font-size: 1rem; }
   #live-scoreboards #game-selector.live-game-tabs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -132,29 +122,21 @@ style.textContent = `
     box-shadow: 0 5px 18px rgba(2, 132, 199, 0.08);
     opacity: 1;
   }
-  #live-scoreboards .live-game-tabs .game-button.completed-game-tab.active strong {
-    color: #f0f9ff;
-  }
+  #live-scoreboards .live-game-tabs .game-button.completed-game-tab.active strong { color: #f0f9ff; }
   #live-scoreboards .live-game-tabs .game-button.unstarted,
-  #live-scoreboards .live-game-tabs .game-button.unknown {
-    display: none;
-  }
+  #live-scoreboards .live-game-tabs .game-button.unknown { display: none; }
   #live-scoreboards .game-selector-empty {
     padding: 12px;
     color: var(--muted);
     font-size: 0.72rem;
     text-align: center;
   }
-  #live-scoreboards #quality-banner {
-    margin: 0;
-  }
+  #live-scoreboards #quality-banner { margin: 0; }
   #live-scoreboards #game-content.live-final-game-content {
     min-width: 0;
     padding: 0;
   }
-  #live-scoreboards #game-content .completed-final-game {
-    margin: 0;
-  }
+  #live-scoreboards #game-content .completed-final-game { margin: 0; }
   #live-scoreboards #game-content .analysis-empty {
     min-height: 240px;
     padding: 28px;
@@ -163,13 +145,9 @@ style.textContent = `
     background: rgba(255, 255, 255, 0.015);
   }
   @media (max-width: 720px) {
-    #live-match-detail {
-      padding: 14px;
-    }
+    #live-match-detail { padding: 14px; }
     #live-match-detail .completed-detail-header,
-    #live-match-detail .completed-scoreboard {
-      padding: 16px;
-    }
+    #live-match-detail .completed-scoreboard { padding: 16px; }
     #live-match-detail .completed-scoreboard {
       grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       gap: 10px;
@@ -178,12 +156,8 @@ style.textContent = `
       gap: 6px;
       font-size: 1.65rem;
     }
-    #live-match-detail .completed-score-team strong {
-      font-size: 0.86rem;
-    }
-    #live-scoreboards #game-selector.live-game-tabs {
-      grid-template-columns: 1fr;
-    }
+    #live-match-detail .completed-score-team strong { font-size: 0.86rem; }
+    #live-scoreboards #game-selector.live-game-tabs { grid-template-columns: 1fr; }
   }
 `;
 document.head.append(style);
@@ -208,6 +182,12 @@ hero.innerHTML = `
     <div class="completed-score-value"><b>0</b><span>–</span><b>0</b></div>
     <div class="completed-score-team"><strong>Team unavailable</strong><small></small></div>
   </div>`;
+
+const competitionNode = requiredChild<HTMLElement>(hero, '[data-live-competition]');
+const headingNode = requiredChild<HTMLElement>(hero, '[data-live-heading]');
+const metaNode = requiredChild<HTMLElement>(hero, '[data-live-meta]');
+const badgeNode = requiredChild<HTMLElement>(hero, '[data-live-status]');
+const scoreboardNode = requiredChild<HTMLElement>(hero, '[data-live-scoreboard]');
 
 const scoreboards = document.createElement('section');
 scoreboards.id = 'live-scoreboards';
@@ -259,9 +239,7 @@ function seriesTeamsAndScore(): { left: string; right: string; leftWins: number;
       rightWins: Number.parseInt(scoreNodes[1]?.textContent ?? '0', 10) || 0
     };
   }
-
-  const raw = selectedSeries.textContent?.trim() ?? '';
-  const parts = raw.split(/\s+vs\s+/i);
+  const parts = (selectedSeries.textContent?.trim() ?? '').split(/\s+vs\s+/i);
   return {
     left: parts[0] || 'Team unavailable',
     right: parts[1] || 'Team unavailable',
@@ -283,7 +261,7 @@ function competitionParts(): { competition: string; stage: string | null } {
 
 function renderHero(): void {
   const active = selectedSeriesId() !== null;
-  analysisPanel.classList.toggle('live-detail-ready', active);
+  setClass(analysisPanel, 'live-detail-ready', active);
   if (!active) return;
 
   const status = statusLabel();
@@ -293,42 +271,36 @@ function renderHero(): void {
     .split('·')
     .map(part => part.trim())
     .filter(Boolean)
-    .filter((_, index) => index > 0);
+    .slice(1);
   if (competition.stage) metaParts.unshift(competition.stage);
-
-  const competitionNode = hero.querySelector<HTMLElement>('[data-live-competition]');
-  const headingNode = hero.querySelector<HTMLElement>('[data-live-heading]');
-  const metaNode = hero.querySelector<HTMLElement>('[data-live-meta]');
-  const badgeNode = hero.querySelector<HTMLElement>('[data-live-status]');
-  const scoreboardNode = hero.querySelector<HTMLElement>('[data-live-scoreboard]');
-
-  if (competitionNode) competitionNode.textContent = competition.competition;
-  if (headingNode) headingNode.textContent = statusHeading(status);
-  if (metaNode) metaNode.textContent = metaParts.join(' · ') || 'Series details unavailable';
-  if (badgeNode) {
-    badgeNode.textContent = status;
-    badgeNode.className = `completed-final-badge ${statusClass(status)}`;
-  }
 
   const leftLeads = teams.leftWins > teams.rightWins;
   const rightLeads = teams.rightWins > teams.leftWins;
+  const tied = teams.leftWins === teams.rightWins;
   const leftLabel = status === 'FINAL'
     ? leftLeads ? 'Series winner' : ''
-    : leftLeads ? 'Series leader' : teams.leftWins === teams.rightWins ? 'Series tied' : '';
+    : leftLeads ? 'Series leader' : tied ? 'Series tied' : '';
   const rightLabel = status === 'FINAL'
     ? rightLeads ? 'Series winner' : ''
-    : rightLeads ? 'Series leader' : teams.leftWins === teams.rightWins ? 'Series tied' : '';
+    : rightLeads ? 'Series leader' : tied ? 'Series tied' : '';
 
-  if (scoreboardNode) {
-    scoreboardNode.innerHTML = `
-      <div class="completed-score-team ${leftLeads ? 'winner' : ''}">
-        <strong>${escapeHtml(teams.left)}</strong><small>${escapeHtml(leftLabel)}</small>
-      </div>
-      <div class="completed-score-value"><b>${teams.leftWins}</b><span>–</span><b>${teams.rightWins}</b></div>
-      <div class="completed-score-team ${rightLeads ? 'winner' : ''}">
-        <strong>${escapeHtml(teams.right)}</strong><small>${escapeHtml(rightLabel)}</small>
-      </div>`;
-  }
+  const signature = JSON.stringify({ status, teams, competition, metaParts, leftLabel, rightLabel });
+  if (hero.dataset.liveSignature === signature) return;
+  hero.dataset.liveSignature = signature;
+
+  competitionNode.textContent = competition.competition;
+  headingNode.textContent = statusHeading(status);
+  metaNode.textContent = metaParts.join(' · ') || 'Series details unavailable';
+  badgeNode.textContent = status;
+  badgeNode.className = `completed-final-badge ${statusClass(status)}`;
+  scoreboardNode.innerHTML = `
+    <div class="completed-score-team ${leftLeads ? 'winner' : ''}">
+      <strong>${escapeHtml(teams.left)}</strong><small>${escapeHtml(leftLabel)}</small>
+    </div>
+    <div class="completed-score-value"><b>${teams.leftWins}</b><span>–</span><b>${teams.rightWins}</b></div>
+    <div class="completed-score-team ${rightLeads ? 'winner' : ''}">
+      <strong>${escapeHtml(teams.right)}</strong><small>${escapeHtml(rightLabel)}</small>
+    </div>`;
 }
 
 function historyCardFor(gameId: string): HTMLElement | null {
@@ -337,12 +309,11 @@ function historyCardFor(gameId: string): HTMLElement | null {
 }
 
 function enhanceGameTabs(): void {
-  gameSelector.classList.add('completed-game-tabs', 'live-game-tabs');
   const buttons = [...gameSelector.querySelectorAll<HTMLButtonElement>('[data-game-id]')];
   const activeGameId = buttons.find(button => button.classList.contains('active'))?.dataset.gameId ?? null;
 
   for (const button of buttons) {
-    button.classList.add('completed-game-tab');
+    if (!button.classList.contains('completed-game-tab')) button.classList.add('completed-game-tab');
     const gameId = button.dataset.gameId ?? '';
     const card = historyCardFor(gameId);
     const number = card?.querySelector('.completed-game-top strong')?.textContent?.match(/\d+/)?.[0]
@@ -363,45 +334,29 @@ function enhanceGameTabs(): void {
     }
   }
 
-  historyPanel.querySelectorAll<HTMLElement>('[data-history-game-id]').forEach(card => {
-    card.classList.toggle('active', Boolean(activeGameId) && card.dataset.historyGameId === activeGameId);
-  });
+  for (const card of historyPanel.querySelectorAll<HTMLElement>('[data-history-game-id]')) {
+    setClass(card, 'active', Boolean(activeGameId) && card.dataset.historyGameId === activeGameId);
+  }
 }
 
-let queued = false;
+let renderFrame: number | null = null;
 function queueRender(): void {
-  if (queued) return;
-  queued = true;
-  queueMicrotask(() => {
-    queued = false;
+  if (renderFrame !== null) return;
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = null;
     renderHero();
     enhanceGameTabs();
   });
 }
 
+const headerObserver = new MutationObserver(queueRender);
 for (const element of [selectedCompetition, selectedSeries, selectedMeta]) {
-  new MutationObserver(queueRender).observe(element, {
-    childList: true,
-    characterData: true,
-    subtree: true
-  });
+  headerObserver.observe(element, { childList: true, characterData: true, subtree: true });
 }
-new MutationObserver(queueRender).observe(scheduleList, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ['class']
-});
-new MutationObserver(queueRender).observe(historyPanel, {
-  childList: true,
-  subtree: true
-});
-new MutationObserver(queueRender).observe(gameSelector, {
-  childList: true,
-  subtree: true,
-  attributes: true,
-  attributeFilter: ['class']
-});
+
+new MutationObserver(queueRender).observe(scheduleList, { childList: true });
+new MutationObserver(queueRender).observe(historyPanel, { childList: true });
+new MutationObserver(queueRender).observe(gameSelector, { childList: true });
 window.addEventListener('esports-live:snapshot', queueRender);
 window.addEventListener('load', queueRender, { once: true });
 queueRender();

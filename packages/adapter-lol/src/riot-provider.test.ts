@@ -163,6 +163,53 @@ test('Riot provider normalizes schedule entries', async () => {
   assert.equal(schedule[0]?.series.games[0]?.id, 'game-1');
 });
 
+test('Riot provider treats a non-clinching partial score as live when the schedule state is stale', async () => {
+  const staleEvent = eventPayload().data.event;
+  staleEvent.state = 'unstarted';
+  staleEvent.match.games = [];
+  staleEvent.match.teams = staleEvent.match.teams.map((team, index) => ({
+    ...team,
+    result: { gameWins: index, outcome: null }
+  }));
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getSchedule')) {
+        return json({ data: { schedule: { events: [staleEvent] } } });
+      }
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule[0]?.series.state, 'live');
+});
+
+test('Riot provider does not infer live after a team has clinched the series', async () => {
+  const completedEvent = eventPayload().data.event;
+  completedEvent.state = 'completed';
+  completedEvent.match.teams = completedEvent.match.teams.map((team, index) => ({
+    ...team,
+    result: { gameWins: index === 0 ? 2 : 0, outcome: null }
+  }));
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getSchedule')) {
+        return json({ data: { schedule: { events: [completedEvent] } } });
+      }
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule[0]?.series.state, 'completed');
+});
+
 test('Riot provider emits a complete normalized gameplay snapshot', async () => {
   const provider = createRiotLolProvider({
     apiKey: 'test-key',

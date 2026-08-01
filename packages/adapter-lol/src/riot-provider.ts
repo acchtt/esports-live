@@ -125,6 +125,24 @@ function seriesState(value: unknown): SeriesState {
   }
 }
 
+function inferredSeriesState(event: Json, match: Json): SeriesState {
+  const reported = seriesState(event.state ?? match.state);
+  if (reported !== 'scheduled' && reported !== 'completed') return reported;
+
+  const strategy = object(match.strategy);
+  const bestOf = firstNumber(strategy, ['count']) ?? 1;
+  const winsRequired = Math.floor(bestOf / 2) + 1;
+  const results = array(match.teams).map(team => object(object(team).result));
+  const wins = results.map(result => firstNumber(result, ['gameWins', 'wins']) ?? 0);
+  const hasFinalOutcome = results.some(result => stringValue(result.outcome) !== null);
+  const hasPartialScore = wins.some(value => value > 0) && wins.every(value => value < winsRequired);
+
+  // Riot can leave an active series marked unstarted (or briefly completed)
+  // between games. A non-clinching score without a final outcome is the more
+  // reliable live signal used by the public LoL Esports schedule clients.
+  return hasPartialScore && !hasFinalOutcome ? 'live' : reported;
+}
+
 function gameState(value: unknown): GameState {
   switch (String(value ?? '').toLowerCase()) {
     case 'unstarted': return 'unstarted';
@@ -195,7 +213,7 @@ function normalizeSeries(value: unknown, observedAt: string, fallbackGameId?: st
     competition: competition(event),
     teams: [teamRef(teams[0], 'team-1', 'Team 1'), teamRef(teams[1], 'team-2', 'Team 2')],
     bestOf: firstNumber(strategy, ['count']) ?? Math.max(games.length, 1),
-    state: seriesState(event.state ?? match.state),
+    state: inferredSeriesState(event, match),
     scheduledStart: firstString(event, ['startTime', 'scheduledStart']) ?? observedAt,
     games
   };

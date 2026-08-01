@@ -29,6 +29,7 @@ const RESULT_LIMIT = 12;
 const CANDIDATE_LIMIT = 16;
 const LOOKBACK_MS = 14 * 24 * 60 * 60 * 1_000;
 const MAX_CONTEXT_CONCURRENCY = 4;
+const BACKGROUND_RESULTS_DELAY_MS = 250;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -451,6 +452,8 @@ async function loadCompletedMatches(): Promise<void> {
 modeTabs.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button => {
   button.addEventListener('click', () => setMode(button.dataset.mode === 'results' ? 'results' : 'active'));
 });
+
+window.setTimeout(() => void loadCompletedMatches(), BACKGROUND_RESULTS_DELAY_MS);
 
 window.addEventListener('beforeunload', () => {
   if (refreshTimer !== null) clearTimeout(refreshTimer);

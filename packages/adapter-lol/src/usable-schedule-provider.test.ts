@@ -67,6 +67,29 @@ function baseProvider(entry: LolProviderScheduleEntry, withHistory: boolean): Lo
   };
 }
 
+function delayedLiveProvider(): LolProviderClient {
+  const provider = baseProvider(sparseEntry(), true);
+  provider.getSeriesContext = async seriesId => ({
+    seriesId,
+    observedAt,
+    rosters: [],
+    standings: [],
+    history: {
+      bestOf: 3,
+      winsRequired: 2,
+      drawPossible: false,
+      score: [{ team: left, wins: 1 }, { team: right, wins: 0 }],
+      games: [
+        { id: 'game-1', number: 1, state: 'completed', blueTeam: left, redTeam: right, winner: left, durationSeconds: null },
+        { id: 'game-2', number: 2, state: 'unstarted', blueTeam: right, redTeam: left, winner: null, durationSeconds: null },
+        { id: 'game-3', number: 3, state: 'unstarted', blueTeam: left, redTeam: right, winner: null, durationSeconds: null }
+      ]
+    },
+    complete: true
+  });
+  return provider;
+}
+
 test('enriches a sparse live event from series history', async () => {
   const provider = createUsableScheduleProvider(baseProvider(sparseEntry(), true));
   const schedule = await provider.getSchedule();
@@ -95,4 +118,46 @@ test('retains scheduled entries before Riot publishes game IDs', async () => {
   const schedule = await createUsableScheduleProvider(base).getSchedule();
   assert.equal(schedule.length, 1);
   assert.equal(contextCalls, 0);
+});
+
+test('promotes an unstarted LPL game when the live-stat feed has gameplay', async () => {
+  const base = delayedLiveProvider();
+  const snapshotCalls: string[] = [];
+  base.getSnapshot = async gameId => {
+    snapshotCalls.push(gameId);
+    return {
+      series: sparseEntry().series,
+      game: { id: gameId, number: 2, state: 'live' },
+      sourceTimestamp: observedAt,
+      observedAt,
+      advancing: null,
+      complete: false,
+      stats: {} as never
+    };
+  };
+
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
+  assert.deepEqual(snapshotCalls, ['game-2']);
+  assert.equal(schedule[0]?.series.games[1]?.state, 'live');
+});
+
+test('tries the next unpublished game slot after a live-stat miss', async () => {
+  const base = delayedLiveProvider();
+  const snapshotCalls: string[] = [];
+  base.getSnapshot = async gameId => {
+    snapshotCalls.push(gameId);
+    return {
+      series: sparseEntry().series,
+      game: { id: gameId, number: gameId === 'game-3' ? 3 : 2, state: gameId === 'game-3' ? 'live' : 'unstarted' },
+      sourceTimestamp: gameId === 'game-3' ? observedAt : null,
+      observedAt,
+      advancing: null,
+      complete: false,
+      stats: gameId === 'game-3' ? {} as never : null
+    };
+  };
+
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
+  assert.deepEqual(snapshotCalls, ['game-2', 'game-3']);
+  assert.equal(schedule[0]?.series.games[2]?.state, 'live');
 });

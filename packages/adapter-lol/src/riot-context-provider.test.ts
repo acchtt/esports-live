@@ -185,6 +185,32 @@ test('getLive supplies game IDs when the base schedule omits them', async () => 
   ]);
 });
 
+test('getLive adds an active event that is absent from the base schedule', async () => {
+  const liveEvent = scheduleEvent('inProgress');
+  liveEvent.id = 'live-only-event';
+  liveEvent.match.id = 'live-only-match';
+  const provider = createRiotLolContextProvider({
+    apiKey: 'test-key',
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getSchedule')) {
+        return json({ data: { schedule: { events: [] } } });
+      }
+      if (url.pathname.endsWith('/getLive')) {
+        return json({ data: { schedule: { events: [liveEvent] } } });
+      }
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule.length, 1);
+  assert.equal(schedule[0]?.series.id, 'live-only-match');
+  assert.equal(schedule[0]?.series.state, 'live');
+  assert.equal(schedule[0]?.series.games[0]?.id, 'game-1');
+});
+
 test('getLive failure leaves the base schedule available', async () => {
   const provider = createRiotLolContextProvider({
     apiKey: 'test-key',

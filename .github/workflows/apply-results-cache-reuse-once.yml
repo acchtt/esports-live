@@ -1,0 +1,77 @@
+name: Apply Results Cache Reuse Once
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.head_ref == 'fix/reuse-background-results-cache'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Reuse freshly preloaded results
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/completed-matches-view.ts')
+          text = path.read_text()
+          old = """let loadPromise: Promise<void> | null = null;
+          let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+          """
+          new = """let loadPromise: Promise<void> | null = null;
+          let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+          let lastCompletedLoadAt = 0;
+          """
+          if old not in text:
+              raise SystemExit('State block not found')
+          text = text.replace(old, new, 1)
+          old = """async function loadCompletedMatches(): Promise<void> {
+            if (loadPromise) return loadPromise;
+          """
+          new = """async function loadCompletedMatches(): Promise<void> {
+            if (loadPromise) return loadPromise;
+            if (completedMatches.length && Date.now() - lastCompletedLoadAt < RESULTS_REFRESH_MS) {
+              renderList();
+              const selected = completedMatches.find(match => match.event.series.id === selectedSeriesId);
+              if (selected) renderDetail(selected);
+              return;
+            }
+          """
+          if old not in text:
+              raise SystemExit('Loader entry not found')
+          text = text.replace(old, new, 1)
+          old = """      renderList();
+                if (!selectedSeriesId && completedMatches[0]) selectCompleted(completedMatches[0].event.series.id);
+              } catch (error) {
+          """
+          new = """      lastCompletedLoadAt = Date.now();
+                renderList();
+                if (!selectedSeriesId && completedMatches[0]) selectCompleted(completedMatches[0].event.series.id);
+              } catch (error) {
+          """
+          if old not in text:
+              raise SystemExit('Successful load block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - run: npm install --no-package-lock
+      - run: npm run check
+      - run: npm run build:web
+      - name: Commit implementation
+        shell: bash
+        run: |
+          rm -f package-lock.json .github/workflows/apply-results-cache-reuse-once.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/web/src/completed-matches-view.ts .github/workflows/apply-results-cache-reuse-once.yml
+          git commit -m "Reuse freshly preloaded results"
+          git push origin HEAD:${{ github.head_ref }}

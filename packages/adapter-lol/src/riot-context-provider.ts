@@ -25,6 +25,8 @@ const LIVE_RECOVERY_LOOKBACK_MS = 6 * 60 * 60 * 1_000;
 const LIVE_RECOVERY_LOOKAHEAD_MS = 5 * 60 * 1_000;
 const LIVE_RECOVERY_CACHE_MS = 30_000;
 const MAX_LIVE_RECOVERY_CANDIDATES = 8;
+const LEAGUE_RECOVERY_WINDOW_MS = 12 * 60 * 60 * 1_000;
+const MAX_LEAGUE_RECOVERY_REQUESTS = 6;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -222,13 +224,31 @@ function mergeLiveSignals(
 
   const knownSeries = new Set(schedule.map(entry => entry.series.id));
   const liveOnly = scheduleEvents(livePayload).flatMap(event => {
-    const state = rawSeriesState(event.state ?? object(event.match).state);
     const series = normalizeRiotSeries(event, observedAt);
+    const state = detailedLiveState(event) ?? series.state;
     return (state === 'live' || state === 'paused') && !knownSeries.has(series.id)
-      ? [{ series, observedAt }]
+      ? [{ series: { ...series, state }, observedAt }]
       : [];
   });
   return [...merged, ...liveOnly];
+}
+
+function nearbyLeagueIds(
+  schedule: readonly LolProviderScheduleEntry[],
+  currentTime: number
+): readonly string[] {
+  return [...schedule]
+    .filter(entry => {
+      const start = Date.parse(entry.series.scheduledStart);
+      return Number.isFinite(start) && Math.abs(start - currentTime) <= LEAGUE_RECOVERY_WINDOW_MS;
+    })
+    .sort((left, right) => (
+      Math.abs(Date.parse(left.series.scheduledStart) - currentTime)
+      - Math.abs(Date.parse(right.series.scheduledStart) - currentTime)
+    ))
+    .map(entry => entry.series.competition.id)
+    .filter((id, index, ids) => ids.indexOf(id) === index)
+    .slice(0, MAX_LEAGUE_RECOVERY_REQUESTS);
 }
 
 function teamDescriptor(value: unknown, fallbackIndex: number): TeamDescriptor {
@@ -470,11 +490,19 @@ export function createRiotLolContextProvider(options: RiotLolProviderOptions): L
 
     async getSchedule(): Promise<readonly LolProviderScheduleEntry[]> {
       const observedAt = now().toISOString();
-      const [schedule, livePayload] = await Promise.all([
-        base.getSchedule(),
-        persisted('getLive', {}).catch(() => null)
+      const schedule = await base.getSchedule();
+      const leagueIds = nearbyLeagueIds(schedule, now().getTime());
+      const [livePayload, ...leaguePayloads] = await Promise.all([
+        persisted('getLive', {}).catch(() => null),
+        ...leagueIds.map(leagueId => (
+          persisted('getSchedule', { leagueId }).catch(() => null)
+        ))
       ]);
-      return recoverRecentLiveSeries(mergeLiveSignals(schedule, livePayload, observedAt));
+      const merged = [livePayload, ...leaguePayloads].reduce<readonly LolProviderScheduleEntry[]>(
+        (entries, payload) => mergeLiveSignals(entries, payload, observedAt),
+        schedule
+      );
+      return recoverRecentLiveSeries(merged);
     },
 
     getSnapshot(gameId: string, after?: string) {

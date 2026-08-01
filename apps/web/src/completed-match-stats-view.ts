@@ -242,8 +242,14 @@ style.textContent = `
     text-align: right;
   }
   .completed-team-metric strong.red { color: #ffe2e7; text-align: left; }
-  .completed-team-metric.gold-diff strong { color: #7dd3fc; }
-  .completed-team-metric.gold-diff strong.red { color: #fda4af; }
+  .completed-team-metric.gold-diff.blue strong { color: #7dd3fc; }
+  .completed-team-metric.gold-diff.red strong { color: #fda4af; }
+  .completed-team-single-value {
+    display: block;
+    font-size: 1rem;
+    line-height: 1.15;
+    text-align: center;
+  }
   .completed-team-objectives .completed-team-metric strong { font-size: 0.92rem; }
 
   /* Compact mirrored scoreboard inspired by the in-game broadcast layout. */
@@ -570,8 +576,23 @@ function comparisonMetric(label: string, blueValue: number | string | null, redV
     </div>`;
 }
 
+function goldDifferenceMetric(blueGold: number | null, redGold: number | null): string {
+  const difference = blueGold === null || redGold === null ? null : blueGold - redGold;
+  const side = difference === null || difference === 0 ? 'even' : difference > 0 ? 'blue' : 'red';
+  const value = difference === null
+    ? '—'
+    : difference === 0
+      ? 'Even'
+      : `+${(Math.abs(difference) / 1000).toFixed(1)}K`;
+  const title = difference === null ? 'Unavailable' : `${Math.abs(difference).toLocaleString()} gold lead`;
+  return `
+    <div class="completed-team-metric gold-diff ${side}">
+      <span class="completed-team-metric-label">Gold diff</span>
+      <strong class="completed-team-single-value" title="${escapeHtml(title)}">${escapeHtml(value)}</strong>
+    </div>`;
+}
+
 function teamComparisonMarkup(blue: LolTeamState, red: LolTeamState): string {
-  const goldDifference = blue.gold === null || red.gold === null ? null : blue.gold - red.gold;
   return `
     <section class="completed-team-comparison">
       <div class="completed-team-scoreline">
@@ -582,7 +603,7 @@ function teamComparisonMarkup(blue: LolTeamState, red: LolTeamState): string {
         <div class="completed-comparison-team red"><strong>${escapeHtml(red.name)}</strong></div>
       </div>
       <div class="completed-team-objectives">
-        ${comparisonMetric('Gold diff', goldDifference, goldDifference === null ? null : -goldDifference)}
+        ${goldDifferenceMetric(blue.gold, red.gold)}
         ${comparisonMetric('Grubs', blue.objectives.grubs ?? null, red.objectives.grubs ?? null)}
         ${comparisonMetric('Dragons', blue.objectives.dragons?.length ?? null, red.objectives.dragons?.length ?? null)}
         ${comparisonMetric('Barons', blue.objectives.barons, red.objectives.barons)}

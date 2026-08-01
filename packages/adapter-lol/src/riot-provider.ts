@@ -75,6 +75,23 @@ function firstNumber(source: Json, keys: readonly string[]): number | null {
   return null;
 }
 
+function objectiveCount(source: Json, keys: readonly string[], nestedKeys: readonly string[] = keys): number | null {
+  const direct = firstNumber(source, keys);
+  if (direct !== null) return direct;
+
+  const objectives = object(source.objectives);
+  const nested = firstNumber(objectives, nestedKeys);
+  if (nested !== null) return nested;
+
+  for (const key of nestedKeys) {
+    const objective = objectives[key];
+    if (Array.isArray(objective)) return objective.length;
+    const count = firstNumber(object(objective), ['kills', 'count', 'captures']);
+    if (count !== null) return count;
+  }
+  return null;
+}
+
 function parseTime(value: unknown): number | null {
   const parsed = Date.parse(String(value ?? ''));
   return Number.isFinite(parsed) ? parsed : null;
@@ -375,7 +392,11 @@ function teamState(
       dragons: dragons(raw.dragons),
       barons: firstNumber(raw, ['barons', 'baronKills']),
       heralds: firstNumber(raw, ['heralds', 'riftHeraldKills']),
-      grubs: firstNumber(raw, ['voidGrubs', 'voidGrubKills', 'grubs', 'hordes', 'hordeKills'])
+      grubs: objectiveCount(
+        raw,
+        ['voidGrubs', 'voidGrubKills', 'grubs', 'hordes', 'hordeKills'],
+        ['horde', 'hordes', 'voidGrub', 'voidGrubs', 'grubs']
+      )
     },
     players: array(raw.participants).map((entry, index) => playerState(entry, index, meta, details))
   };

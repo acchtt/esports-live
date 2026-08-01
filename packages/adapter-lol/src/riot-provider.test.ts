@@ -81,7 +81,7 @@ function windowPayload() {
         dragons: ['infernal'],
         barons: 0,
         heralds: 1,
-        voidGrubs: 4,
+        objectives: { horde: { kills: 4 } },
         participants: Array.from({ length: 5 }, (_, index) => participant(index + 1))
       },
       redTeam: {
@@ -92,7 +92,7 @@ function windowPayload() {
         dragons: [],
         barons: 0,
         heralds: 0,
-        voidGrubs: 2,
+        objectives: { horde: { kills: 2 } },
         participants: Array.from({ length: 5 }, (_, index) => participant(index + 6))
       }
     }]

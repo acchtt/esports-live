@@ -228,6 +228,19 @@ function frames(value: unknown): readonly Json[] {
   return array(payload.frames ?? object(payload.window).frames ?? object(payload.data).frames).map(object);
 }
 
+function schedulePayload(value: unknown): Json {
+  const payload = object(value);
+  return object(object(payload.data).schedule ?? payload.schedule);
+}
+
+function scheduleEvents(value: unknown): readonly Json[] {
+  return array(schedulePayload(value).events).map(object);
+}
+
+function olderScheduleToken(value: unknown): string | null {
+  return firstString(object(schedulePayload(value).pages), ['older']);
+}
+
 function frameTime(frame: Json): string | null {
   const value = firstString(frame, ['rfc460Timestamp', 'timestamp']);
   return value && parseTime(value) !== null ? value : null;
@@ -597,9 +610,19 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
 
     async getSchedule(): Promise<readonly LolProviderScheduleEntry[]> {
       const observedAt = now().toISOString();
-      const payload = object(await persisted('getSchedule', {}));
-      const events = array(object(object(payload.data).schedule).events ?? object(payload.schedule).events);
-      return events.map(event => ({ series: normalizeRiotSeries(event, observedAt), observedAt }));
+      const payload = await persisted('getSchedule', {});
+      const olderToken = olderScheduleToken(payload);
+      const olderPayload = olderToken
+        ? await persisted('getSchedule', { pageToken: olderToken }).catch(() => null)
+        : null;
+      const entries = [...scheduleEvents(payload), ...scheduleEvents(olderPayload)]
+        .map(event => ({ series: normalizeRiotSeries(event, observedAt), observedAt }));
+      const seen = new Set<string>();
+      return entries.filter(entry => {
+        if (seen.has(entry.series.id)) return false;
+        seen.add(entry.series.id);
+        return true;
+      });
     },
 
     async getSnapshot(gameId: string, after?: string): Promise<LolProviderSnapshot> {

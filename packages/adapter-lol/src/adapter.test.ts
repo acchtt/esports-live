@@ -26,7 +26,7 @@ const stats: LolStats = {
     side: 'blue',
     gold: 18000,
     kills: 3,
-    objectives: { towers: 1, inhibitors: 0, dragons: ['infernal'], barons: 0, heralds: 1 },
+    objectives: { towers: 1, inhibitors: 0, dragons: ['infernal'], barons: 0, heralds: 1, grubs: 4 },
     players: []
   },
   red: {
@@ -35,7 +35,7 @@ const stats: LolStats = {
     side: 'red',
     gold: 17500,
     kills: 2,
-    objectives: { towers: 0, inhibitors: 0, dragons: [], barons: 0, heralds: 0 },
+    objectives: { towers: 0, inhibitors: 0, dragons: [], barons: 0, heralds: 0, grubs: 2 },
     players: []
   }
 };

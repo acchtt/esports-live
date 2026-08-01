@@ -32,7 +32,7 @@ function team(side: 'blue' | 'red', gold: number, items: readonly string[] | nul
     side,
     gold,
     kills: 5,
-    objectives: { towers: 2, inhibitors: 0, dragons: [], barons: 0, heralds: 1 },
+    objectives: { towers: 2, inhibitors: 0, dragons: [], barons: 0, heralds: 1, grubs: 3 },
     players: Array.from({ length: 5 }, (_, index) => player(String(index + 1 + offset), items))
   };
 }

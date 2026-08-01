@@ -6,6 +6,7 @@ export interface LolObjectiveState {
   dragons: readonly string[] | null;
   barons: number | null;
   heralds: number | null;
+  grubs: number | null;
 }
 
 export interface LolPlayerState {

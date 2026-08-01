@@ -25,7 +25,7 @@ Owns League of Legends concepts and provider normalization:
 
 - map clock and patch
 - team gold and kills
-- towers, inhibitors, dragons, barons, and heralds
+- towers, inhibitors, dragons, barons, heralds, and Void Grubs
 - player champion, role, KDA, CS, gold, and items
 
 The adapter accepts an injected provider client. Authentication, endpoint selection, caching, retries, and raw payload parsing belong to the provider implementation—not the core or UI.

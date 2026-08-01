@@ -81,6 +81,7 @@ function windowPayload() {
         dragons: ['infernal'],
         barons: 0,
         heralds: 1,
+        voidGrubs: 4,
         participants: Array.from({ length: 5 }, (_, index) => participant(index + 1))
       },
       redTeam: {
@@ -91,6 +92,7 @@ function windowPayload() {
         dragons: [],
         barons: 0,
         heralds: 0,
+        voidGrubs: 2,
         participants: Array.from({ length: 5 }, (_, index) => participant(index + 6))
       }
     }]
@@ -174,6 +176,7 @@ test('Riot provider emits a complete normalized gameplay snapshot', async () => 
   assert.equal(snapshot.game.state, 'live');
   assert.equal(snapshot.stats?.gameClockSeconds, 590);
   assert.equal(snapshot.stats?.blue.gold, 30000);
+  assert.equal(snapshot.stats?.blue.objectives.grubs, 4);
   assert.deepEqual(snapshot.stats?.blue.players[0]?.items, ['3006', '3363']);
   assert.equal(snapshot.stats?.blue.players[0]?.kills, 4);
   assert.equal(snapshot.quality.freshness, 'fresh');

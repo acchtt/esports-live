@@ -1,10 +1,7 @@
-name: Deploy production
+name: Deploy sparse live fix
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  pull_request:
 
 permissions:
   contents: read
@@ -19,9 +16,12 @@ env:
 
 jobs:
   deploy:
+    if: github.head_ref == 'ops/deploy-sparse-live-events'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: 19a85201eae9cc0d6bad4d7d5ece91e070c23a7d
 
       - uses: actions/setup-node@v6
         with:
@@ -56,7 +56,7 @@ jobs:
           done
           exit 1
 
-      - name: Verify API Worker
+      - name: Verify API and live schedule
         shell: bash
         env:
           API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
@@ -68,18 +68,61 @@ jobs:
           let last = 'no response';
           for (let attempt = 1; attempt <= 30; attempt += 1) {
             try {
-              const response = await fetch(`${base}/health?release=${Date.now()}`, {
+              const healthResponse = await fetch(`${base}/health?release=${Date.now()}`, {
                 headers: { 'cache-control': 'no-cache' }
               });
-              const body = await response.text();
-              last = `HTTP ${response.status}: ${body.slice(0, 300)}`;
-              if (response.ok) {
-                const parsed = JSON.parse(body);
-                if (parsed?.ok === true && Array.isArray(parsed.adapters) && parsed.adapters.includes('lol')) {
-                  console.log(`PRODUCTION_API_VERIFIED=${JSON.stringify({ base, service: parsed.service, adapters: parsed.adapters })}`);
-                  process.exit(0);
-                }
+              const healthText = await healthResponse.text();
+              if (!healthResponse.ok) {
+                last = `health HTTP ${healthResponse.status}: ${healthText.slice(0, 300)}`;
+                await sleep(4000);
+                continue;
               }
+              const health = JSON.parse(healthText);
+              if (health?.ok !== true || !Array.isArray(health.adapters) || !health.adapters.includes('lol')) {
+                last = `invalid health: ${healthText.slice(0, 300)}`;
+                await sleep(4000);
+                continue;
+              }
+
+              const scheduleResponse = await fetch(
+                `${base}/v1/lol/schedule?states=live,paused,scheduled&release=${Date.now()}`,
+                { headers: { 'cache-control': 'no-cache' } }
+              );
+              const scheduleText = await scheduleResponse.text();
+              if (!scheduleResponse.ok) {
+                last = `schedule HTTP ${scheduleResponse.status}: ${scheduleText.slice(0, 300)}`;
+                await sleep(4000);
+                continue;
+              }
+              const schedule = JSON.parse(scheduleText);
+              const events = Array.isArray(schedule?.events) ? schedule.events : [];
+              const active = events.filter(event => ['live', 'paused'].includes(event?.series?.state));
+              const invalid = active.filter(event => {
+                const series = event?.series ?? {};
+                const teams = Array.isArray(series.teams) ? series.teams : [];
+                return !Array.isArray(series.games)
+                  || series.games.length === 0
+                  || teams.length !== 2
+                  || teams.some((team, index) => (
+                    team?.id === `team-${index + 1}` || team?.name === `Team ${index + 1}`
+                  ));
+              });
+              if (invalid.length) {
+                last = `unresolved live placeholders: ${JSON.stringify(invalid).slice(0, 600)}`;
+                await sleep(4000);
+                continue;
+              }
+              console.log(`PRODUCTION_SCHEDULE_VERIFIED=${JSON.stringify({
+                base,
+                totalEvents: events.length,
+                activeEvents: active.length,
+                activeSeries: active.map(event => ({
+                  id: event.series.id,
+                  teams: event.series.teams.map(team => team.name),
+                  games: event.series.games.length
+                }))
+              })}`);
+              process.exit(0);
             } catch (error) {
               last = error instanceof Error ? error.message : String(error);
             }
@@ -91,13 +134,12 @@ jobs:
       - name: Deploy Pages
         shell: bash
         run: |
-          message="$(git log -1 --pretty=%s)"
           for attempt in 1 2 3 4 5; do
             if npx wrangler pages deploy apps/web/dist \
               --project-name esports-live \
               --branch main \
-              --commit-hash "$GITHUB_SHA" \
-              --commit-message "$message"; then
+              --commit-hash 19a85201eae9cc0d6bad4d7d5ece91e070c23a7d \
+              --commit-message "Resolve sparse live schedule events"; then
               exit 0
             fi
             sleep $((attempt * 20))

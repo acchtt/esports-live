@@ -1,0 +1,100 @@
+name: Deploy ended winner fix once
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy-and-verify:
+    if: github.head_ref == 'ops/deploy-ended-winner-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 0b058bdf95eae079b76e348c9e95863f614e0790
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "${{ vars.VITE_API_BASE_URL }}" || { echo "Missing VITE_API_BASE_URL"; exit 1; }
+
+      - run: npm install --no-package-lock
+      - run: npm run check
+
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: Deploy API Worker
+        run: npm run deploy:api
+
+      - name: Verify API Worker
+        env:
+          API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          node --input-type=module - <<'NODE'
+          const base = process.env.API_BASE_URL.replace(/\/$/, '');
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const response = await fetch(`${base}/health?release=${Date.now()}`, {
+              headers: { 'cache-control': 'no-cache' }
+            }).catch(() => null);
+            if (response?.ok) {
+              const body = await response.json();
+              if (body?.ok === true && body.adapters?.includes('lol')) {
+                console.log(`PRODUCTION_API_VERIFIED=${JSON.stringify(body)}`);
+                process.exit(0);
+              }
+            }
+            await sleep(4000);
+          }
+          throw new Error('Production API did not become healthy.');
+          NODE
+
+      - name: Deploy Pages
+        run: |
+          npx wrangler pages deploy apps/web/dist \
+            --project-name esports-live \
+            --branch main \
+            --commit-hash 0b058bdf95eae079b76e348c9e95863f614e0790 \
+            --commit-message "Preserve ended-match winners and auto-deploy fixes"
+
+      - name: Verify Pages release
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const web = 'https://esports-live.pages.dev';
+          const localHtml = fs.readFileSync('apps/web/dist/index.html', 'utf8');
+          const expectedJs = localHtml.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          if (!expectedJs) throw new Error('Built JavaScript entry is missing.');
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const response = await fetch(`${web}/?release=${Date.now()}`, {
+              headers: { 'cache-control': 'no-cache' }
+            }).catch(() => null);
+            const html = response?.ok ? await response.text() : '';
+            if (html.includes(expectedJs)) {
+              console.log(`PRODUCTION_WEB_VERIFIED=${expectedJs}`);
+              process.exit(0);
+            }
+            await sleep(4000);
+          }
+          throw new Error(`Production did not expose ${expectedJs}.`);
+          NODE

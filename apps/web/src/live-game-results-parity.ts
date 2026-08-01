@@ -92,11 +92,14 @@ if (historyPanel) {
     if (!heading) {
       heading = document.createElement('div');
       heading.className = 'live-results-heading completed-section-heading';
+      heading.innerHTML = `
+        <div><span class="eyebrow">SERIES</span><h3>Game results</h3></div>
+        <span data-live-results-count></span>`;
       historyPanel.insertBefore(heading, games);
     }
-    heading.innerHTML = `
-      <div><span class="eyebrow">SERIES</span><h3>Game results</h3></div>
-      <span>${completed} of ${cards.length} games played</span>`;
+    const count = heading.querySelector<HTMLElement>('[data-live-results-count]');
+    const countLabel = `${completed} of ${cards.length} games played`;
+    if (count && count.textContent !== countLabel) count.textContent = countLabel;
 
     for (const card of cards) {
       card.classList.add('completed-game');

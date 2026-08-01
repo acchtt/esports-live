@@ -191,36 +191,21 @@ style.textContent = `
   }
   .completed-team-objectives {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     min-width: 800px;
     background: rgba(1, 5, 15, 0.56);
   }
   .completed-team-metric {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: baseline;
-    gap: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
     min-width: 0;
     padding: 9px 10px;
   }
   .completed-team-scoreline .completed-team-metric {
-    grid-template-rows: auto auto;
-    align-content: center;
-    row-gap: 3px;
     min-height: 70px;
     border-left: 1px solid rgba(148, 163, 184, 0.1);
-  }
-  .completed-team-scoreline .completed-team-metric > span {
-    grid-row: 1;
-    grid-column: 1 / -1;
-  }
-  .completed-team-scoreline .completed-team-metric > strong:first-child {
-    grid-row: 2;
-    grid-column: 1;
-  }
-  .completed-team-scoreline .completed-team-metric > strong.red {
-    grid-row: 2;
-    grid-column: 3;
   }
   .completed-team-scoreline .completed-team-metric:nth-last-child(2) {
     border-right: 1px solid rgba(148, 163, 184, 0.1);
@@ -228,13 +213,26 @@ style.textContent = `
   .completed-team-objectives .completed-team-metric {
     border-right: 1px solid rgba(148, 163, 184, 0.09);
   }
-  .completed-team-metric span {
+  .completed-team-metric-label {
     color: #8290a5;
     font-size: 0.56rem;
     font-weight: 800;
     letter-spacing: 0.05em;
     text-align: center;
     text-transform: uppercase;
+  }
+  .completed-team-values {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 7px;
+    width: 100%;
+  }
+  .completed-team-values i {
+    color: #526177;
+    font-size: 0.78rem;
+    font-style: normal;
+    font-weight: 700;
   }
   .completed-team-metric strong {
     min-width: 0;
@@ -244,6 +242,8 @@ style.textContent = `
     text-align: right;
   }
   .completed-team-metric strong.red { color: #ffe2e7; text-align: left; }
+  .completed-team-metric.gold-diff strong { color: #7dd3fc; }
+  .completed-team-metric.gold-diff strong.red { color: #fda4af; }
   .completed-team-objectives .completed-team-metric strong { font-size: 0.92rem; }
 
   /* Compact mirrored scoreboard inspired by the in-game broadcast layout. */
@@ -530,7 +530,7 @@ function roleGoldDeltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | 
     ? 'No data'
     : magnitude === 0
       ? 'Even'
-      : `${difference! > 0 ? 'Blue' : 'Red'} +${magnitude.toLocaleString()}`;
+      : `+${magnitude.toLocaleString()}`;
   return `
     <div class="role-gold-delta ${side}" style="--role-edge: ${edge}%">
       <strong>${lead}</strong>
@@ -552,18 +552,26 @@ function roleMatchupRows(blue: LolTeamState, red: LolTeamState): string {
 function comparisonMetric(label: string, blueValue: number | string | null, redValue: number | string | null): string {
   const displayValue = (value: number | string | null): string => {
     if (value === null) return '—';
-    if (label === 'Gold' && typeof value === 'number') return `${(value / 1000).toFixed(1)}K`;
+    if ((label === 'Gold' || label === 'Gold diff') && typeof value === 'number') {
+      const magnitude = `${(Math.abs(value) / 1000).toFixed(1)}K`;
+      if (label === 'Gold') return magnitude;
+      return value > 0 ? `+${magnitude}` : value < 0 ? `−${magnitude}` : 'Even';
+    }
     return typeof value === 'number' ? value.toLocaleString() : value;
   };
   return `
-    <div class="completed-team-metric">
-      <strong title="${escapeHtml(typeof blueValue === 'number' ? blueValue.toLocaleString() : blueValue ?? '—')}">${escapeHtml(displayValue(blueValue))}</strong>
-      <span>${escapeHtml(label)}</span>
-      <strong class="red" title="${escapeHtml(typeof redValue === 'number' ? redValue.toLocaleString() : redValue ?? '—')}">${escapeHtml(displayValue(redValue))}</strong>
+    <div class="completed-team-metric${label === 'Gold diff' ? ' gold-diff' : ''}">
+      <span class="completed-team-metric-label">${escapeHtml(label)}</span>
+      <div class="completed-team-values">
+        <strong title="${escapeHtml(typeof blueValue === 'number' ? blueValue.toLocaleString() : blueValue ?? '—')}">${escapeHtml(displayValue(blueValue))}</strong>
+        <i aria-hidden="true">–</i>
+        <strong class="red" title="${escapeHtml(typeof redValue === 'number' ? redValue.toLocaleString() : redValue ?? '—')}">${escapeHtml(displayValue(redValue))}</strong>
+      </div>
     </div>`;
 }
 
 function teamComparisonMarkup(blue: LolTeamState, red: LolTeamState): string {
+  const goldDifference = blue.gold === null || red.gold === null ? null : blue.gold - red.gold;
   return `
     <section class="completed-team-comparison">
       <div class="completed-team-scoreline">
@@ -574,6 +582,8 @@ function teamComparisonMarkup(blue: LolTeamState, red: LolTeamState): string {
         <div class="completed-comparison-team red"><strong>${escapeHtml(red.name)}</strong></div>
       </div>
       <div class="completed-team-objectives">
+        ${comparisonMetric('Gold diff', goldDifference, goldDifference === null ? null : -goldDifference)}
+        ${comparisonMetric('Grubs', blue.objectives.grubs ?? null, red.objectives.grubs ?? null)}
         ${comparisonMetric('Dragons', blue.objectives.dragons?.length ?? null, red.objectives.dragons?.length ?? null)}
         ${comparisonMetric('Barons', blue.objectives.barons, red.objectives.barons)}
         ${comparisonMetric('Inhibitors', blue.objectives.inhibitors, red.objectives.inhibitors)}

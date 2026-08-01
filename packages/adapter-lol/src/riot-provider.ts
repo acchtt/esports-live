@@ -374,7 +374,8 @@ function teamState(
       inhibitors: firstNumber(raw, ['inhibitors', 'inhibitorKills']),
       dragons: dragons(raw.dragons),
       barons: firstNumber(raw, ['barons', 'baronKills']),
-      heralds: firstNumber(raw, ['heralds', 'riftHeraldKills'])
+      heralds: firstNumber(raw, ['heralds', 'riftHeraldKills']),
+      grubs: firstNumber(raw, ['voidGrubs', 'voidGrubKills', 'grubs', 'hordes', 'hordeKills'])
     },
     players: array(raw.participants).map((entry, index) => playerState(entry, index, meta, details))
   };

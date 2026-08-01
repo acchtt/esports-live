@@ -40,7 +40,8 @@ function mergeTeam(previous: LolTeamState, incoming: LolTeamState): LolTeamState
       inhibitors: incoming.objectives.inhibitors ?? previous.objectives.inhibitors,
       dragons: incoming.objectives.dragons ?? previous.objectives.dragons,
       barons: incoming.objectives.barons ?? previous.objectives.barons,
-      heralds: incoming.objectives.heralds ?? previous.objectives.heralds
+      heralds: incoming.objectives.heralds ?? previous.objectives.heralds,
+      grubs: incoming.objectives.grubs ?? previous.objectives.grubs
     },
     players: players.map(player => mergePlayer(oldPlayers.get(player.id), player))
   };

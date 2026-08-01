@@ -217,7 +217,7 @@ function playerMarkup(team: LolTeamState): string {
   return team.players.map(player => {
     const items = player.items?.length ? player.items.join(' · ') : 'Items unavailable';
     return `
-      <div class="completed-final-player">
+      <div class="completed-final-player" data-role="${escapeHtml(player.role ?? '')}" data-champion="${escapeHtml(player.championId ?? '')}">
         <div><strong>${escapeHtml(player.handle ?? 'Unknown player')}</strong><small>${escapeHtml(player.championId ?? 'Champion unavailable')}</small></div>
         <span>${formatNumber(player.kills)}/${formatNumber(player.deaths)}/${formatNumber(player.assists)} · ${formatNumber(player.creepScore)} CS</span>
         <span class="completed-final-items">${escapeHtml(items)} · ${formatNumber(player.totalGold)}g</span>

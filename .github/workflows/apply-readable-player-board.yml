@@ -1,0 +1,572 @@
+name: Apply readable player board
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-check:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'agent/readable-player-board'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/readable-player-board
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Apply UI changes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          main_path = Path('apps/web/src/main.ts')
+          main = main_path.read_text()
+          start = main.index("type ObjectiveKind = 'towers'")
+          end = main.index("\ntype CanonicalRole", start)
+          objective = textwrap.dedent('''\
+          function objectiveMarkup(team: LolTeamState): string {
+            const objectives = team.objectives;
+            const dragonCount = objectives.dragons === null ? null : objectives.dragons.length;
+            const dragonList = objectives.dragons?.length
+              ? objectives.dragons.map(dragon => String(dragon).replaceAll('_', ' ')).join(', ')
+              : null;
+            const cell = (label: string, value: number | null, detail?: string | null): string => {
+              const formatted = formatNumber(value);
+              const title = detail ? `${label}: ${formatted} · ${detail}` : `${label}: ${formatted}`;
+              return `
+                <div class="objective-stat" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">
+                  <span class="objective-label">${escapeHtml(label)}</span>
+                  <strong>${formatted}</strong>
+                </div>`;
+            };
+            return `
+              <div class="objective-grid">
+                ${cell('Towers', objectives.towers)}
+                ${cell('Dragons', dragonCount, dragonList)}
+                ${cell('Barons', objectives.barons)}
+                ${cell('Heralds', objectives.heralds)}
+                ${cell('Inhibitors', objectives.inhibitors)}
+              </div>`;
+          }
+          ''')
+          main = main[:start] + objective + main[end:]
+          main_path.write_text(main)
+
+          board_path = Path('apps/web/src/player-board-view.ts')
+          board = board_path.read_text()
+          marker = "\n`;\ndocument.head.append(style);"
+          if marker not in board:
+              raise SystemExit('player board style terminator not found')
+          readability = textwrap.dedent('''\
+
+            /* player-board-readability */
+            .telemetry-player-board {
+              grid-template-columns: 40px minmax(96px, 1fr) 42px 62px 42px 58px;
+              gap: 8px;
+              min-height: 74px;
+              padding: 10px 12px;
+              border-color: rgba(148, 163, 184, 0.17);
+              background: rgba(2, 6, 23, 0.34);
+            }
+
+            .telemetry-champion {
+              width: 40px;
+              height: 40px;
+              border-radius: 9px;
+            }
+
+            .telemetry-player-copy strong {
+              color: #f8fafc;
+              font-size: .82rem;
+            }
+
+            .telemetry-player-copy span {
+              color: #a4b0c1;
+              font-size: .6rem;
+            }
+
+            .telemetry-level {
+              color: #dbeafe;
+              font-size: .58rem;
+            }
+
+            .telemetry-player-stat span {
+              color: #94a3b8;
+              font-size: .48rem;
+            }
+
+            .telemetry-player-stat strong {
+              color: #f1f5f9;
+              font-size: .68rem;
+            }
+
+            .telemetry-inventory {
+              gap: 5px;
+              min-height: 26px;
+              padding-left: 48px;
+            }
+
+            .telemetry-inventory-label {
+              color: #94a3b8;
+              font-size: .5rem;
+            }
+
+            .telemetry-item-slot {
+              width: 24px;
+              height: 24px;
+              flex-basis: 24px;
+              border-color: rgba(148, 163, 184, 0.2);
+            }
+
+            .role-matchup-row {
+              min-height: 106px;
+            }
+
+            .role-player,
+            .role-player.red {
+              grid-template-columns: 44px minmax(0, 1fr) minmax(176px, auto);
+              grid-template-areas:
+                "portrait heading stats"
+                "portrait items items";
+              gap: 9px 12px;
+              padding: 14px 18px;
+            }
+
+            .role-player.red {
+              grid-template-columns: minmax(176px, auto) minmax(0, 1fr) 44px;
+              grid-template-areas:
+                "stats heading portrait"
+                "items items portrait";
+            }
+
+            .role-player-portrait .telemetry-champion {
+              width: 44px;
+              height: 44px;
+              border-radius: 10px;
+            }
+
+            .role-player .role-player-heading {
+              gap: 10px;
+            }
+
+            .role-player .role-chip {
+              min-width: 58px;
+              min-height: 26px;
+              font-size: .54rem;
+            }
+
+            .role-player .role-player-name strong {
+              color: #f8fafc;
+              font-size: .9rem;
+              line-height: 1.25;
+            }
+
+            .role-player .role-player-name small {
+              display: block;
+              margin-top: 3px;
+              color: #a5b2c3;
+              font-size: .64rem;
+            }
+
+            .role-player .role-player-stats {
+              grid-template-columns: repeat(3, minmax(52px, auto));
+              gap: 6px;
+            }
+
+            .role-player .role-player-stats > span {
+              min-width: 52px;
+              padding: 6px 8px;
+              border: 1px solid rgba(148, 163, 184, 0.13);
+              border-radius: 8px;
+              background: rgba(15, 23, 42, 0.44);
+            }
+
+            .role-player .role-player-stats small {
+              color: #94a3b8;
+              font-size: .5rem;
+            }
+
+            .role-player .role-player-stats strong {
+              margin-top: 3px;
+              color: #f1f5f9;
+              font-size: .72rem;
+            }
+
+            .role-player-items .telemetry-inventory {
+              gap: 5px;
+              min-height: 24px;
+            }
+
+            .role-player-items .telemetry-item-slot {
+              width: 23px;
+              height: 23px;
+              flex-basis: 23px;
+              border-radius: 5px;
+            }
+
+            .role-player-items .telemetry-inventory-label {
+              display: inline;
+              color: #8f9caf;
+              font-size: .46rem;
+            }
+
+            @container (max-width: 360px) {
+              .telemetry-player-board {
+                grid-template-areas:
+                  "champion copy level"
+                  "kda cs gold"
+                  "inventory inventory inventory";
+                grid-template-columns: 40px minmax(0, 1fr) 42px;
+                gap: 8px;
+              }
+
+              .telemetry-player-stat {
+                text-align: left;
+              }
+
+              .telemetry-inventory {
+                padding-left: 0;
+              }
+            }
+
+            @media (max-width: 1320px) {
+              .role-player,
+              .role-player.red {
+                grid-template-columns: 40px minmax(0, 1fr);
+                grid-template-areas:
+                  "portrait heading"
+                  "stats stats"
+                  "items items";
+                gap: 8px 10px;
+              }
+
+              .role-player.red {
+                grid-template-columns: minmax(0, 1fr) 40px;
+                grid-template-areas:
+                  "heading portrait"
+                  "stats stats"
+                  "items items";
+              }
+
+              .role-player-portrait .telemetry-champion {
+                width: 40px;
+                height: 40px;
+              }
+
+              .role-player .role-player-stats {
+                width: 100%;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+              }
+            }
+
+            @media (max-width: 720px) {
+              .role-player,
+              .role-player.red {
+                padding: 12px 10px;
+              }
+
+              .role-player .role-chip {
+                min-width: 0;
+                font-size: .48rem;
+              }
+
+              .role-player .role-player-name strong {
+                font-size: .78rem;
+              }
+
+              .role-player .role-player-name small,
+              .role-player .role-player-stats > span:nth-child(2) {
+                display: block;
+              }
+
+              .role-player .role-player-stats {
+                gap: 4px;
+              }
+
+              .role-player .role-player-stats > span {
+                min-width: 0;
+                padding: 5px 4px;
+              }
+
+              .role-player .role-player-stats small {
+                font-size: .43rem;
+              }
+
+              .role-player .role-player-stats strong {
+                font-size: .62rem;
+              }
+
+              .role-player-items .telemetry-inventory-label {
+                display: none;
+              }
+            }
+          ''')
+          board = board.replace(marker, readability + marker, 1)
+          board_path.write_text(board)
+
+          styles_path = Path('apps/web/src/styles.css')
+          styles = styles_path.read_text()
+          styles += textwrap.dedent('''\
+
+          /* readable-objective-text */
+          .objective-grid > .objective-stat {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            place-items: center;
+            gap: 3px;
+            min-width: 0;
+            text-align: center;
+          }
+
+          .objective-label {
+            display: block;
+            max-width: 100%;
+            overflow: hidden;
+            color: #aab6c6;
+            font-size: .55rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            line-height: 1.15;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .team-overview .objective-grid > .objective-stat {
+            min-height: 50px;
+            padding: 7px 5px;
+          }
+
+          .team-overview .objective-label {
+            font-size: .5rem;
+          }
+
+          .role-objectives .objective-grid {
+            grid-template-columns: repeat(5, minmax(62px, 1fr));
+            gap: 6px;
+          }
+
+          .role-objectives .objective-grid > .objective-stat {
+            min-height: 44px;
+            padding: 6px 4px;
+            border-color: rgba(148, 163, 184, 0.12);
+            background: rgba(255, 255, 255, 0.022);
+          }
+
+          .role-objectives .objective-label {
+            color: #9eacbd;
+            font-size: .5rem;
+          }
+
+          .role-objectives .objective-stat strong {
+            color: #f8fafc;
+            font-size: .84rem;
+          }
+
+          .role-gold-delta small {
+            color: #8998ab;
+            font-size: .48rem;
+          }
+
+          .role-gold-delta > strong {
+            font-size: .9rem;
+          }
+
+          @media (max-width: 720px) {
+            .role-objectives {
+              padding: 7px 5px;
+              overflow-x: auto;
+              scrollbar-width: thin;
+            }
+
+            .role-objectives .objective-grid {
+              grid-template-columns: repeat(5, minmax(60px, 1fr));
+              min-width: 320px;
+            }
+
+            .role-objectives .objective-stat:nth-child(4),
+            .role-objectives .objective-stat:nth-child(5) {
+              display: grid;
+            }
+
+            .role-objective-comparison > span {
+              display: block;
+              font-size: .46rem;
+            }
+          }
+          ''')
+          styles_path.write_text(styles)
+
+          checks = {
+              main_path: ['objective-label', "cell('Inhibitors'", 'objective-icon'],
+              board_path: ['player-board-readability', 'font-size: .9rem', 'nth-child(2)'],
+              styles_path: ['readable-objective-text', 'min-width: 320px']
+          }
+          if 'objectiveAsset(' in main_path.read_text() or 'OBJECTIVE_ASSETS' in main_path.read_text():
+              raise SystemExit('objective image assets are still referenced')
+          if '<img class="objective-icon"' in main_path.read_text():
+              raise SystemExit('objective icon markup is still present')
+          for path, markers in checks.items():
+              value = path.read_text()
+              for required in markers:
+                  if required not in value:
+                      raise SystemExit(f'{path}: missing {required}')
+          PY
+
+      - name: Install dependencies
+        run: npm install --no-package-lock
+
+      - name: Validate
+        run: |
+          npm run check
+          npm run build:web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: Install browser verifier
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+
+      - name: Verify board readability
+        shell: bash
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          npx vite preview apps/web --host 127.0.0.1 --port 4173 --strictPort > /tmp/esports-live-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill $preview_pid 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173 >/dev/null && break
+            sleep 1
+          done
+          node --input-type=module - <<'NODE'
+          import { chromium } from 'playwright';
+
+          const now = new Date().toISOString();
+          const blue = { id: 'blue', name: 'Blue Team', code: 'BLUE' };
+          const red = { id: 'red', name: 'Red Team', code: 'RED' };
+          const roles = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
+          const champions = ['Aatrox', 'LeeSin', 'Ahri', 'Jinx', 'Nautilus'];
+          const player = (side, index) => ({
+            id: `${side}-${index}`,
+            handle: `${side === 'blue' ? 'Blue' : 'Red'} Player ${index + 1}`,
+            championId: champions[index],
+            role: roles[index],
+            level: 14 + (index % 2),
+            kills: index + 1,
+            deaths: index % 3,
+            assists: 5 + index,
+            creepScore: 170 + index * 18,
+            totalGold: 10500 + index * 720 + (side === 'blue' ? 300 : 0),
+            items: ['1055', '3006', '3031', '3094', '3036', '3072', '3363']
+          });
+          const game = { id: 'g1', number: 1, state: 'live' };
+          const series = {
+            id: 's1', esport: 'lol',
+            competition: { id: 'league', name: 'Readable League', stage: 'Week 1' },
+            teams: [blue, red], bestOf: 3, state: 'live', scheduledStart: now, games: [game]
+          };
+          const provider = { id: 'fixture', name: 'Fixture' };
+          const snapshot = {
+            schemaVersion: '1.0', esport: 'lol', provider, series, game,
+            stats: {
+              gameClockSeconds: 1842,
+              patch: '16.15.1',
+              blue: {
+                ...blue, side: 'blue', gold: 62500, kills: 15,
+                objectives: { towers: 7, inhibitors: 1, dragons: ['cloud', 'infernal', 'ocean'], barons: 1, heralds: 1 },
+                players: roles.map((_, index) => player('blue', index))
+              },
+              red: {
+                ...red, side: 'red', gold: 59800, kills: 11,
+                objectives: { towers: 4, inhibitors: 0, dragons: ['mountain'], barons: 0, heralds: 1 },
+                players: roles.map((_, index) => player('red', index))
+              }
+            },
+            quality: {
+              freshness: 'fresh', sourceTimestamp: now, observedAt: now, ageSeconds: 1,
+              complete: true, advancing: true, safeForLiveAnalysis: true, reasons: []
+            }
+          };
+
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 700, height: 1200 } });
+          await page.route('**/*', async route => {
+            const url = new URL(route.request().url());
+            const json = value => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+            if (url.pathname === '/health') return json({ ok: true, service: 'fixture', schemaVersion: '1.0', adapters: ['lol'] });
+            if (url.pathname === '/v1/lol/schedule') return json({ esport: 'lol', events: [{ series, provider, observedAt: now }] });
+            if (url.pathname.includes('/games/g1/live')) return json(snapshot);
+            if (url.pathname.includes('/series/s1/context')) {
+              return json({ schemaVersion: '1.0', esport: 'lol', seriesId: 's1', provider, observedAt: now, rosters: [], standings: [], complete: false, reasons: [] });
+            }
+            return route.continue();
+          });
+
+          await page.goto(`http://127.0.0.1:4173/?verify=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+          await page.locator('.role-scoreboard-board').waitFor({ state: 'visible', timeout: 30000 });
+          await page.waitForTimeout(1000);
+
+          const counts = {
+            objectiveIcons: await page.locator('.objective-icon').count(),
+            objectiveLabels: await page.locator('.role-objective-comparison .objective-label').count(),
+            roleRows: await page.locator('.role-matchup-row').count(),
+            rolePlayers: await page.locator('.role-player-name strong').count(),
+            roleStats: await page.locator('.role-player-stats > span:visible').count(),
+            rolePortraits: await page.locator('.role-player-portrait .telemetry-champion').count(),
+            roleItemSlots: await page.locator('.role-player-items .telemetry-item-slot').count(),
+            teamPlayers: await page.locator('.telemetry-player-board').count()
+          };
+          const expected = {
+            objectiveIcons: 0,
+            objectiveLabels: 10,
+            roleRows: 5,
+            rolePlayers: 10,
+            roleStats: 30,
+            rolePortraits: 10,
+            roleItemSlots: 70,
+            teamPlayers: 10
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (counts[key] !== value) throw new Error(`${key}: expected ${value}, received ${counts[key]}`);
+          }
+
+          const labels = await page.locator('.role-objective-comparison .objective-label').allTextContents();
+          for (const label of ['Towers', 'Dragons', 'Barons', 'Heralds', 'Inhibitors']) {
+            if (labels.filter(value => value === label).length !== 2) throw new Error(`Objective label missing: ${label}`);
+          }
+          const playerFont = parseFloat(await page.locator('.role-player-name strong').first().evaluate(element => getComputedStyle(element).fontSize));
+          const teamPlayerFont = parseFloat(await page.locator('.telemetry-player-copy strong').first().evaluate(element => getComputedStyle(element).fontSize));
+          if (playerFont < 12 || teamPlayerFont < 12) {
+            throw new Error(`Player text remains too small: role=${playerFont}px team=${teamPlayerFont}px`);
+          }
+
+          await page.locator('.analysis-panel').screenshot({ path: 'readable-player-board.png' });
+          console.log(`READABLE_PLAYER_BOARD_VERIFIED=${JSON.stringify({ counts, labels, playerFont, teamPlayerFont })}`);
+          await browser.close();
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: readable-player-board-verification
+          path: readable-player-board.png
+          retention-days: 2
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          rm .github/workflows/apply-readable-player-board.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/web/src/main.ts apps/web/src/player-board-view.ts apps/web/src/styles.css .github/workflows/apply-readable-player-board.yml
+          git commit -m "Restore objective text and improve player board readability"
+          git push origin HEAD:agent/readable-player-board

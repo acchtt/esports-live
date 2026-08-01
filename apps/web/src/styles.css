@@ -1668,3 +1668,16 @@ footer { display: flex; justify-content: space-between; gap: 20px; width: min(15
     font-size: .46rem;
   }
 }
+
+
+/* missing-live-game-fallback */
+.game-selector-empty {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  color: #9eacbd;
+  font-size: 0.66rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}

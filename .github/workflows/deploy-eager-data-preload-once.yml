@@ -1,0 +1,183 @@
+name: Deploy Eager Data Preload Once
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy-and-verify:
+    if: github.head_ref == 'ops/deploy-eager-data-preload'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 6d2f4f1a45c7cbdeaac98b66e40530f846293905
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install --no-package-lock
+      - run: npm run check
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: https://esports-live-api.acchtt.workers.dev
+      - name: Deploy Pages
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npx wrangler pages deploy apps/web/dist --project-name esports-live --branch main --commit-hash 6d2f4f1a45c7cbdeaac98b66e40530f846293905 --commit-message "Preload match data before interaction"; then exit 0; fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+      - name: Verify production asset release
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const web = 'https://esports-live.pages.dev';
+          const localHtml = fs.readFileSync('apps/web/dist/index.html', 'utf8');
+          const expectedJs = localHtml.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          if (!expectedJs) throw new Error('Built JavaScript entry is missing.');
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          let verified = false;
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const html = await fetch(`${web}/?release=${Date.now()}`, { headers: { 'cache-control': 'no-cache' } }).then(r => r.text()).catch(() => '');
+            if (html.includes(expectedJs)) { verified = true; break; }
+            await sleep(4000);
+          }
+          if (!verified) throw new Error(`Production did not expose ${expectedJs}.`);
+          console.log(`PRODUCTION_EAGER_PRELOAD_ASSET=${expectedJs}`);
+          NODE
+      - name: Install browser verifier
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+      - name: Verify requests begin before interaction
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import { chromium } from 'playwright';
+
+          const now = new Date().toISOString();
+          const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+          const blue = { id: 'blue', name: 'Blue Team', code: 'BLUE' };
+          const red = { id: 'red', name: 'Red Team', code: 'RED' };
+          const winner = { id: 'winner', name: 'Winner Team', code: 'WIN' };
+          const loser = { id: 'loser', name: 'Loser Team', code: 'LOSE' };
+          const activeGames = [
+            { id: 'a1', number: 1, state: 'completed' },
+            { id: 'a2', number: 2, state: 'completed' },
+            { id: 'a3', number: 3, state: 'live' }
+          ];
+          const completedGames = [
+            { id: 'c1', number: 1, state: 'completed' },
+            { id: 'c2', number: 2, state: 'completed' },
+            { id: 'c3', number: 3, state: 'completed' }
+          ];
+          const activeSeries = {
+            id: 'active-series', esport: 'lol',
+            competition: { id: 'lec', name: 'LEC', stage: 'Week 2' },
+            teams: [blue, red], bestOf: 3, state: 'live', scheduledStart: now, games: activeGames
+          };
+          const completedSeries = {
+            id: 'completed-series', esport: 'lol',
+            competition: { id: 'lec', name: 'LEC', stage: 'Week 1' },
+            teams: [winner, loser], bestOf: 3, state: 'completed', scheduledStart: past, games: completedGames
+          };
+          const provider = { id: 'fixture', name: 'Production verifier' };
+          const activeHistory = {
+            bestOf: 3, winsRequired: 2, drawPossible: false,
+            score: [{ team: blue, wins: 1 }, { team: red, wins: 1 }],
+            games: [
+              { ...activeGames[0], blueTeam: blue, redTeam: red, winner: blue, durationSeconds: 1800 },
+              { ...activeGames[1], blueTeam: red, redTeam: blue, winner: red, durationSeconds: 1900 },
+              { ...activeGames[2], blueTeam: blue, redTeam: red, winner: null, durationSeconds: null }
+            ]
+          };
+          const completedHistory = {
+            bestOf: 3, winsRequired: 2, drawPossible: false,
+            score: [{ team: winner, wins: 2 }, { team: loser, wins: 1 }],
+            games: [
+              { ...completedGames[0], blueTeam: winner, redTeam: loser, winner, durationSeconds: 1801 },
+              { ...completedGames[1], blueTeam: loser, redTeam: winner, winner: loser, durationSeconds: 1911 },
+              { ...completedGames[2], blueTeam: winner, redTeam: loser, winner, durationSeconds: 1702 }
+            ]
+          };
+          const quality = {
+            freshness: 'stale', sourceTimestamp: now, observedAt: now, ageSeconds: 120,
+            complete: false, advancing: false, safeForLiveAnalysis: false,
+            reasons: [{ code: 'fixture', message: 'Verification fixture' }]
+          };
+          const requests = [];
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+          await page.route('https://esports-live-api.acchtt.workers.dev/**', async route => {
+            const url = new URL(route.request().url());
+            requests.push(`${url.pathname}${url.search}`);
+            const json = value => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+            if (url.pathname === '/health') return json({ ok: true, service: 'fixture', schemaVersion: '1.0', adapters: ['lol'] });
+            if (url.pathname === '/v1/lol/schedule') {
+              if (url.searchParams.has('limit')) return json({ esport: 'lol', events: [{ series: completedSeries, provider, observedAt: now }] });
+              return json({ esport: 'lol', events: [{ series: activeSeries, provider, observedAt: now }] });
+            }
+            if (url.pathname.includes('/series/active-series/context')) {
+              return json({ schemaVersion: '1.0', esport: 'lol', seriesId: activeSeries.id, provider, observedAt: now, rosters: [], standings: [], history: activeHistory, complete: true, reasons: [] });
+            }
+            if (url.pathname.includes('/series/completed-series/context')) {
+              return json({ schemaVersion: '1.0', esport: 'lol', seriesId: completedSeries.id, provider, observedAt: now, rosters: [], standings: [], history: completedHistory, complete: true, reasons: [] });
+            }
+            if (url.pathname.includes('/games/')) {
+              const id = url.pathname.split('/').at(-2);
+              const game = activeGames.find(item => item.id === id) ?? completedGames.find(item => item.id === id) ?? activeGames[2];
+              const series = id?.startsWith('c') ? completedSeries : activeSeries;
+              return json({ schemaVersion: '1.0', esport: 'lol', provider, series, game, stats: null, quality });
+            }
+            return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Fixture route unavailable' }) });
+          });
+
+          const waitFor = async (predicate, label, timeout = 30000) => {
+            const started = Date.now();
+            while (Date.now() - started < timeout) {
+              if (predicate()) return;
+              await page.waitForTimeout(100);
+            }
+            throw new Error(`Timed out waiting for ${label}. Requests: ${JSON.stringify(requests)}`);
+          };
+
+          await page.goto(`https://esports-live.pages.dev/?verification=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+          await waitFor(() => requests.some(path => path.startsWith('/v1/lol/schedule?limit=80')), 'background Results schedule');
+          await waitFor(() => ['a1', 'a2'].every(id => requests.some(path => path.startsWith(`/v1/lol/games/${id}/live?prefetch=`))), 'active completed-game prefetches');
+          await waitFor(() => ['c1', 'c2', 'c3'].every(id => requests.some(path => path.startsWith(`/v1/lol/games/${id}/live?final=`))), 'completed-series telemetry prefetches');
+          await page.locator('[data-completed-series-id="completed-series"].selected').waitFor({ state: 'attached', timeout: 30000 });
+
+          const schedulesBeforeClick = requests.filter(path => path.startsWith('/v1/lol/schedule?limit=80')).length;
+          const finalRequestsBeforeClick = requests.filter(path => /\/games\/c[123]\/live\?final=/.test(path)).length;
+          await page.locator('.schedule-mode[data-mode="results"]').click();
+          await page.waitForTimeout(800);
+          const schedulesAfterClick = requests.filter(path => path.startsWith('/v1/lol/schedule?limit=80')).length;
+          const finalRequestsAfterClick = requests.filter(path => /\/games\/c[123]\/live\?final=/.test(path)).length;
+          if (schedulesAfterClick !== schedulesBeforeClick) {
+            throw new Error(`Results click reloaded schedule: before ${schedulesBeforeClick}, after ${schedulesAfterClick}`);
+          }
+          if (finalRequestsAfterClick !== finalRequestsBeforeClick) {
+            throw new Error(`Results click reloaded final telemetry: before ${finalRequestsBeforeClick}, after ${finalRequestsAfterClick}`);
+          }
+          const resultsHidden = await page.locator('#completed-match-list').evaluate(element => element.hidden);
+          const detailHidden = await page.locator('#completed-match-detail').evaluate(element => element.hidden);
+          if (resultsHidden || detailHidden) throw new Error(`Results mode visibility invalid: list=${resultsHidden}, detail=${detailHidden}`);
+
+          await page.locator('.analysis-panel').screenshot({ path: 'production-eager-data-preload.png' });
+          console.log(`PRODUCTION_EAGER_PRELOAD_RENDERED=${JSON.stringify({ schedulesBeforeClick, schedulesAfterClick, finalRequestsBeforeClick, finalRequestsAfterClick, requestCount: requests.length })}`);
+          await browser.close();
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-eager-data-preload-verification
+          path: production-eager-data-preload.png
+          retention-days: 1

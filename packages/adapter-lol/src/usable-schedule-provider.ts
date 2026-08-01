@@ -1,9 +1,7 @@
 import type { LolProviderClient, LolProviderScheduleEntry, LolProviderSeries } from './provider.ts';
 
 function hasPlaceholderTeam(series: LolProviderSeries): boolean {
-  return series.teams.some((team, index) => (
-    team.id === `team-${index + 1}` || team.name === `Team ${index + 1}`
-  ));
+  return series.teams.some((team, index) => team.name === `Team ${index + 1}`);
 }
 
 function isUsableLiveSeries(series: LolProviderSeries): boolean {

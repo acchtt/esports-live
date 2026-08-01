@@ -3,10 +3,21 @@ import type { LolStats } from '@esports-live/adapter-lol';
 
 const style = document.createElement('style');
 style.textContent = `
+  .completed-final-game-header.live-match-clock-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+  }
+  .completed-final-game-header.live-match-clock-header > strong {
+    grid-column: 1;
+    justify-self: start;
+  }
   .completed-final-game-header .live-match-clock-group {
     display: flex;
+    grid-column: 2;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: center;
+    justify-self: center;
     gap: 7px;
     min-width: 0;
     color: #8fa0b7;
@@ -28,7 +39,7 @@ style.textContent = `
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.015em;
     line-height: 1;
-    text-align: right;
+    text-align: center;
   }
   @media (max-width: 620px) {
     .completed-final-game-header .live-match-clock-group::before { display: none; }
@@ -54,6 +65,8 @@ function renderSnapshotClock(snapshot: LiveSnapshot<LolStats>): void {
   queueMicrotask(() => {
     const element = document.querySelector<HTMLElement>('#live-game-clock');
     if (!element) return;
+    const header = element.closest<HTMLElement>('.completed-final-game-header');
+    header?.classList.add('live-match-clock-header');
     element.classList.add('live-match-clock');
     element.parentElement?.classList.add('live-match-clock-group');
     element.textContent = formatClock(seconds);

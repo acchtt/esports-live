@@ -22,6 +22,12 @@ interface CachedContext {
   value: SeriesContext;
 }
 
+interface StoredHistoryState {
+  score: [number, number];
+  completed: string[];
+  winners: Record<string, string>;
+}
+
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const RESULTS_REFRESH_MS = 2 * 60 * 1_000;
 const CONTEXT_CACHE_MS = 5 * 60 * 1_000;
@@ -197,6 +203,38 @@ let loadPromise: Promise<void> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let lastCompletedLoadAt = 0;
 const contextCache = new Map<string, CachedContext>();
+
+function storedHistoryKey(seriesId: string): string {
+  return `esports-live:history:${seriesId}`;
+}
+
+function applyStoredWinners(seriesId: string, history: SeriesHistoryRef): SeriesHistoryRef {
+  let stored: StoredHistoryState | null = null;
+  try {
+    const value = localStorage.getItem(storedHistoryKey(seriesId));
+    stored = value ? JSON.parse(value) as StoredHistoryState : null;
+  } catch {}
+
+  const teams = history.score.map(entry => entry.team);
+  const winners = { ...(stored?.winners ?? {}) };
+  const games = history.games.map(game => {
+    if (game.winner) {
+      winners[game.id] = game.winner.id;
+      return game;
+    }
+    const winnerId = winners[game.id];
+    const winner = teams.find(team => team.id === winnerId) ?? null;
+    return winner ? { ...game, winner } : game;
+  });
+  try {
+    localStorage.setItem(storedHistoryKey(seriesId), JSON.stringify({
+      score: [history.score[0].wins, history.score[1].wins],
+      completed: games.filter(game => game.state === 'completed').map(game => game.id),
+      winners
+    } satisfies StoredHistoryState));
+  } catch {}
+  return { ...history, games };
+}
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -407,8 +445,11 @@ async function loadCompletedMatches(): Promise<void> {
       const resolved = await mapWithConcurrency(candidates, MAX_CONTEXT_CONCURRENCY, async event => {
         try {
           const context = await contextFor(event.series.id);
-          const match = context.history && isEnded(event, context.history)
-            ? { event, context, history: context.history } satisfies CompletedMatch
+          const history = context.history
+            ? applyStoredWinners(event.series.id, context.history)
+            : null;
+          const match: CompletedMatch | null = history && isEnded(event, history)
+            ? { event, context, history }
             : null;
           if (match) {
             completedMatches = [...completedMatches, match]

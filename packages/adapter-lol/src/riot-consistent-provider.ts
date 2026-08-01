@@ -244,6 +244,75 @@ function winnerCounts(games: readonly SeriesGameHistoryRef[], teams: readonly Te
   ];
 }
 
+const HISTORY_STATE_RANK: Record<SeriesGameHistoryRef['state'], number> = {
+  unknown: 0,
+  unstarted: 1,
+  draft: 2,
+  live: 3,
+  paused: 3,
+  completed: 4
+};
+
+export function mergeObservedSeriesHistory(
+  previous: SeriesHistoryRef | undefined,
+  incoming: SeriesHistoryRef
+): SeriesHistoryRef {
+  if (!previous) return reconcileSeriesHistory(incoming);
+
+  const previousById = new Map(previous.games.map(game => [game.id, game]));
+  const previousByNumber = new Map(previous.games.map(game => [game.number, game]));
+  const score = [
+    {
+      team: incoming.score[0].team,
+      wins: Math.max(previous.score[0]?.wins ?? 0, incoming.score[0].wins)
+    },
+    {
+      team: incoming.score[1].team,
+      wins: Math.max(previous.score[1]?.wins ?? 0, incoming.score[1].wins)
+    }
+  ] as const;
+  let games = incoming.games.map(game => {
+    const old = previousById.get(game.id) ?? previousByNumber.get(game.number);
+    if (!old) return { ...game };
+    return {
+      ...game,
+      state: HISTORY_STATE_RANK[old.state] > HISTORY_STATE_RANK[game.state]
+        ? old.state
+        : game.state,
+      blueTeam: game.blueTeam ?? old.blueTeam,
+      redTeam: game.redTeam ?? old.redTeam,
+      winner: game.winner ?? old.winner,
+      durationSeconds: game.durationSeconds ?? old.durationSeconds
+    };
+  });
+  for (const old of previous.games) {
+    if (!games.some(game => game.id === old.id || game.number === old.number)) games.push({ ...old });
+  }
+  games = games.sort((left, right) => left.number - right.number);
+
+  const previousCompleted = new Set(
+    previous.games.filter(game => game.state === 'completed').map(game => game.id)
+  );
+  const newlyCompleted = games.filter(
+    game => game.state === 'completed' && !previousCompleted.has(game.id)
+  );
+  const leftDelta = score[0].wins - (previous.score[0]?.wins ?? score[0].wins);
+  const rightDelta = score[1].wins - (previous.score[1]?.wins ?? score[1].wins);
+  if (newlyCompleted.length === 1 && !newlyCompleted[0]!.winner) {
+    const winner = leftDelta === 1 && rightDelta === 0
+      ? score[0].team
+      : rightDelta === 1 && leftDelta === 0
+        ? score[1].team
+        : null;
+    if (winner) {
+      const gameId = newlyCompleted[0]!.id;
+      games = games.map(game => game.id === gameId ? { ...game, winner } : game);
+    }
+  }
+
+  return reconcileSeriesHistory({ ...incoming, score: [...score], games });
+}
+
 export function reconcileSeriesHistory(history: SeriesHistoryRef): SeriesHistoryRef {
   const teams = [history.score[0].team, history.score[1].team] as const;
   const targetWins = [history.score[0].wins, history.score[1].wins] as const;
@@ -299,6 +368,7 @@ export function createRiotLolConsistentProvider(options: RiotLolProviderOptions)
   const latestSnapshots = new Map<string, LolProviderSnapshot>();
   const snapshotInFlight = new Map<string, Promise<LolProviderSnapshot>>();
   const detailCache = new Map<string, DetailItemsCacheEntry>();
+  const latestHistories = new Map<string, SeriesHistoryRef>();
 
   const loadItems = async (gameId: string, snapshot: LolProviderSnapshot): Promise<LolProviderSnapshot> => {
     if (!snapshot.stats || !snapshot.sourceTimestamp) return snapshot;
@@ -366,9 +436,10 @@ export function createRiotLolConsistentProvider(options: RiotLolProviderOptions)
     getSnapshot,
     async getSeriesContext(seriesId: string): Promise<LolProviderSeriesContext> {
       const context = await base.getSeriesContext!(seriesId);
-      return context.history
-        ? { ...context, history: reconcileSeriesHistory(context.history) }
-        : context;
+      if (!context.history) return context;
+      const history = mergeObservedSeriesHistory(latestHistories.get(seriesId), context.history);
+      latestHistories.set(seriesId, history);
+      return { ...context, history };
     }
   };
 }

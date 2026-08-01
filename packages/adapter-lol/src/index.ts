@@ -6,3 +6,4 @@ export * from './riot-history-provider.ts';
 export * from './riot-provider.ts';
 export * from './riot-resolved-provider.ts';
 export * from './types.ts';
+export * from './usable-schedule-provider.ts';

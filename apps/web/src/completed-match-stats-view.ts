@@ -9,7 +9,6 @@ interface CachedValue<T> {
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const CACHE_MS = 15 * 60 * 1_000;
 const MAX_CONCURRENCY = 3;
-const PREFETCH_MATCH_LIMIT = 2;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -23,7 +22,6 @@ const contextCache = new Map<string, CachedValue<SeriesContext>>();
 const snapshotCache = new Map<string, CachedValue<LiveSnapshot<LolStats>>>();
 const contextRequests = new Map<string, Promise<SeriesContext>>();
 const snapshotRequests = new Map<string, Promise<LiveSnapshot<LolStats>>>();
-const prefetchedSeries = new Set<string>();
 let selectedSeriesId: string | null = null;
 let requestGeneration = 0;
 
@@ -214,26 +212,6 @@ async function mapWithConcurrency<T, R>(
   return output;
 }
 
-async function prefetchSeries(seriesId: string): Promise<void> {
-  if (prefetchedSeries.has(seriesId)) return;
-  prefetchedSeries.add(seriesId);
-  try {
-    const context = await contextFor(seriesId);
-    const games = context.history?.games.filter(game => game.state === 'completed') ?? [];
-    await mapWithConcurrency(games, MAX_CONCURRENCY, game => snapshotFor(game.id));
-  } catch {
-    prefetchedSeries.delete(seriesId);
-  }
-}
-
-function prefetchVisibleSeries(): void {
-  const ids = [...resultsList.querySelectorAll<HTMLElement>('[data-completed-series-id]')]
-    .map(card => card.dataset.completedSeriesId)
-    .filter((value): value is string => Boolean(value))
-    .slice(0, PREFETCH_MATCH_LIMIT);
-  ids.forEach(seriesId => void prefetchSeries(seriesId));
-}
-
 function playerMarkup(team: LolTeamState): string {
   if (!team.players.length) return '<div class="completed-telemetry-empty">Player data unavailable.</div>';
   return team.players.map(player => {
@@ -345,13 +323,9 @@ function syncSelectedSeries(): void {
   void loadSelectedSeries(seriesId);
 }
 
-const observer = new MutationObserver(() => {
-  syncSelectedSeries();
-  prefetchVisibleSeries();
-});
+const observer = new MutationObserver(syncSelectedSeries);
 observer.observe(resultsList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 syncSelectedSeries();
-prefetchVisibleSeries();
 
 resultsList.addEventListener('click', event => {
   const target = event.target instanceof Element

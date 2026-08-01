@@ -136,12 +136,13 @@ if (historyPanel) {
   document.head.append(style);
 
   function directChildWithClass(parent: HTMLElement, className: string): HTMLElement | null {
-    return Array.from(parent.children).find(child => child.classList.contains(className)) as HTMLElement | undefined ?? null;
+    const child = Array.from(parent.children).find(element => element.classList.contains(className));
+    return child instanceof HTMLElement ? child : null;
   }
 
   function resetParity(): void {
     historyPanel.classList.remove('live-results-parity', 'completed-games-panel');
-    for (const property of ['display', 'gap', 'margin', 'padding', 'border', 'border-radius', 'background']) {
+    for (const property of ['padding', 'border', 'border-radius', 'background']) {
       historyPanel.style.removeProperty(property);
     }
   }
@@ -154,9 +155,6 @@ if (historyPanel) {
     }
 
     historyPanel.classList.add('live-results-parity', 'completed-games-panel');
-    historyPanel.style.display = 'grid';
-    historyPanel.style.gap = '13px';
-    historyPanel.style.margin = '0 24px 20px';
     historyPanel.style.padding = '0';
     historyPanel.style.border = '0';
     historyPanel.style.borderRadius = '0';
@@ -164,7 +162,7 @@ if (historyPanel) {
     games.classList.add('completed-games');
 
     const cards = Array.from(games.children)
-      .filter(child => child.classList.contains('history-game')) as HTMLElement[];
+      .filter((child): child is HTMLElement => child instanceof HTMLElement && child.classList.contains('history-game'));
     const completed = cards.filter(card => card.classList.contains('completed')).length;
     let heading = directChildWithClass(historyPanel, 'live-results-heading');
     if (!heading) {

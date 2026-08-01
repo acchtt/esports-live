@@ -107,21 +107,30 @@ style.textContent = `
   .completed-card-score span { color: var(--muted); font-size: 0.65rem; }
   .completed-match-detail {
     display: grid;
-    gap: 16px;
+    gap: 20px;
     min-height: calc(100vh - 120px);
-    padding: 24px;
+    padding: 26px;
   }
   .completed-match-detail[hidden] { display: none; }
+  .completed-series-hero {
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.17);
+    border-radius: 18px;
+    background:
+      linear-gradient(110deg, rgba(14, 165, 233, 0.07), transparent 42%),
+      linear-gradient(250deg, rgba(244, 63, 94, 0.06), transparent 42%),
+      rgba(255, 255, 255, 0.016);
+  }
   .completed-detail-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 20px;
-    padding-bottom: 18px;
-    border-bottom: 1px solid var(--border);
+    padding: 20px 22px 17px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   }
-  .completed-detail-header h2 { margin-top: 5px; }
-  .completed-detail-header p { margin: 8px 0 0; color: var(--muted); font-size: 0.78rem; }
+  .completed-detail-header h2 { margin-top: 6px; font-size: 1.12rem; }
+  .completed-detail-header p { margin: 8px 0 0; color: #9aa8bc; font-size: 0.8rem; }
   .completed-final-badge {
     flex: 0 0 auto;
     padding: 7px 10px;
@@ -137,30 +146,59 @@ style.textContent = `
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 18px;
-    padding: 20px;
-    border: 1px solid var(--border);
-    border-radius: 15px;
-    background: rgba(255, 255, 255, 0.018);
+    gap: 22px;
+    padding: 22px;
+    border: 0;
+    border-radius: 0;
+    background: rgba(2, 6, 23, 0.18);
   }
   .completed-score-team { min-width: 0; }
   .completed-score-team:last-child { text-align: right; }
-  .completed-score-team strong { display: block; overflow-wrap: anywhere; }
-  .completed-score-team small { display: block; margin-top: 4px; color: var(--muted); }
-  .completed-score-value { display: flex; align-items: center; gap: 10px; font-size: 2rem; font-weight: 950; }
+  .completed-score-team strong { display: block; overflow-wrap: anywhere; font-size: 1.05rem; }
+  .completed-score-team small { display: block; margin-top: 5px; color: #91a0b5; font-size: 0.72rem; }
+  .completed-score-team.winner strong { color: #f8fafc; }
+  .completed-score-team.winner small { color: #86efac; }
+  .completed-score-value { display: flex; align-items: center; gap: 11px; font-size: 2.25rem; font-weight: 950; }
   .completed-score-value span { color: #475569; font-size: 1rem; }
+  .completed-games-panel {
+    display: grid;
+    gap: 13px;
+  }
+  .completed-section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .completed-section-heading h3 { margin-top: 4px; font-size: 1rem; }
+  .completed-section-heading > span { color: #91a0b5; font-size: 0.72rem; }
   .completed-games {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 12px;
+    gap: 13px;
   }
   .completed-game {
     display: grid;
-    gap: 10px;
-    padding: 15px;
+    gap: 12px;
+    min-height: 154px;
+    padding: 17px;
     border: 1px solid rgba(148, 163, 184, 0.14);
-    border-radius: 13px;
-    background: rgba(255, 255, 255, 0.016);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.01));
+  }
+  .completed-game.completed { border-color: rgba(52, 211, 153, 0.16); }
+  .completed-game.unstarted,
+  .completed-game.unknown { opacity: 0.72; }
+  .completed-game-state {
+    padding: 3px 7px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 999px;
+    color: #a7b4c6;
+    background: rgba(148, 163, 184, 0.055);
+    font-size: 0.58rem;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
   .completed-game-top,
   .completed-side,
@@ -170,14 +208,14 @@ style.textContent = `
     justify-content: space-between;
     gap: 10px;
   }
-  .completed-game-top span,
   .completed-side span,
-  .completed-result span { color: var(--muted); font-size: 0.66rem; }
-  .completed-side b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.74rem; }
+  .completed-result span { color: var(--muted); font-size: 0.7rem; }
+  .completed-game-top strong { font-size: 0.92rem; }
+  .completed-side b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
   .completed-side.blue span { color: #7dd3fc; }
   .completed-side.red span { color: #fda4af; }
-  .completed-result { padding-top: 9px; border-top: 1px solid rgba(148, 163, 184, 0.1); }
-  .completed-result strong { color: #bbf7d0; font-size: 0.72rem; }
+  .completed-result { margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.1); }
+  .completed-result strong { color: #bbf7d0; font-size: 0.76rem; }
   .completed-empty {
     display: grid;
     place-items: center;
@@ -188,10 +226,11 @@ style.textContent = `
   }
   @media (max-width: 720px) {
     .completed-match-detail { padding: 14px; }
-    .completed-detail-header { display: grid; }
+    .completed-detail-header { display: grid; padding: 17px; }
     .completed-scoreboard { grid-template-columns: 1fr auto 1fr; padding: 14px; }
     .completed-score-value { font-size: 1.55rem; }
     .completed-games { grid-template-columns: 1fr; }
+    .completed-section-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
   }
 `;
 document.head.append(style);
@@ -363,13 +402,14 @@ function renderList(): void {
 
 function gameMarkup(game: SeriesGameHistoryRef): string {
   const result = game.winner
-    ? `Winner · ${game.winner.name}`
+    ? `${game.winner.name} won`
     : game.state === 'completed' ? 'Winner unavailable' : 'Not played';
+  const state = game.state === 'completed' ? 'Final' : game.state === 'unstarted' || game.state === 'unknown' ? 'Not played' : game.state;
   return `
-    <article class="completed-game">
+    <article class="completed-game ${escapeHtml(game.state)}">
       <div class="completed-game-top">
         <strong>Game ${escapeHtml(game.number)}</strong>
-        <span>${escapeHtml(game.state === 'completed' ? 'Final' : game.state)}</span>
+        <span class="completed-game-state">${escapeHtml(state)}</span>
       </div>
       <div class="completed-side blue"><span>BLUE</span><b>${escapeHtml(teamName(game.blueTeam))}</b></div>
       <div class="completed-side red"><span>RED</span><b>${escapeHtml(teamName(game.redTeam))}</b></div>
@@ -379,21 +419,32 @@ function gameMarkup(game: SeriesGameHistoryRef): string {
 
 function renderDetail(match: CompletedMatch): void {
   const [left, right] = match.history.score;
+  const playedGames = match.history.games.filter(game => game.state === 'completed').length;
+  const leftWinner = left.wins > right.wins;
+  const rightWinner = right.wins > left.wins;
   completedDetail.innerHTML = `
-    <div class="completed-detail-header">
-      <div>
-        <span class="eyebrow">${escapeHtml(match.event.series.competition.name)}</span>
-        <h2>${escapeHtml(left.team.name)} vs ${escapeHtml(right.team.name)}</h2>
-        <p>${escapeHtml(formatDate(match.event.series.scheduledStart))} · Best of ${escapeHtml(match.history.bestOf)} · ${escapeHtml(match.event.series.competition.stage ?? 'Stage unavailable')}</p>
+    <section class="completed-series-hero">
+      <div class="completed-detail-header">
+        <div>
+          <span class="eyebrow">${escapeHtml(match.event.series.competition.name)}</span>
+          <h2>Final series result</h2>
+          <p>${escapeHtml(formatDate(match.event.series.scheduledStart))} · Best of ${escapeHtml(match.history.bestOf)} · ${escapeHtml(match.event.series.competition.stage ?? 'Stage unavailable')}</p>
+        </div>
+        <span class="completed-final-badge">FINAL</span>
       </div>
-      <span class="completed-final-badge">FINAL</span>
-    </div>
-    <div class="completed-scoreboard">
-      <div class="completed-score-team"><strong>${escapeHtml(left.team.name)}</strong><small>${escapeHtml(left.team.code ?? '')}</small></div>
-      <div class="completed-score-value"><b>${escapeHtml(left.wins)}</b><span>–</span><b>${escapeHtml(right.wins)}</b></div>
-      <div class="completed-score-team"><strong>${escapeHtml(right.team.name)}</strong><small>${escapeHtml(right.team.code ?? '')}</small></div>
-    </div>
-    <div class="completed-games">${match.history.games.map(gameMarkup).join('')}</div>`;
+      <div class="completed-scoreboard">
+        <div class="completed-score-team ${leftWinner ? 'winner' : ''}"><strong>${escapeHtml(left.team.name)}</strong><small>${leftWinner ? 'Series winner' : escapeHtml(left.team.code ?? '')}</small></div>
+        <div class="completed-score-value"><b>${escapeHtml(left.wins)}</b><span>–</span><b>${escapeHtml(right.wins)}</b></div>
+        <div class="completed-score-team ${rightWinner ? 'winner' : ''}"><strong>${escapeHtml(right.team.name)}</strong><small>${rightWinner ? 'Series winner' : escapeHtml(right.team.code ?? '')}</small></div>
+      </div>
+    </section>
+    <section class="completed-games-panel">
+      <div class="completed-section-heading">
+        <div><span class="eyebrow">SERIES</span><h3>Game results</h3></div>
+        <span>${escapeHtml(playedGames)} of ${escapeHtml(match.history.games.length)} games played</span>
+      </div>
+      <div class="completed-games">${match.history.games.map(gameMarkup).join('')}</div>
+    </section>`;
 }
 
 function selectCompleted(seriesId: string): void {

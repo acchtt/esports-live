@@ -163,6 +163,38 @@ test('Riot provider normalizes schedule entries', async () => {
   assert.equal(schedule[0]?.series.games[0]?.id, 'game-1');
 });
 
+test('Riot provider includes the first older schedule page', async () => {
+  const upcomingEvent = eventPayload().data.event;
+  upcomingEvent.id = 'upcoming-event';
+  upcomingEvent.match.id = 'upcoming-match';
+  upcomingEvent.state = 'unstarted';
+  const liveEvent = structuredClone(eventPayload().data.event);
+  liveEvent.id = 'older-live-event';
+  liveEvent.match.id = 'older-live-match';
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (!url.pathname.endsWith('/getSchedule')) {
+        return json({ error: 'unexpected_url', url: url.toString() }, 500);
+      }
+      if (url.searchParams.get('pageToken') === 'older-page') {
+        return json({ data: { schedule: { events: [liveEvent], pages: {} } } });
+      }
+      return json({
+        data: { schedule: { events: [upcomingEvent], pages: { older: 'older-page' } } }
+      });
+    },
+    now: () => new Date(NOW)
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.deepEqual(schedule.map(entry => [entry.series.id, entry.series.state]), [
+    ['upcoming-match', 'scheduled'],
+    ['older-live-match', 'live']
+  ]);
+});
+
 test('Riot provider treats a non-clinching partial score as live when the schedule state is stale', async () => {
   const staleEvent = eventPayload().data.event;
   staleEvent.state = 'unstarted';

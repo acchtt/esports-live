@@ -1,5 +1,5 @@
 import type { LiveSnapshot, SeriesContext, SeriesGameHistoryRef } from '@esports-live/core';
-import type { LolStats, LolTeamState } from '@esports-live/adapter-lol';
+import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapter-lol';
 
 interface CachedValue<T> {
   expiresAt: number;
@@ -9,6 +9,11 @@ interface CachedValue<T> {
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const CACHE_MS = 15 * 60 * 1_000;
 const MAX_CONCURRENCY = 3;
+type CanonicalRole = 'top' | 'jungle' | 'mid' | 'bottom' | 'support';
+const ROLE_ORDER: readonly CanonicalRole[] = ['top', 'jungle', 'mid', 'bottom', 'support'];
+const ROLE_LABELS: Record<CanonicalRole, string> = {
+  top: 'Top', jungle: 'Jungle', mid: 'Mid', bottom: 'Bottom', support: 'Support'
+};
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -225,6 +230,71 @@ function playerMarkup(team: LolTeamState): string {
   }).join('');
 }
 
+function canonicalRole(value: string | null): CanonicalRole | null {
+  const normalized = value?.trim().toLowerCase().replaceAll('_', ' ').replaceAll('-', ' ') ?? '';
+  if (normalized.includes('top')) return 'top';
+  if (normalized.includes('jung')) return 'jungle';
+  if (normalized.includes('mid')) return 'mid';
+  if (normalized.includes('bot') || normalized.includes('adc') || normalized.includes('carry')) return 'bottom';
+  if (normalized.includes('sup') || normalized.includes('utility')) return 'support';
+  return null;
+}
+
+function orderedPlayers(team: LolTeamState): readonly (LolPlayerState | null)[] {
+  const assigned = new Map<CanonicalRole, LolPlayerState>();
+  const unassigned: LolPlayerState[] = [];
+  for (const player of team.players) {
+    const role = canonicalRole(player.role);
+    if (role && !assigned.has(role)) assigned.set(role, player);
+    else unassigned.push(player);
+  }
+  return ROLE_ORDER.map(role => assigned.get(role) ?? unassigned.shift() ?? null);
+}
+
+function playerIdentityMarkup(player: LolPlayerState | null, role: CanonicalRole, side: 'blue' | 'red'): string {
+  return `
+    <div class="role-player ${side}">
+      <div class="role-player-heading">
+        <span class="role-chip">${ROLE_LABELS[role]}</span>
+        <div class="role-player-name">
+          <strong>${escapeHtml(player?.handle ?? 'Player unavailable')}</strong>
+          <small>${escapeHtml(player?.championId ?? 'Champion unavailable')}</small>
+        </div>
+      </div>
+      <div class="role-player-stats">
+        <span><small>KDA</small><strong>${formatNumber(player?.kills ?? null)}/${formatNumber(player?.deaths ?? null)}/${formatNumber(player?.assists ?? null)}</strong></span>
+        <span><small>CS</small><strong>${formatNumber(player?.creepScore ?? null)}</strong></span>
+        <span><small>GOLD</small><strong>${formatNumber(player?.totalGold ?? null)}</strong></span>
+      </div>
+    </div>`;
+}
+
+function roleGoldDeltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | null, role: CanonicalRole): string {
+  const blueGold = blue?.totalGold ?? null;
+  const redGold = red?.totalGold ?? null;
+  const difference = blueGold === null || redGold === null ? null : blueGold - redGold;
+  const side = difference === null ? 'unknown' : difference > 0 ? 'blue' : difference < 0 ? 'red' : 'even';
+  const magnitude = difference === null ? null : Math.abs(difference);
+  const edge = magnitude === null ? 0 : Math.min(50, Math.round((magnitude / 2500) * 50));
+  return `
+    <div class="role-gold-delta ${side}" style="--role-edge: ${edge}%">
+      <small>${ROLE_LABELS[role]} GOLD DELTA</small>
+      <strong>${magnitude === null ? '—' : `+${magnitude.toLocaleString()}`}</strong>
+      <span class="role-edge-track" aria-hidden="true"><i></i></span>
+    </div>`;
+}
+
+function roleMatchupRows(blue: LolTeamState, red: LolTeamState): string {
+  const bluePlayers = orderedPlayers(blue);
+  const redPlayers = orderedPlayers(red);
+  return ROLE_ORDER.map((role, index) => `
+    <div class="role-matchup-row">
+      ${playerIdentityMarkup(bluePlayers[index] ?? null, role, 'blue')}
+      ${roleGoldDeltaMarkup(bluePlayers[index] ?? null, redPlayers[index] ?? null, role)}
+      ${playerIdentityMarkup(redPlayers[index] ?? null, role, 'red')}
+    </div>`).join('');
+}
+
 function teamMarkup(team: LolTeamState): string {
   const objectives = team.objectives;
   return `
@@ -240,7 +310,6 @@ function teamMarkup(team: LolTeamState): string {
         <div><span>Barons</span><strong>${formatNumber(objectives.barons)}</strong></div>
         <div><span>Inhibitors</span><strong>${formatNumber(objectives.inhibitors)}</strong></div>
       </div>
-      <div class="completed-final-players">${playerMarkup(team)}</div>
     </section>`;
 }
 
@@ -260,12 +329,13 @@ function gameMarkup(
   const winner = history.winner?.name ? `Winner · ${history.winner.name}` : 'Winner not published by Riot';
   const duration = history.durationSeconds ?? stats.gameClockSeconds;
   return `
-    <article class="completed-final-game">
+    <article class="completed-final-game" data-final-game-id="${escapeHtml(snapshot.game.id)}">
       <div class="completed-final-game-header">
         <strong>Game ${escapeHtml(history.number)} · ${escapeHtml(winner)}</strong>
         <span>${escapeHtml(formatClock(duration))} · ${escapeHtml(formatTimestamp(snapshot.quality.sourceTimestamp))}</span>
       </div>
       <div class="completed-final-team-grid">${teamMarkup(stats.blue)}${teamMarkup(stats.red)}</div>
+      <div class="role-matchup-list completed-final-matchups">${roleMatchupRows(stats.blue, stats.red)}</div>
     </article>`;
 }
 
@@ -309,6 +379,18 @@ async function loadSelectedSeries(seriesId: string): Promise<void> {
     host.innerHTML = `
       <div class="completed-telemetry-heading"><h3>Final game telemetry</h3><span>Historical frames are intentionally marked stale</span></div>
       ${rows.map(row => gameMarkup(row.game, row.snapshot, row.error)).join('')}`;
+    const gamesById = new Map(
+      [...host.querySelectorAll<HTMLElement>('[data-final-game-id]')]
+        .map(game => [game.dataset.finalGameId, game] as const)
+    );
+    for (const row of rows) {
+      if (!row.snapshot?.stats) continue;
+      const root = gamesById.get(row.snapshot.game.id);
+      if (!root) continue;
+      window.dispatchEvent(new CustomEvent('esports-live:ended-snapshot', {
+        detail: { snapshot: row.snapshot, root }
+      }));
+    }
   } catch (error) {
     if (generation !== requestGeneration || selectedSeriesId !== seriesId) return;
     host.innerHTML = `<div class="completed-telemetry-empty">${escapeHtml(error instanceof Error ? error.message : 'Final telemetry unavailable')}</div>`;

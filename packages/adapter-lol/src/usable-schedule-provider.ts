@@ -10,6 +10,29 @@ function isUsableLiveSeries(series: LolProviderSeries): boolean {
   return !hasPlaceholderTeam(series) && series.games.length > 0;
 }
 
+async function reconcileLiveGameState(
+  provider: LolProviderClient,
+  games: readonly LolProviderSeries['games'][number][]
+): Promise<readonly LolProviderSeries['games'][number][]> {
+  if (games.some(game => game.state === 'live' || game.state === 'draft')) return games;
+
+  const candidates = games.filter(game => game.state === 'unstarted' || game.state === 'unknown');
+  for (const candidate of candidates) {
+    try {
+      const snapshot = await provider.getSnapshot(candidate.id);
+      if (snapshot.stats && snapshot.game.state === 'live') {
+        return games.map(game => game.id === candidate.id ? { ...game, state: 'live' } : game);
+      }
+      if (snapshot.game.state === 'draft') {
+        return games.map(game => game.id === candidate.id ? { ...game, state: 'draft' } : game);
+      }
+    } catch {
+      // A live-stat miss is expected while Riot is between games; try the next slot.
+    }
+  }
+  return games;
+}
+
 async function resolveSparseEntry(
   provider: LolProviderClient,
   entry: LolProviderScheduleEntry
@@ -24,13 +47,15 @@ async function resolveSparseEntry(
     const history = context.history;
     if (!history || history.score.length < 2 || !history.games.length) return null;
 
+    const historyGames = history.games
+      .map(game => ({ id: game.id, number: game.number, state: game.state }))
+      .sort((left, right) => left.number - right.number);
+    const games = await reconcileLiveGameState(provider, historyGames);
     const resolvedSeries: LolProviderSeries = {
       ...series,
       teams: [history.score[0]!.team, history.score[1]!.team],
       bestOf: history.bestOf,
-      games: history.games
-        .map(game => ({ id: game.id, number: game.number, state: game.state }))
-        .sort((left, right) => left.number - right.number)
+      games
     };
     return isUsableLiveSeries(resolvedSeries) ? { ...entry, series: resolvedSeries } : null;
   } catch {

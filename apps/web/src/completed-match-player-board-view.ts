@@ -187,7 +187,8 @@ async function run(): Promise<void> {
     running = false;
     if (rerun) {
       rerun = false;
-      queue();
+      void version();
+queue();
     }
   }
 }

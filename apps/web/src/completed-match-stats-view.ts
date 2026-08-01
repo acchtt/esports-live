@@ -8,7 +8,8 @@ interface CachedValue<T> {
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const CACHE_MS = 15 * 60 * 1_000;
-const MAX_CONCURRENCY = 2;
+const MAX_CONCURRENCY = 3;
+const PREFETCH_MATCH_LIMIT = 2;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -20,6 +21,9 @@ const resultsList = requiredElement<HTMLElement>('#completed-match-list');
 const completedDetail = requiredElement<HTMLElement>('#completed-match-detail');
 const contextCache = new Map<string, CachedValue<SeriesContext>>();
 const snapshotCache = new Map<string, CachedValue<LiveSnapshot<LolStats>>>();
+const contextRequests = new Map<string, Promise<SeriesContext>>();
+const snapshotRequests = new Map<string, Promise<LiveSnapshot<LolStats>>>();
+const prefetchedSeries = new Set<string>();
 let selectedSeriesId: string | null = null;
 let requestGeneration = 0;
 
@@ -165,17 +169,31 @@ async function api<T>(path: string): Promise<T> {
 async function contextFor(seriesId: string): Promise<SeriesContext> {
   const cached = contextCache.get(seriesId);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const value = await api<SeriesContext>(`/v1/lol/series/${encodeURIComponent(seriesId)}/context?final=${Date.now()}`);
-  contextCache.set(seriesId, { value, expiresAt: Date.now() + CACHE_MS });
-  return value;
+  const pending = contextRequests.get(seriesId);
+  if (pending) return pending;
+  const request = api<SeriesContext>(
+    `/v1/lol/series/${encodeURIComponent(seriesId)}/context?final=${Date.now()}`
+  ).then(value => {
+    contextCache.set(seriesId, { value, expiresAt: Date.now() + CACHE_MS });
+    return value;
+  }).finally(() => contextRequests.delete(seriesId));
+  contextRequests.set(seriesId, request);
+  return request;
 }
 
 async function snapshotFor(gameId: string): Promise<LiveSnapshot<LolStats>> {
   const cached = snapshotCache.get(gameId);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const value = await api<LiveSnapshot<LolStats>>(`/v1/lol/games/${encodeURIComponent(gameId)}/live?final=${Date.now()}`);
-  snapshotCache.set(gameId, { value, expiresAt: Date.now() + CACHE_MS });
-  return value;
+  const pending = snapshotRequests.get(gameId);
+  if (pending) return pending;
+  const request = api<LiveSnapshot<LolStats>>(
+    `/v1/lol/games/${encodeURIComponent(gameId)}/live?final=${Date.now()}`
+  ).then(value => {
+    if (value.stats) snapshotCache.set(gameId, { value, expiresAt: Date.now() + CACHE_MS });
+    return value;
+  }).finally(() => snapshotRequests.delete(gameId));
+  snapshotRequests.set(gameId, request);
+  return request;
 }
 
 async function mapWithConcurrency<T, R>(
@@ -194,6 +212,26 @@ async function mapWithConcurrency<T, R>(
   });
   await Promise.all(workers);
   return output;
+}
+
+async function prefetchSeries(seriesId: string): Promise<void> {
+  if (prefetchedSeries.has(seriesId)) return;
+  prefetchedSeries.add(seriesId);
+  try {
+    const context = await contextFor(seriesId);
+    const games = context.history?.games.filter(game => game.state === 'completed') ?? [];
+    await mapWithConcurrency(games, MAX_CONCURRENCY, game => snapshotFor(game.id));
+  } catch {
+    prefetchedSeries.delete(seriesId);
+  }
+}
+
+function prefetchVisibleSeries(): void {
+  const ids = [...resultsList.querySelectorAll<HTMLElement>('[data-completed-series-id]')]
+    .map(card => card.dataset.completedSeriesId)
+    .filter((value): value is string => Boolean(value))
+    .slice(0, PREFETCH_MATCH_LIMIT);
+  ids.forEach(seriesId => void prefetchSeries(seriesId));
 }
 
 function playerMarkup(team: LolTeamState): string {
@@ -307,9 +345,13 @@ function syncSelectedSeries(): void {
   void loadSelectedSeries(seriesId);
 }
 
-const observer = new MutationObserver(syncSelectedSeries);
+const observer = new MutationObserver(() => {
+  syncSelectedSeries();
+  prefetchVisibleSeries();
+});
 observer.observe(resultsList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 syncSelectedSeries();
+prefetchVisibleSeries();
 
 resultsList.addEventListener('click', event => {
   const target = event.target instanceof Element

@@ -18,6 +18,8 @@ const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, 
 const SNAPSHOT_POLL_MS = 3_000;
 const SCHEDULE_POLL_MS = 15_000;
 const ACTIVE_SCHEDULE_GRACE_MS = 6 * 60 * 60 * 1_000;
+const COMPLETED_SNAPSHOT_CACHE_MS = 30 * 60 * 1_000;
+const COMPLETED_PREFETCH_CONCURRENCY = 2;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -46,6 +48,8 @@ let renderedGameId: string | null = null;
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
 let scheduleTimer: ReturnType<typeof setInterval> | null = null;
 let liveClockBaseSeconds: number | null = null;
+const completedSnapshotCache = new Map<string, { expiresAt: number; value: LiveSnapshot<LolStats> }>();
+const completedSnapshotRequests = new Map<string, Promise<LiveSnapshot<LolStats>>>();
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -63,6 +67,49 @@ async function api<T>(path: string): Promise<T> {
     throw new Error(body?.message ?? `API returned ${response.status}`);
   }
   return response.json() as Promise<T>;
+}
+
+async function completedSnapshotFor(gameId: string): Promise<LiveSnapshot<LolStats>> {
+  const cached = completedSnapshotCache.get(gameId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = completedSnapshotRequests.get(gameId);
+  if (pending) return pending;
+  const request = api<LiveSnapshot<LolStats>>(
+    `/v1/lol/games/${encodeURIComponent(gameId)}/live?prefetch=${Date.now()}`
+  ).then(snapshot => {
+    if (snapshot.stats) {
+      completedSnapshotCache.set(gameId, {
+        value: snapshot,
+        expiresAt: Date.now() + COMPLETED_SNAPSHOT_CACHE_MS
+      });
+    }
+    return snapshot;
+  }).finally(() => completedSnapshotRequests.delete(gameId));
+  completedSnapshotRequests.set(gameId, request);
+  return request;
+}
+
+function snapshotForGame(game: SeriesGameRef, after: string | null): Promise<LiveSnapshot<LolStats>> {
+  if (game.state === 'completed' && !after) return completedSnapshotFor(game.id);
+  const query = after ? `?after=${encodeURIComponent(after)}` : '';
+  return api<LiveSnapshot<LolStats>>(`/v1/lol/games/${encodeURIComponent(game.id)}/live${query}`);
+}
+
+async function prefetchCompletedGames(event: ScheduleEvent): Promise<void> {
+  const games = event.series.games.filter(game => game.state === 'completed');
+  if (!games.length) return;
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(COMPLETED_PREFETCH_CONCURRENCY, games.length) },
+    async () => {
+      while (cursor < games.length) {
+        const game = games[cursor++];
+        if (!game) continue;
+        try { await completedSnapshotFor(game.id); } catch {}
+      }
+    }
+  );
+  await Promise.all(workers);
 }
 
 function formatTime(value: string): string {
@@ -458,8 +505,7 @@ async function refreshSnapshot(): Promise<void> {
   const requestedSeries = event.series.id;
   const requestedGame = game.id;
   try {
-    const query = lastSourceTimestamp ? `?after=${encodeURIComponent(lastSourceTimestamp)}` : '';
-    const snapshot = await api<LiveSnapshot<LolStats>>(`/v1/lol/games/${encodeURIComponent(game.id)}/live${query}`);
+    const snapshot = await snapshotForGame(game, lastSourceTimestamp);
     if (selectedSeriesId !== requestedSeries || selectedGameId !== requestedGame) return;
     if (snapshot.quality.sourceTimestamp) lastSourceTimestamp = snapshot.quality.sourceTimestamp;
     renderSnapshot(snapshot);
@@ -499,6 +545,7 @@ function selectSeries(seriesId: string): void {
   clearLiveClock();
   renderSchedule();
   renderSeriesHeader(event);
+  void prefetchCompletedGames(event);
   if (selectedGameId) void refreshSnapshot();
   else renderUpcoming(event);
 }
@@ -518,6 +565,7 @@ function syncSelection(): void {
     lastSourceTimestamp = null;
   }
   renderSeriesHeader(event);
+  void prefetchCompletedGames(event);
   if (selectedGameId) void refreshSnapshot();
   else renderUpcoming(event);
 }
@@ -532,6 +580,7 @@ async function refreshSchedule(): Promise<void> {
     });
     renderSchedule();
     syncSelection();
+    void Promise.all(events.slice(0, 3).map(event => prefetchCompletedGames(event)));
     connectionDetail.textContent = `${events.filter(event => event.series.state === 'live').length} live · ${events.length} active listings`;
   } catch (error) {
     scheduleList.innerHTML = `<div class="empty-state"><strong>Schedule unavailable</strong><span>${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</span></div>`;

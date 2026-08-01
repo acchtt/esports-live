@@ -1,11 +1,6 @@
 import type { LiveSnapshot } from '@esports-live/core';
 import type { LolStats } from '@esports-live/adapter-lol';
 
-let clockBaseSeconds: number | null = null;
-let clockStartedAt = 0;
-let clockAdvancing = false;
-let clockTimer: number | null = null;
-
 const style = document.createElement('style');
 style.textContent = `
   .completed-final-game-header .live-match-clock-group {
@@ -51,47 +46,21 @@ function formatClock(seconds: number | null): string {
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
 }
 
-function stopClock(): void {
-  if (clockTimer !== null) window.clearInterval(clockTimer);
-  clockTimer = null;
-  clockBaseSeconds = null;
-  clockStartedAt = 0;
-  clockAdvancing = false;
-}
-
-function displayedSeconds(): number | null {
-  if (clockBaseSeconds === null) return null;
-  if (!clockAdvancing) return clockBaseSeconds;
-  const elapsed = Math.max(0, Math.floor((Date.now() - clockStartedAt) / 1_000));
-  return clockBaseSeconds + elapsed;
-}
-
-function updateClock(): void {
-  const element = document.querySelector<HTMLElement>('#live-game-clock');
-  if (!element) return;
-  element.classList.add('live-match-clock');
-  element.parentElement?.classList.add('live-match-clock-group');
-  element.textContent = formatClock(displayedSeconds());
-  element.setAttribute('aria-label', `Game time ${element.textContent}`);
-}
-
-function startClock(snapshot: LiveSnapshot<LolStats>): void {
-  stopClock();
-  clockBaseSeconds = snapshot.stats?.gameClockSeconds ?? null;
-  clockStartedAt = Date.now();
-  clockAdvancing = snapshot.game.state === 'live' && snapshot.quality.advancing !== false;
+function renderSnapshotClock(snapshot: LiveSnapshot<LolStats>): void {
+  const seconds = snapshot.stats?.gameClockSeconds ?? null;
 
   // The history-style renderer handles the same event and replaces the main panel.
   // Wait until all synchronous snapshot listeners have run before decorating its clock.
-  queueMicrotask(updateClock);
-
-  if (clockBaseSeconds !== null && clockAdvancing) {
-    clockTimer = window.setInterval(updateClock, 250);
-  }
+  queueMicrotask(() => {
+    const element = document.querySelector<HTMLElement>('#live-game-clock');
+    if (!element) return;
+    element.classList.add('live-match-clock');
+    element.parentElement?.classList.add('live-match-clock-group');
+    element.textContent = formatClock(seconds);
+    element.setAttribute('aria-label', `Game time at latest snapshot ${element.textContent}`);
+  });
 }
 
 window.addEventListener('esports-live:snapshot', event => {
-  startClock((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
+  renderSnapshotClock((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
 });
-
-window.addEventListener('beforeunload', stopClock);

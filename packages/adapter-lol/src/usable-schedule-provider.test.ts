@@ -101,6 +101,44 @@ test('enriches a sparse live event from series history', async () => {
   assert.equal(schedule[0]?.series.games[0]?.id, 'game-1');
 });
 
+test('retains real team names when Riot only supplies fallback team IDs', async () => {
+  const fallbackLeft = { id: 'team-1', name: 'GIANTX', code: 'GX' };
+  const fallbackRight = { id: 'team-2', name: 'SK Gaming', code: 'SK' };
+  const provider = baseProvider(sparseEntry(), true);
+  provider.getSeriesContext = async seriesId => ({
+    seriesId,
+    observedAt,
+    rosters: [],
+    standings: [],
+    history: {
+      bestOf: 3,
+      winsRequired: 2,
+      drawPossible: false,
+      score: [
+        { team: fallbackLeft, wins: 1 },
+        { team: fallbackRight, wins: 1 }
+      ],
+      games: [{
+        id: 'game-3',
+        number: 3,
+        state: 'live',
+        blueTeam: fallbackLeft,
+        redTeam: fallbackRight,
+        winner: null,
+        durationSeconds: null
+      }]
+    },
+    complete: true
+  });
+
+  const schedule = await createUsableScheduleProvider(provider).getSchedule();
+
+  assert.equal(schedule.length, 1);
+  assert.equal(schedule[0]?.series.teams[0].name, 'GIANTX');
+  assert.equal(schedule[0]?.series.teams[1].name, 'SK Gaming');
+  assert.equal(schedule[0]?.series.games[0]?.id, 'game-3');
+});
+
 test('suppresses a live placeholder that cannot be resolved', async () => {
   const provider = createUsableScheduleProvider(baseProvider(sparseEntry(), false));
   assert.deepEqual(await provider.getSchedule(), []);

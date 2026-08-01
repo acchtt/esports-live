@@ -55,6 +55,7 @@ function applyDateLabel(label: string | null): void {
 
 async function refreshSchedule(): Promise<void> {
   if (refreshRequest) return refreshRequest;
+  lastRefreshAt = Date.now();
   refreshRequest = (async () => {
     try {
       const response = await fetch(`${API_BASE}/v1/lol/schedule?states=live,paused,scheduled`, {
@@ -65,7 +66,8 @@ async function refreshSchedule(): Promise<void> {
       for (const event of payload.events) {
         scheduledStarts.set(event.series.id, event.series.scheduledStart);
       }
-      lastRefreshAt = Date.now();
+    } catch {
+      // The main schedule renderer reports connection failures; retry this optional date lookup later.
     } finally {
       refreshRequest = null;
       queueRender();

@@ -1,19 +1,21 @@
 name: Fix Eager Prewarm Placement Once
 
 on:
-  pull_request:
+  push:
+    branches:
+      - fix/eager-data-preload
 
 permissions:
   contents: write
 
 jobs:
   fix-and-validate:
-    if: github.head_ref == 'fix/eager-data-preload'
+    if: github.ref == 'refs/heads/fix/eager-data-preload'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.head_ref }}
+          ref: fix/eager-data-preload
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v6
         with:
@@ -61,4 +63,4 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add apps/web/src/completed-match-player-board-view.ts .github/workflows/fix-eager-prewarm-placement-once.yml
           git commit -m "Prewarm Data Dragon at startup"
-          git push origin HEAD:${{ github.head_ref }}
+          git push origin HEAD:fix/eager-data-preload

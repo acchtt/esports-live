@@ -196,6 +196,7 @@ let completedMatches: CompletedMatch[] = [];
 let selectedSeriesId: string | null = null;
 let loadPromise: Promise<void> | null = null;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let lastCompletedLoadAt = 0;
 const contextCache = new Map<string, CachedContext>();
 
 function escapeHtml(value: unknown): string {
@@ -391,6 +392,12 @@ function setMode(nextMode: 'active' | 'results'): void {
 
 async function loadCompletedMatches(): Promise<void> {
   if (loadPromise) return loadPromise;
+  if (completedMatches.length && Date.now() - lastCompletedLoadAt < RESULTS_REFRESH_MS) {
+    renderList();
+    const selected = completedMatches.find(match => match.event.series.id === selectedSeriesId);
+    if (selected) renderDetail(selected);
+    return;
+  }
   loadPromise = (async () => {
     resultsList.innerHTML = '<div class="empty-state"><strong>Loading recent results</strong><span>Confirming final series scores and game states…</span></div>';
     try {
@@ -430,6 +437,7 @@ async function loadCompletedMatches(): Promise<void> {
       if (selectedSeriesId && !completedMatches.some(match => match.event.series.id === selectedSeriesId)) {
         selectedSeriesId = null;
       }
+      lastCompletedLoadAt = Date.now();
       renderList();
       if (!selectedSeriesId && completedMatches[0]) selectCompleted(completedMatches[0].event.series.id);
     } catch (error) {

@@ -730,8 +730,13 @@ function enhanceRolePlayer(container: HTMLElement | null, player: LolPlayerState
   items.innerHTML = inventoryMarkup(player, patch);
 }
 
-function renderRoleBoard(blue: LolTeamState, red: LolTeamState, patch: string | null): void {
-  const rows = [...document.querySelectorAll<HTMLElement>('.role-matchup-row')];
+function renderRoleBoard(
+  blue: LolTeamState,
+  red: LolTeamState,
+  patch: string | null,
+  root: ParentNode = document
+): void {
+  const rows = [...root.querySelectorAll<HTMLElement>('.role-matchup-row')];
   if (!rows.length) return;
 
   const bluePlayers = orderedPlayers(blue);
@@ -742,8 +747,8 @@ function renderRoleBoard(blue: LolTeamState, red: LolTeamState, patch: string | 
   });
 }
 
-function bindImageFallbacks(): void {
-  document.querySelectorAll<HTMLImageElement>('.telemetry-image:not([data-fallback-bound])').forEach(image => {
+function bindImageFallbacks(root: ParentNode = document): void {
+  root.querySelectorAll<HTMLImageElement>('.telemetry-image:not([data-fallback-bound])').forEach(image => {
     image.dataset.fallbackBound = 'true';
     const showFallback = (): void => {
       image.hidden = true;
@@ -774,6 +779,14 @@ function renameHistoryControl(): void {
 
 window.addEventListener('esports-live:snapshot', event => {
   renderSnapshot((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
+});
+
+window.addEventListener('esports-live:ended-snapshot', event => {
+  const detail = (event as CustomEvent<{ snapshot: LiveSnapshot<LolStats>; root: HTMLElement }>).detail;
+  if (!detail.snapshot.stats || !detail.root.isConnected) return;
+  const patch = dataDragonPatch(detail.snapshot.stats.patch);
+  renderRoleBoard(detail.snapshot.stats.blue, detail.snapshot.stats.red, patch, detail.root);
+  bindImageFallbacks(detail.root);
 });
 
 const controlObserver = new MutationObserver(mutations => {

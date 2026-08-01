@@ -29,7 +29,10 @@ const schedule: LolProviderScheduleEntry = {
   }
 };
 
-function history(winners: readonly (TeamRef | null)[] = [null, null, null]): SeriesHistoryRef {
+function history(
+  winners: readonly (TeamRef | null)[] = [null, null, null],
+  durations: readonly (number | null)[] = [null, null, null]
+): SeriesHistoryRef {
   return {
     bestOf: 3,
     winsRequired: 2,
@@ -43,7 +46,7 @@ function history(winners: readonly (TeamRef | null)[] = [null, null, null]): Ser
       blueTeam: left,
       redTeam: right,
       winner: winners[index] ?? null,
-      durationSeconds: null
+      durationSeconds: durations[index] ?? null
     }))
   };
 }
@@ -125,7 +128,7 @@ test('supplements ambiguous completed-game winners and durations from Leaguepedi
 test('does not request fallback data when completed games already have results', async () => {
   let requests = 0;
   const provider = createLeaguepediaHistoryFallbackProvider(
-    baseProvider(history([left, right, null])),
+    baseProvider(history([left, right, null], [2_527, 2_951, null])),
     { fetcher: async () => { requests += 1; return Response.json({ cargoquery: [] }); } }
   );
 

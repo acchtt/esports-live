@@ -211,6 +211,38 @@ test('getLive adds an active event that is absent from the base schedule', async
   assert.equal(schedule[0]?.series.games[0]?.id, 'game-1');
 });
 
+test('league schedule adds an active event omitted by both global live lists', async () => {
+  const upcomingEvent = scheduleEvent('unstarted');
+  upcomingEvent.id = 'upcoming-event';
+  upcomingEvent.match.id = 'upcoming-match';
+  upcomingEvent.startTime = '2026-07-31T09:00:00.000Z';
+  const liveEvent = scheduleEvent('inProgress');
+  liveEvent.id = 'league-live-event';
+  liveEvent.match.id = 'league-live-match';
+  const provider = createRiotLolContextProvider({
+    apiKey: 'test-key',
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getSchedule') && url.searchParams.has('leagueId')) {
+        assert.equal(url.searchParams.get('leagueId'), '98767991310872058');
+        return json({ data: { schedule: { events: [liveEvent, upcomingEvent] } } });
+      }
+      if (url.pathname.endsWith('/getSchedule')) {
+        return json({ data: { schedule: { events: [upcomingEvent] } } });
+      }
+      if (url.pathname.endsWith('/getLive')) return json({ data: { schedule: { events: [] } } });
+      if (url.pathname.endsWith('/getEventDetails')) return json({ data: { event: upcomingEvent } });
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  const schedule = await provider.getSchedule();
+  const recovered = schedule.find(entry => entry.series.id === 'league-live-match');
+  assert.equal(recovered?.series.state, 'live');
+  assert.equal(recovered?.series.games[0]?.id, 'game-1');
+});
+
 test('getLive failure leaves the base schedule available', async () => {
   const provider = createRiotLolContextProvider({
     apiKey: 'test-key',

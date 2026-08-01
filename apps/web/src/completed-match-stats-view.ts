@@ -150,80 +150,101 @@ style.textContent = `
   .completed-final-items { color: var(--muted); font-size: 0.58rem; }
 
   .completed-team-comparison {
-    overflow: hidden;
+    overflow-x: auto;
     border: 1px solid rgba(148, 163, 184, 0.15);
-    border-radius: 15px;
+    border-radius: 12px;
     background:
-      linear-gradient(90deg, rgba(14, 165, 233, 0.055), transparent 38%),
-      linear-gradient(270deg, rgba(244, 63, 94, 0.05), transparent 38%),
-      rgba(2, 6, 23, 0.24);
+      linear-gradient(90deg, rgba(14, 165, 233, 0.11), transparent 34%),
+      linear-gradient(270deg, rgba(244, 63, 94, 0.1), transparent 34%),
+      rgba(3, 8, 22, 0.9);
+    scrollbar-color: rgba(56, 189, 248, 0.36) rgba(15, 23, 42, 0.7);
+    scrollbar-width: thin;
   }
-  .completed-team-comparison-header {
+  .completed-team-scoreline {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: minmax(150px, 1.35fr) repeat(3, minmax(112px, 0.8fr)) minmax(150px, 1.35fr);
     align-items: center;
-    gap: 16px;
-    padding: 14px 16px;
+    min-width: 800px;
+    min-height: 70px;
+    padding: 0 14px;
     border-bottom: 1px solid rgba(148, 163, 184, 0.11);
   }
-  .completed-team-comparison-header > span {
-    color: #78879c;
-    font-size: 0.56rem;
-    font-weight: 850;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
+  .completed-comparison-team {
+    min-width: 0;
+    padding: 8px 12px;
+    border-left: 3px solid #22d3ee;
   }
-  .completed-comparison-team { min-width: 0; }
-  .completed-comparison-team.red { text-align: right; }
+  .completed-comparison-team.red {
+    padding-right: 12px;
+    border-right: 3px solid #fb7185;
+    border-left: 0;
+    text-align: right;
+  }
   .completed-comparison-team strong {
     display: block;
     overflow: hidden;
     color: #f8fafc;
-    font-size: 0.9rem;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .completed-comparison-team em {
-    display: block;
-    margin-bottom: 3px;
-    color: #7dd3fc;
-    font-size: 0.52rem;
-    font-style: normal;
-    font-weight: 850;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .completed-comparison-team.red em { color: #fda4af; }
-  .completed-team-metrics {
+  .completed-team-objectives {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1px;
-    background: rgba(148, 163, 184, 0.09);
+    min-width: 800px;
+    background: rgba(1, 5, 15, 0.56);
   }
   .completed-team-metric {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: baseline;
-    gap: 8px;
+    gap: 4px;
     min-width: 0;
-    padding: 12px 14px;
-    background: rgba(8, 15, 29, 0.96);
+    padding: 9px 10px;
+  }
+  .completed-team-scoreline .completed-team-metric {
+    grid-template-rows: auto auto;
+    align-content: center;
+    row-gap: 3px;
+    min-height: 70px;
+    border-left: 1px solid rgba(148, 163, 184, 0.1);
+  }
+  .completed-team-scoreline .completed-team-metric > span {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+  .completed-team-scoreline .completed-team-metric > strong:first-child {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .completed-team-scoreline .completed-team-metric > strong.red {
+    grid-row: 2;
+    grid-column: 3;
+  }
+  .completed-team-scoreline .completed-team-metric:nth-last-child(2) {
+    border-right: 1px solid rgba(148, 163, 184, 0.1);
+  }
+  .completed-team-objectives .completed-team-metric {
+    border-right: 1px solid rgba(148, 163, 184, 0.09);
   }
   .completed-team-metric span {
     color: #8290a5;
-    font-size: 0.62rem;
+    font-size: 0.56rem;
     font-weight: 800;
     letter-spacing: 0.05em;
+    text-align: center;
     text-transform: uppercase;
   }
   .completed-team-metric strong {
     min-width: 0;
     color: #dff5ff;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
   .completed-team-metric strong.red { color: #ffe2e7; text-align: left; }
+  .completed-team-objectives .completed-team-metric strong { font-size: 0.92rem; }
 
   /* Compact mirrored scoreboard inspired by the in-game broadcast layout. */
   .completed-final-matchups {
@@ -237,7 +258,7 @@ style.textContent = `
   .completed-final-matchups .role-matchup-row {
     grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr);
     min-width: 800px;
-    min-height: 94px;
+    min-height: 100px;
     border-bottom-color: rgba(148, 163, 184, 0.12);
   }
   .completed-final-matchups .role-matchup-row:nth-child(even) .role-player.blue {
@@ -327,7 +348,7 @@ style.textContent = `
   .completed-final-matchups .role-player-items { grid-area: items; min-width: 0; }
   .completed-final-matchups .role-player-items .telemetry-inventory {
     gap: 4px;
-    min-height: 28px;
+    min-height: 34px;
     padding: 0;
     overflow: hidden;
   }
@@ -335,10 +356,10 @@ style.textContent = `
   .completed-final-matchups .role-player.red .telemetry-inventory { justify-content: flex-end; }
   .completed-final-matchups .role-player-items .telemetry-inventory-label { display: none; }
   .completed-final-matchups .role-player-items .telemetry-item-slot {
-    width: 28px;
-    height: 28px;
-    flex-basis: 28px;
-    border-radius: 5px;
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+    border-radius: 6px;
   }
   .completed-final-matchups .role-gold-delta {
     gap: 7px;
@@ -357,10 +378,8 @@ style.textContent = `
     .completed-final-items { grid-column: 1 / -1; }
     .completed-final-game { padding: 12px; }
     .completed-telemetry-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
-    .completed-team-comparison-header { gap: 8px; padding: 12px; }
-    .completed-team-comparison-header > span { display: none; }
-    .completed-team-comparison-header { grid-template-columns: 1fr 1fr; }
-    .completed-team-metrics { grid-template-columns: 1fr; }
+    .completed-team-scoreline,
+    .completed-team-objectives { min-width: 720px; }
   }
 `;
 document.head.append(style);
@@ -531,26 +550,30 @@ function roleMatchupRows(blue: LolTeamState, red: LolTeamState): string {
 }
 
 function comparisonMetric(label: string, blueValue: number | string | null, redValue: number | string | null): string {
+  const displayValue = (value: number | string | null): string => {
+    if (value === null) return '—';
+    if (label === 'Gold' && typeof value === 'number') return `${(value / 1000).toFixed(1)}K`;
+    return typeof value === 'number' ? value.toLocaleString() : value;
+  };
   return `
     <div class="completed-team-metric">
-      <strong>${escapeHtml(typeof blueValue === 'number' ? blueValue.toLocaleString() : blueValue ?? '—')}</strong>
+      <strong title="${escapeHtml(typeof blueValue === 'number' ? blueValue.toLocaleString() : blueValue ?? '—')}">${escapeHtml(displayValue(blueValue))}</strong>
       <span>${escapeHtml(label)}</span>
-      <strong class="red">${escapeHtml(typeof redValue === 'number' ? redValue.toLocaleString() : redValue ?? '—')}</strong>
+      <strong class="red" title="${escapeHtml(typeof redValue === 'number' ? redValue.toLocaleString() : redValue ?? '—')}">${escapeHtml(displayValue(redValue))}</strong>
     </div>`;
 }
 
 function teamComparisonMarkup(blue: LolTeamState, red: LolTeamState): string {
   return `
     <section class="completed-team-comparison">
-      <div class="completed-team-comparison-header">
-        <div class="completed-comparison-team blue"><em>Blue side</em><strong>${escapeHtml(blue.name)}</strong></div>
-        <span>Team totals</span>
-        <div class="completed-comparison-team red"><em>Red side</em><strong>${escapeHtml(red.name)}</strong></div>
-      </div>
-      <div class="completed-team-metrics">
+      <div class="completed-team-scoreline">
+        <div class="completed-comparison-team blue"><strong>${escapeHtml(blue.name)}</strong></div>
         ${comparisonMetric('Gold', blue.gold, red.gold)}
         ${comparisonMetric('Kills', blue.kills, red.kills)}
         ${comparisonMetric('Towers', blue.objectives.towers, red.objectives.towers)}
+        <div class="completed-comparison-team red"><strong>${escapeHtml(red.name)}</strong></div>
+      </div>
+      <div class="completed-team-objectives">
         ${comparisonMetric('Dragons', blue.objectives.dragons?.length ?? null, red.objectives.dragons?.length ?? null)}
         ${comparisonMetric('Barons', blue.objectives.barons, red.objectives.barons)}
         ${comparisonMetric('Inhibitors', blue.objectives.inhibitors, red.objectives.inhibitors)}

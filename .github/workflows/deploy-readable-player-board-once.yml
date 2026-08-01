@@ -1,0 +1,198 @@
+name: Deploy readable player board once
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-readable-player-board
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  deploy-and-verify:
+    if: github.head_ref == 'ops/deploy-readable-player-board'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 892dfd169f1cb5c3c7f6f177dbb566aad1edf33f
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "${{ vars.VITE_API_BASE_URL }}" || { echo "Missing VITE_API_BASE_URL"; exit 1; }
+
+      - run: npm install --no-package-lock
+      - run: npm run check
+
+      - name: Build web application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: Deploy Pages
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npx wrangler pages deploy apps/web/dist \
+              --project-name esports-live \
+              --branch main \
+              --commit-hash 892dfd169f1cb5c3c7f6f177dbb566aad1edf33f \
+              --commit-message "Restore objective text and improve player board readability"; then
+              exit 0
+            fi
+            sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: Verify production asset
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const web = 'https://esports-live.pages.dev';
+          const html = fs.readFileSync('apps/web/dist/index.html', 'utf8');
+          const expectedJs = html.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+          const expectedCss = [...html.matchAll(/<link[^>]+href="([^"]+\.css)"/g)].map(match => match[1]);
+          if (!expectedJs) throw new Error('Built JavaScript entry is missing.');
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          for (let attempt = 1; attempt <= 30; attempt += 1) {
+            const response = await fetch(`${web}/?release=${Date.now()}`, {
+              headers: { 'cache-control': 'no-cache' }
+            }).catch(() => null);
+            const productionHtml = response?.ok ? await response.text() : '';
+            if (productionHtml.includes(expectedJs) && expectedCss.every(asset => productionHtml.includes(asset))) {
+              console.log(`PRODUCTION_READABLE_BOARD_ASSET=${JSON.stringify({ expectedJs, expectedCss })}`);
+              process.exit(0);
+            }
+            await sleep(4000);
+          }
+          throw new Error(`Production did not expose ${expectedJs}.`);
+          NODE
+
+      - name: Install browser verifier
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+
+      - name: Verify production player board
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import { chromium } from 'playwright';
+
+          const now = new Date().toISOString();
+          const blue = { id: 'blue', name: 'Blue Team', code: 'BLUE' };
+          const red = { id: 'red', name: 'Red Team', code: 'RED' };
+          const roles = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
+          const champions = ['Aatrox', 'LeeSin', 'Ahri', 'Jinx', 'Nautilus'];
+          const player = (side, index) => ({
+            id: `${side}-${index}`,
+            handle: `${side === 'blue' ? 'Blue' : 'Red'} Player ${index + 1}`,
+            championId: champions[index],
+            role: roles[index],
+            level: 14 + (index % 2),
+            kills: index + 1,
+            deaths: index % 3,
+            assists: 5 + index,
+            creepScore: 170 + index * 18,
+            totalGold: 10500 + index * 720 + (side === 'blue' ? 300 : 0),
+            items: ['1055', '3006', '3031', '3094', '3036', '3072', '3363']
+          });
+          const game = { id: 'g1', number: 1, state: 'live' };
+          const series = {
+            id: 's1', esport: 'lol',
+            competition: { id: 'league', name: 'Readable League', stage: 'Week 1' },
+            teams: [blue, red], bestOf: 3, state: 'live', scheduledStart: now, games: [game]
+          };
+          const provider = { id: 'fixture', name: 'Production verifier' };
+          const snapshot = {
+            schemaVersion: '1.0', esport: 'lol', provider, series, game,
+            stats: {
+              gameClockSeconds: 1842,
+              patch: '16.15.1',
+              blue: {
+                ...blue, side: 'blue', gold: 62500, kills: 15,
+                objectives: { towers: 7, inhibitors: 1, dragons: ['cloud', 'infernal', 'ocean'], barons: 1, heralds: 1 },
+                players: roles.map((_, index) => player('blue', index))
+              },
+              red: {
+                ...red, side: 'red', gold: 59800, kills: 11,
+                objectives: { towers: 4, inhibitors: 0, dragons: ['mountain'], barons: 0, heralds: 1 },
+                players: roles.map((_, index) => player('red', index))
+              }
+            },
+            quality: {
+              freshness: 'fresh', sourceTimestamp: now, observedAt: now, ageSeconds: 1,
+              complete: true, advancing: true, safeForLiveAnalysis: true, reasons: []
+            }
+          };
+
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 700, height: 1200 } });
+          await page.route('https://esports-live-api.acchtt.workers.dev/**', async route => {
+            const url = new URL(route.request().url());
+            const json = value => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
+            if (url.pathname === '/health') return json({ ok: true, service: 'fixture', schemaVersion: '1.0', adapters: ['lol'] });
+            if (url.pathname === '/v1/lol/schedule') return json({ esport: 'lol', events: [{ series, provider, observedAt: now }] });
+            if (url.pathname.includes('/games/g1/live')) return json(snapshot);
+            if (url.pathname.includes('/series/s1/context')) {
+              return json({ schemaVersion: '1.0', esport: 'lol', seriesId: 's1', provider, observedAt: now, rosters: [], standings: [], complete: false, reasons: [] });
+            }
+            return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+          });
+
+          await page.goto(`https://esports-live.pages.dev/?verification=${Date.now()}`, { waitUntil: 'domcontentloaded' });
+          await page.locator('.role-scoreboard-board').waitFor({ state: 'visible', timeout: 30000 });
+          await page.waitForTimeout(1000);
+
+          const counts = {
+            objectiveIcons: await page.locator('.objective-icon').count(),
+            objectiveLabels: await page.locator('.role-objective-comparison .objective-label').count(),
+            roleRows: await page.locator('.role-matchup-row').count(),
+            rolePlayers: await page.locator('.role-player-name strong').count(),
+            roleStats: await page.locator('.role-player-stats > span:visible').count(),
+            rolePortraits: await page.locator('.role-player-portrait .telemetry-champion').count(),
+            roleItemSlots: await page.locator('.role-player-items .telemetry-item-slot').count()
+          };
+          const expected = {
+            objectiveIcons: 0,
+            objectiveLabels: 10,
+            roleRows: 5,
+            rolePlayers: 10,
+            roleStats: 30,
+            rolePortraits: 10,
+            roleItemSlots: 70
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (counts[key] !== value) throw new Error(`${key}: expected ${value}, received ${counts[key]}`);
+          }
+          const labels = await page.locator('.role-objective-comparison .objective-label').allTextContents();
+          for (const label of ['Towers', 'Dragons', 'Barons', 'Heralds', 'Inhibitors']) {
+            if (labels.filter(value => value === label).length !== 2) throw new Error(`Objective label missing: ${label}`);
+          }
+          const playerFont = parseFloat(await page.locator('.role-player-name strong').first().evaluate(element => getComputedStyle(element).fontSize));
+          if (playerFont < 12) throw new Error(`Player font too small: ${playerFont}px`);
+
+          await page.locator('.analysis-panel').screenshot({ path: 'production-readable-player-board.png' });
+          console.log(`PRODUCTION_READABLE_BOARD_VERIFIED=${JSON.stringify({ counts, labels, playerFont })}`);
+          await browser.close();
+          NODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-readable-player-board-verification
+          path: production-readable-player-board.png
+          retention-days: 2

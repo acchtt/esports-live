@@ -1,3 +1,5 @@
+export {};
+
 const historyPanel = document.querySelector<HTMLElement>('#series-history');
 
 if (historyPanel) {

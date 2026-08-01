@@ -17,6 +17,10 @@ import { createRiotLolProvider, type RiotLolProviderOptions } from './riot-provi
 
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const REQUEST_TIMEOUT_MS = 8_000;
+const LIVE_RECOVERY_LOOKBACK_MS = 6 * 60 * 60 * 1_000;
+const LIVE_RECOVERY_LOOKAHEAD_MS = 5 * 60 * 1_000;
+const LIVE_RECOVERY_CACHE_MS = 30_000;
+const MAX_LIVE_RECOVERY_CANDIDATES = 8;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -27,6 +31,11 @@ interface TeamDescriptor {
   name: string;
   code: string | null;
   imageUrl: string | null;
+}
+
+interface LiveRecoveryCacheEntry {
+  expiresAt: number;
+  event: Json | null;
 }
 
 const object = (value: unknown): Json => (
@@ -123,6 +132,51 @@ function eventGames(event: Json): readonly LolProviderGame[] {
       state: rawGameState(game.state)
     }];
   });
+}
+
+function detailedLiveState(event: Json): 'live' | 'paused' | null {
+  const games = eventGames(event);
+  if (games.some(game => game.state === 'paused')) return 'paused';
+  if (games.some(game => game.state === 'live' || game.state === 'draft')) return 'live';
+
+  const match = object(event.match);
+  const reported = rawSeriesState(event.state ?? match.state);
+  if (reported === 'live' || reported === 'paused') return reported;
+
+  const bestOf = firstNumber(object(match.strategy), ['count']) ?? 1;
+  const winsRequired = Math.floor(bestOf / 2) + 1;
+  const results = array(match.teams).map(team => object(object(team).result));
+  const wins = results.map(result => firstNumber(result, ['gameWins', 'wins']) ?? 0);
+  const hasFinalOutcome = results.some(result => stringValue(result.outcome) !== null);
+  return wins.some(value => value > 0)
+    && wins.every(value => value < winsRequired)
+    && !hasFinalOutcome
+    ? 'live'
+    : null;
+}
+
+function mergeDetailedLiveSignal(
+  entry: LolProviderScheduleEntry,
+  detailsEvent: Json
+): LolProviderScheduleEntry {
+  const state = detailedLiveState(detailsEvent);
+  if (!state) return entry;
+
+  const gamesById = new Map(entry.series.games.map(game => [game.id, game] as const));
+  for (const signal of eventGames(detailsEvent)) {
+    const existing = gamesById.get(signal.id);
+    gamesById.set(signal.id, existing
+      ? { ...existing, state: signal.state !== 'unknown' ? signal.state : existing.state }
+      : signal);
+  }
+  return {
+    ...entry,
+    series: {
+      ...entry.series,
+      state,
+      games: [...gamesById.values()].sort((left, right) => left.number - right.number)
+    }
+  };
 }
 
 function mergeLiveSignals(
@@ -339,6 +393,7 @@ export function createRiotLolContextProvider(options: RiotLolProviderOptions): L
   const locale = options.locale ?? 'en-US';
   const now = options.now ?? (() => new Date());
   const base = createRiotLolProvider({ ...options, fetcher });
+  const liveRecoveryCache = new Map<string, LiveRecoveryCacheEntry>();
 
   const persisted = async (
     path: string,
@@ -353,6 +408,46 @@ export function createRiotLolContextProvider(options: RiotLolProviderOptions): L
     return requestJson(fetcher, url, apiKey);
   };
 
+  const loadLiveRecoveryEvent = async (seriesId: string): Promise<Json | null> => {
+    const currentTime = now().getTime();
+    const cached = liveRecoveryCache.get(seriesId);
+    if (cached && cached.expiresAt > currentTime) return cached.event;
+    const event = await persisted('getEventDetails', { id: seriesId })
+      .then(eventFromDetails)
+      .catch(() => null);
+    liveRecoveryCache.set(seriesId, {
+      event,
+      expiresAt: currentTime + LIVE_RECOVERY_CACHE_MS
+    });
+    return event;
+  };
+
+  const recoverRecentLiveSeries = async (
+    schedule: readonly LolProviderScheduleEntry[]
+  ): Promise<readonly LolProviderScheduleEntry[]> => {
+    const currentTime = now().getTime();
+    const candidates = schedule
+      .filter(entry => entry.series.state !== 'live'
+        && entry.series.state !== 'paused'
+        && entry.series.state !== 'cancelled')
+      .filter(entry => {
+        const start = Date.parse(entry.series.scheduledStart);
+        return Number.isFinite(start)
+          && start >= currentTime - LIVE_RECOVERY_LOOKBACK_MS
+          && start <= currentTime + LIVE_RECOVERY_LOOKAHEAD_MS;
+      })
+      .sort((left, right) => Date.parse(right.series.scheduledStart) - Date.parse(left.series.scheduledStart))
+      .slice(0, MAX_LIVE_RECOVERY_CANDIDATES);
+    if (!candidates.length) return schedule;
+
+    const recovered = new Map<string, LolProviderScheduleEntry>();
+    await Promise.all(candidates.map(async entry => {
+      const event = await loadLiveRecoveryEvent(entry.series.id);
+      if (event) recovered.set(entry.series.id, mergeDetailedLiveSignal(entry, event));
+    }));
+    return schedule.map(entry => recovered.get(entry.series.id) ?? entry);
+  };
+
   const context: LolProviderClient = {
     id: base.id,
     name: base.name,
@@ -363,7 +458,7 @@ export function createRiotLolContextProvider(options: RiotLolProviderOptions): L
         base.getSchedule(),
         persisted('getLive', {}).catch(() => null)
       ]);
-      return mergeLiveSignals(schedule, livePayload);
+      return recoverRecentLiveSeries(mergeLiveSignals(schedule, livePayload));
     },
 
     getSnapshot(gameId: string, after?: string) {

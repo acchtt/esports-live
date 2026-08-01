@@ -196,6 +196,42 @@ test('getLive failure leaves the base schedule available', async () => {
   assert.equal(schedule[0]?.series.state, 'scheduled');
 });
 
+test('event details recover a live series when both schedule feeds have stale state', async () => {
+  const staleEvent = scheduleEvent();
+  staleEvent.match.games = [];
+  const detailedEvent = scheduleEvent('unstarted');
+  detailedEvent.match.games = [
+    { id: 'game-1', number: 1, state: 'completed' },
+    { id: 'game-2', number: 2, state: 'inProgress' },
+    { id: 'game-3', number: 3, state: 'unstarted' }
+  ];
+  detailedEvent.match.teams = detailedEvent.match.teams.map((entry, index) => ({
+    ...entry,
+    result: { gameWins: index, outcome: null }
+  }));
+  const provider = createRiotLolContextProvider({
+    apiKey: 'test-key',
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getSchedule')) {
+        return json({ data: { schedule: { events: [staleEvent] } } });
+      }
+      if (url.pathname.endsWith('/getLive')) return json({ data: { schedule: { events: [] } } });
+      if (url.pathname.endsWith('/getEventDetails')) return json({ data: { event: detailedEvent } });
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule[0]?.series.state, 'live');
+  assert.deepEqual(schedule[0]?.series.games.map(game => [game.id, game.state]), [
+    ['game-1', 'completed'],
+    ['game-2', 'live'],
+    ['game-3', 'unstarted']
+  ]);
+});
+
 test('series context normalizes rosters and active-tournament standings', async () => {
   const provider = createRiotLolContextProvider({
     apiKey: 'test-key',

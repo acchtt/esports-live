@@ -195,7 +195,11 @@ function gameRef(value: unknown, fallbackNumber: number): LolProviderGame | null
   } : null;
 }
 
-function normalizeSeries(value: unknown, observedAt: string, fallbackGameId?: string): LolProviderSeries {
+export function normalizeRiotSeries(
+  value: unknown,
+  observedAt: string,
+  fallbackGameId?: string
+): LolProviderSeries {
   const event = object(value);
   const match = object(event.match);
   const teams = array(match.teams);
@@ -595,14 +599,14 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
       const observedAt = now().toISOString();
       const payload = object(await persisted('getSchedule', {}));
       const events = array(object(object(payload.data).schedule).events ?? object(payload.schedule).events);
-      return events.map(event => ({ series: normalizeSeries(event, observedAt), observedAt }));
+      return events.map(event => ({ series: normalizeRiotSeries(event, observedAt), observedAt }));
     },
 
     async getSnapshot(gameId: string, after?: string): Promise<LolProviderSnapshot> {
       const observedAt = now().toISOString();
       const candidate = await bestWindow(gameId, after);
       if (!candidate) {
-        const series = normalizeSeries({}, observedAt, gameId);
+        const series = normalizeRiotSeries({}, observedAt, gameId);
         return {
           series,
           game: series.games[0]!,
@@ -620,7 +624,7 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
       const metadata = object(effectiveCandidate.payload.gameMetadata ?? effectiveCandidate.frame.gameMetadata);
       const matchId = firstString(candidate.payload, ['esportsMatchId']) ?? firstString(metadata, ['esportsMatchId']);
       const event = await eventDetails(matchId).catch(() => ({}));
-      const baseSeries = normalizeSeries(event, observedAt, gameId);
+      const baseSeries = normalizeRiotSeries(event, observedAt, gameId);
       const existing = baseSeries.games.find(game => game.id === gameId)
         ?? { id: gameId, number: baseSeries.games.length || 1, state: 'unknown' as const };
       const game: LolProviderGame = {

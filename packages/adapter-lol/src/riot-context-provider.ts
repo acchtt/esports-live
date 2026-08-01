@@ -13,7 +13,11 @@ import type {
   LolProviderScheduleEntry,
   LolProviderSeriesContext
 } from './provider.ts';
-import { createRiotLolProvider, type RiotLolProviderOptions } from './riot-provider.ts';
+import {
+  createRiotLolProvider,
+  normalizeRiotSeries,
+  type RiotLolProviderOptions
+} from './riot-provider.ts';
 
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -181,7 +185,8 @@ function mergeDetailedLiveSignal(
 
 function mergeLiveSignals(
   schedule: readonly LolProviderScheduleEntry[],
-  livePayload: unknown
+  livePayload: unknown,
+  observedAt: string
 ): readonly LolProviderScheduleEntry[] {
   const byId = new Map<string, Json>();
   for (const event of scheduleEvents(livePayload)) {
@@ -189,7 +194,7 @@ function mergeLiveSignals(
   }
   if (byId.size === 0) return schedule;
 
-  return schedule.map(entry => {
+  const merged = schedule.map(entry => {
     const liveEvent = byId.get(entry.series.id);
     if (!liveEvent || entry.series.state === 'completed' || entry.series.state === 'cancelled') return entry;
 
@@ -214,6 +219,16 @@ function mergeLiveSignals(
       }
     };
   });
+
+  const knownSeries = new Set(schedule.map(entry => entry.series.id));
+  const liveOnly = scheduleEvents(livePayload).flatMap(event => {
+    const state = rawSeriesState(event.state ?? object(event.match).state);
+    const series = normalizeRiotSeries(event, observedAt);
+    return (state === 'live' || state === 'paused') && !knownSeries.has(series.id)
+      ? [{ series, observedAt }]
+      : [];
+  });
+  return [...merged, ...liveOnly];
 }
 
 function teamDescriptor(value: unknown, fallbackIndex: number): TeamDescriptor {
@@ -454,11 +469,12 @@ export function createRiotLolContextProvider(options: RiotLolProviderOptions): L
     ...(base.sourceUrl ? { sourceUrl: base.sourceUrl } : {}),
 
     async getSchedule(): Promise<readonly LolProviderScheduleEntry[]> {
+      const observedAt = now().toISOString();
       const [schedule, livePayload] = await Promise.all([
         base.getSchedule(),
         persisted('getLive', {}).catch(() => null)
       ]);
-      return recoverRecentLiveSeries(mergeLiveSignals(schedule, livePayload));
+      return recoverRecentLiveSeries(mergeLiveSignals(schedule, livePayload, observedAt));
     },
 
     getSnapshot(gameId: string, after?: string) {

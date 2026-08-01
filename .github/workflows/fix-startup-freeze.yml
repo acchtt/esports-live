@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - agent/fix-startup-freeze
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   patch-and-check:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -143,6 +145,7 @@ jobs:
           npm run check
 
       - name: Commit fix
+        if: github.event_name == 'push'
         shell: bash
         run: |
           rm .github/workflows/fix-startup-freeze.yml

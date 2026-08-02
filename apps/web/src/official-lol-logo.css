@@ -1,0 +1,59 @@
+.series-hero-game-mark.official-lol-logo {
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 42px;
+  min-height: 42px;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-color: rgba(200, 164, 86, 0.28);
+  background:
+    linear-gradient(145deg, rgba(200, 164, 86, 0.075), rgba(56, 189, 248, 0.035));
+}
+
+.series-hero-game-mark.official-lol-logo img,
+.series-hero-game-mark.official-lol-logo b {
+  grid-area: 1 / 1;
+}
+
+.series-hero-game-mark.official-lol-logo img {
+  display: block;
+  width: 72px;
+  height: 38px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3));
+}
+
+.series-hero-game-mark.official-lol-logo b {
+  display: none;
+  color: #d6bd78;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.series-hero-game-mark.official-lol-logo.image-failed img {
+  display: none;
+}
+
+.series-hero-game-mark.official-lol-logo.image-failed b {
+  display: block;
+}
+
+@media (max-width: 680px) {
+  .series-hero-game-mark.official-lol-logo {
+    width: 70px;
+    height: 36px;
+    min-height: 36px;
+    padding: 2px 5px;
+  }
+
+  .series-hero-game-mark.official-lol-logo img {
+    width: 60px;
+    height: 32px;
+  }
+
+  .series-hero-game-mark.official-lol-logo.image-failed b {
+    display: block;
+  }
+}

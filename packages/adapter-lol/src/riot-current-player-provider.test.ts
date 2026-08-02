@@ -108,16 +108,32 @@ function windowPayload(timestamp: string) {
   };
 }
 
-function fetcher(timestamp: string) {
-  return async (): Promise<Response> => new Response(JSON.stringify(windowPayload(timestamp)), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' }
-  });
+function detailPayload(timestamp: string, blueItem: number, redItem: number) {
+  return {
+    frames: [{
+      rfc460Timestamp: timestamp,
+      participants: [
+        { participantId: 1, items: [{ itemID: blueItem }] },
+        { participantId: 6, items: [{ itemID: redItem }] }
+      ]
+    }]
+  };
+}
+
+function windowOnlyFetcher(timestamp: string) {
+  return async (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(String(input));
+    const value = url.pathname.includes('/window/') ? windowPayload(timestamp) : null;
+    return new Response(value === null ? null : JSON.stringify(value), {
+      status: value === null ? 204 : 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  };
 }
 
 test('uses same-frame window counters while preserving detail inventories', async () => {
   const provider = createRiotCurrentPlayerProvider(baseProvider(snapshot()), {
-    fetcher: fetcher(SOURCE)
+    fetcher: windowOnlyFetcher(SOURCE)
   });
 
   const result = await provider.getSnapshot('game-1');
@@ -137,7 +153,7 @@ test('uses same-frame window counters while preserving detail inventories', asyn
 test('rejects player counters from a different telemetry timestamp', async () => {
   const delayed = new Date(Date.parse(SOURCE) - 10_000).toISOString();
   const provider = createRiotCurrentPlayerProvider(baseProvider(snapshot()), {
-    fetcher: fetcher(delayed)
+    fetcher: windowOnlyFetcher(delayed)
   });
 
   const result = await provider.getSnapshot('game-1');
@@ -147,4 +163,30 @@ test('rejects player counters from a different telemetry timestamp', async () =>
   assert.equal(blue?.creepScore, 55);
   assert.equal(blue?.totalGold, 5_200);
   assert.deepEqual(blue?.items, ['3006']);
+});
+
+test('uses the freshest near-current details frame for inventories', async () => {
+  const older = new Date(Date.parse(SOURCE) - 20_000).toISOString();
+  const requestedDetails: string[] = [];
+  const provider = createRiotCurrentPlayerProvider(baseProvider(snapshot()), {
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/window/')) {
+        return new Response(JSON.stringify(windowPayload(SOURCE)), { status: 200 });
+      }
+      requestedDetails.push(url.searchParams.get('startingTime') ?? '');
+      const currentAnchor = url.searchParams.get('startingTime') === SOURCE;
+      const payload = currentAnchor
+        ? detailPayload(SOURCE, 3078, 3157)
+        : detailPayload(older, 1001, 1004);
+      return new Response(JSON.stringify(payload), { status: 200 });
+    }
+  });
+
+  const result = await provider.getSnapshot('game-1');
+
+  assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
+  assert.equal(result.stats?.blue.players[0]?.kills, 3);
+  assert.deepEqual(requestedDetails.sort(), [older, SOURCE].sort());
 });

@@ -219,9 +219,11 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await liveCard.click();
 
   const selectedSeries = page.locator('#selected-series');
+  const liveScoreboard = page.locator('[data-live-history-game-id="game-live-1"]');
   await expect(selectedSeries).toContainText('Blue Team');
   await expect(selectedSeries).toContainText('Red Team');
-  await expect(page.locator('.role-scoreboard-board')).toBeVisible();
+  await expect.poll(requests.liveRequests).toBeGreaterThan(0);
+  await expect(liveScoreboard).toBeVisible();
   await expect(page.locator('#live-game-clock')).toHaveText(/\d+:\d{2}/);
 
   const refresh = page.getByRole('button', { name: 'Refresh' });
@@ -241,7 +243,7 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await expect(page.getByText('Match scheduled')).toBeVisible();
 
   await liveCard.click();
-  await expect(page.locator('.role-scoreboard-board')).toBeVisible();
+  await expect(liveScoreboard).toBeVisible();
   const liveRequestsBeforePolling = requests.liveRequests();
   await page.waitForTimeout(6_000);
   await expect.poll(requests.liveRequests).toBeGreaterThan(liveRequestsBeforePolling);

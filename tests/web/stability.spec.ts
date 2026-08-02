@@ -267,7 +267,7 @@ test('stays visible and interactive through polling and view changes', async ({ 
   });
   expect(clockCenterOffset).toBeLessThan(2);
 
-  const refresh = page.getByRole('button', { name: 'Refresh' });
+  const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
   await refresh.click();
   await expect.poll(requests.scheduleRequests).toBeGreaterThanOrEqual(2);
   await expect(refresh).toBeEnabled();

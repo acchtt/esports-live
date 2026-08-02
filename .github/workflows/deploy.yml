@@ -1,6 +1,9 @@
 name: Deploy Cloudflare
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       target:
@@ -12,6 +15,10 @@ on:
           - api
           - web
           - all
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -29,12 +36,12 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
-          if [[ "${{ inputs.target }}" == "web" || "${{ inputs.target }}" == "all" ]]; then
+          if [[ "${{ github.event_name }}" == "push" || "${{ inputs.target }}" == "web" || "${{ inputs.target }}" == "all" ]]; then
             test -n "${{ vars.VITE_API_BASE_URL }}" || { echo "Missing repository variable VITE_API_BASE_URL"; exit 1; }
           fi
 
   deploy-api:
-    if: inputs.target == 'api' || inputs.target == 'all'
+    if: github.event_name == 'workflow_dispatch' && (inputs.target == 'api' || inputs.target == 'all')
     needs: validate
     runs-on: ubuntu-latest
     environment: production
@@ -49,7 +56,7 @@ jobs:
         run: npm run deploy:api
 
   deploy-web:
-    if: inputs.target == 'web' || inputs.target == 'all'
+    if: github.event_name == 'push' || inputs.target == 'web' || inputs.target == 'all'
     needs: validate
     runs-on: ubuntu-latest
     environment: production
@@ -83,3 +90,18 @@ jobs:
           --branch main
           --commit-hash "$GITHUB_SHA"
           --commit-message "${{ github.event.head_commit.message || 'Manual production deployment' }}"
+      - name: Verify production shell
+        shell: bash
+        run: |
+          url="https://esports-live.pages.dev/?commit=$GITHUB_SHA"
+          for attempt in {1..12}; do
+            html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$url" || true)"
+            if grep -q '<title>Esports Live</title>' <<<"$html" && grep -q 'class="app-frame"' <<<"$html"; then
+              echo "Production shell is available at $url"
+              exit 0
+            fi
+            echo "Production shell not ready (attempt $attempt/12)."
+            sleep 5
+          done
+          echo "Production shell verification failed."
+          exit 1

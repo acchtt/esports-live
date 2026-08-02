@@ -94,12 +94,17 @@ body .workspace .game-content {
 
   body .workspace .platform-panel {
     display: block;
-    grid-column: auto;
-    position: sticky;
+    position: fixed;
     top: 94px;
-    width: auto;
+    right: 0;
+    z-index: 18;
+    width: clamp(260px, 17vw, 300px);
     min-width: 0;
     max-height: calc(100vh - 104px);
+    overflow-y: auto;
+    border-right: 0;
+    border-radius: 20px 0 0 20px;
+    box-shadow: -22px 24px 80px rgba(0, 0, 0, 0.34);
     transition: width 180ms ease, border-color 180ms ease, background 180ms ease;
   }
 
@@ -149,6 +154,10 @@ body .workspace .game-content {
     position: static;
     width: auto;
     max-height: none;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
   }
 
   body .workspace.platform-collapsed .platform-panel-heading {
@@ -211,5 +220,51 @@ body .workspace .game-content {
 
   body .workspace .game-content {
     padding: 12px;
+  }
+}
+
+/* Unified completed-series summary and compact game results. */
+body .completed-match-detail {
+  gap: 0;
+}
+
+body .completed-match-detail > .completed-series-hero {
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+}
+
+body .completed-match-detail > .completed-series-hero + .completed-games-panel {
+  gap: 14px;
+  padding: 20px 22px 22px;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 0 0 18px 18px;
+  background:
+    linear-gradient(110deg, rgba(14, 165, 233, 0.045), transparent 42%),
+    linear-gradient(250deg, rgba(244, 63, 94, 0.04), transparent 42%),
+    rgba(255, 255, 255, 0.012);
+}
+
+body .completed-match-detail .completed-game {
+  min-height: 88px;
+  gap: 10px;
+}
+
+body .completed-match-detail .completed-side {
+  display: none !important;
+}
+
+body .completed-match-detail .completed-result {
+  margin-top: 0;
+  padding-top: 10px;
+}
+
+body .completed-match-detail .completed-result > span {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  body .completed-match-detail > .completed-series-hero + .completed-games-panel {
+    padding: 17px;
   }
 }

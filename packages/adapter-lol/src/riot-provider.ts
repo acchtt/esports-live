@@ -562,7 +562,12 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
       if (previous === undefined || openingTime < previous) gameStartTimes.set(gameId, openingTime);
     }
     const first = windowCandidate(openingPayload);
-    if (first?.gameplay && observedMs - first.timestampMs <= 30_000) {
+    const afterMs = parseTime(after);
+    if (
+      first?.gameplay
+      && observedMs - first.timestampMs <= 30_000
+      && (afterMs === null || first.timestampMs >= afterMs)
+    ) {
       return first;
     }
     const candidates = first ? [first] : [];

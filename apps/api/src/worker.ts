@@ -1,6 +1,7 @@
 import {
   LolAdapter,
   createLeaguepediaHistoryFallbackProvider,
+  createRiotCurrentPlayerProvider,
   createRiotLolConsistentProvider,
   createUsableScheduleProvider
 } from '@esports-live/adapter-lol';
@@ -23,7 +24,9 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const registry = new AdapterRegistry();
   if (apiKey) {
     const provider = createUsableScheduleProvider(
-      createLeaguepediaHistoryFallbackProvider(createRiotLolConsistentProvider({ apiKey }))
+      createLeaguepediaHistoryFallbackProvider(
+        createRiotCurrentPlayerProvider(createRiotLolConsistentProvider({ apiKey }))
+      )
     );
     registry.register(new CachedAdapter(new LolAdapter(provider), {
       scheduleTtlMs: 45_000,

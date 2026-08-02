@@ -1,11 +1,13 @@
 import type {
   LiveSnapshot,
+  ScheduleEvent,
   SeriesContext,
   SeriesGameHistoryRef,
   SeriesHistoryRef,
   TeamRef
 } from '@esports-live/core';
 import type { LolStats } from '@esports-live/adapter-lol';
+import { apiJson } from './api-client.ts';
 
 interface StoredHistoryState {
   score: [number, number];
@@ -14,8 +16,8 @@ interface StoredHistoryState {
 }
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-const LIVE_REFRESH_MS = 15_000;
-const IDLE_REFRESH_MS = 60_000;
+const LIVE_REFRESH_MS = 30_000;
+const IDLE_REFRESH_MS = 120_000;
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -25,7 +27,6 @@ function requiredElement<T extends Element>(selector: string): T {
 
 const selectedSeries = requiredElement<HTMLElement>('#selected-series');
 const selectedMeta = requiredElement<HTMLElement>('#selected-meta');
-const scheduleList = requiredElement<HTMLElement>('#schedule-list');
 const historyPanel = requiredElement<HTMLElement>('#series-history');
 const analysisHeader = requiredElement<HTMLElement>('.analysis-header');
 const gameSelector = requiredElement<HTMLElement>('#game-selector');
@@ -37,6 +38,7 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const histories = new Map<string, SeriesHistoryRef>();
 const liveClocks = new Map<string, number>();
 const finalSnapshots = new Map<string, Promise<LiveSnapshot<LolStats> | null>>();
+let historyController: AbortController | null = null;
 
 const style = document.createElement('style');
 style.textContent = `
@@ -134,10 +136,6 @@ function escapeHtml(value: unknown): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
-}
-
-function selectedSeriesIdentifier(): string | null {
-  return scheduleList.querySelector<HTMLButtonElement>('.match-card.selected')?.dataset.seriesId ?? null;
 }
 
 function formatClock(seconds: number): string {
@@ -350,6 +348,7 @@ function nextRefreshDelay(): number {
 
 function scheduleRefresh(seriesId: string): void {
   clearRefreshTimer();
+  if (document.hidden) return;
   refreshTimer = setTimeout(() => {
     if (activeSeriesId === seriesId) void loadHistory(seriesId);
   }, nextRefreshDelay());
@@ -358,11 +357,10 @@ function scheduleRefresh(seriesId: string): void {
 async function snapshotFor(gameId: string): Promise<LiveSnapshot<LolStats> | null> {
   const existing = finalSnapshots.get(gameId);
   if (existing) return existing;
-  const request = fetch(
-    `${API_BASE}/v1/lol/games/${encodeURIComponent(gameId)}/live?historyFinal=${Date.now()}`,
-    { cache: 'no-store' }
+  const request = apiJson<LiveSnapshot<LolStats>>(
+    API_BASE,
+    `/v1/lol/games/${encodeURIComponent(gameId)}/live?historyFinal=${Date.now()}`
   )
-    .then(async response => response.ok ? await response.json() as LiveSnapshot<LolStats> : null)
     .catch(() => null);
   finalSnapshots.set(gameId, request);
   return request;
@@ -395,22 +393,19 @@ async function enrichDurations(seriesId: string): Promise<void> {
 async function loadHistory(seriesId: string): Promise<void> {
   if (loadingSeriesId === seriesId) return;
   const currentRequest = ++requestId;
+  historyController?.abort();
+  const controller = new AbortController();
+  historyController = controller;
   loadingSeriesId = seriesId;
   if (!histories.has(seriesId)) showMessage('Loading series score and game results…');
   try {
-    const response = await fetch(
-      `${API_BASE}/v1/lol/series/${encodeURIComponent(seriesId)}/context?history=${Date.now()}`,
-      { cache: 'no-store' }
+    const body = await apiJson<SeriesContext>(
+      API_BASE,
+      `/v1/lol/series/${encodeURIComponent(seriesId)}/context?history=${Date.now()}`,
+      { signal: controller.signal }
     );
-    const body = await response.json().catch(() => null) as SeriesContext | { message?: string } | null;
-    if (!response.ok) {
-      const message = body && 'message' in body
-        ? body.message ?? `History API returned ${response.status}.`
-        : `History API returned ${response.status}.`;
-      throw new Error(message);
-    }
     if (currentRequest !== requestId || activeSeriesId !== seriesId) return;
-    const context = body as SeriesContext;
+    const context = body;
     if (!context.history) {
       if (!histories.has(seriesId)) showMessage('Riot has not published game-history details for this series.', true);
     } else {
@@ -420,6 +415,7 @@ async function loadHistory(seriesId: string): Promise<void> {
       void enrichDurations(seriesId);
     }
   } catch (error) {
+    if (controller.signal.aborted) return;
     if (currentRequest !== requestId || activeSeriesId !== seriesId) return;
     if (!histories.has(seriesId)) {
       showMessage(error instanceof Error ? error.message : 'Series history is unavailable.', true);
@@ -439,13 +435,14 @@ function resetHistoryPanel(): void {
   historyPanel.replaceChildren();
 }
 
-function syncSelection(): void {
-  const seriesId = selectedSeriesIdentifier();
+function syncSelection(seriesId: string | null): void {
   if (!seriesId) {
     activeSeriesId = null;
     requestId += 1;
     loadingSeriesId = null;
     clearRefreshTimer();
+    historyController?.abort();
+    historyController = null;
     resetHistoryPanel();
     return;
   }
@@ -487,8 +484,15 @@ window.addEventListener('esports-live:snapshot', event => {
   renderHistory(snapshot.series.id);
 });
 
-const observer = new MutationObserver(() => queueMicrotask(syncSelection));
-observer.observe(selectedSeries, { childList: true, characterData: true, subtree: true });
-observer.observe(scheduleList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+window.addEventListener('esports-live:selection', event => {
+  const selection = (event as CustomEvent<ScheduleEvent>).detail;
+  syncSelection(selection.series.id);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    clearRefreshTimer();
+    return;
+  }
+  if (activeSeriesId) void loadHistory(activeSeriesId);
+});
 window.addEventListener('beforeunload', clearRefreshTimer);
-syncSelection();

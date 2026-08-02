@@ -16,7 +16,7 @@ interface ScheduleResponse {
 }
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-const SNAPSHOT_POLL_MS = 5_000;
+const SNAPSHOT_POLL_MS = 500;
 const SCHEDULE_POLL_MS = 30_000;
 const ACTIVE_SCHEDULE_GRACE_MS = 6 * 60 * 60 * 1_000;
 const COMPLETED_SNAPSHOT_CACHE_MS = 30 * 60 * 1_000;

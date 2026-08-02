@@ -26,6 +26,8 @@ export interface RiotLolProviderOptions {
   fetcher?: FetchLike;
   locale?: string;
   now?: () => Date;
+  includeDetails?: boolean;
+  useDetailItemFallback?: boolean;
 }
 
 interface Candidate {
@@ -522,7 +524,9 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
   const fetcher = options.fetcher ?? fetch;
   const locale = options.locale ?? 'en-US';
   const now = options.now ?? (() => new Date());
+  const includeDetails = options.includeDetails ?? true;
   const gameStartTimes = new Map<string, number>();
+  const eventDetailsCache = new Map<string, Promise<Json>>();
 
   const persisted = async (path: string, params: Record<string, string | string[] | undefined>): Promise<unknown> => {
     const url = new URL(`${PERSISTED_BASE}/${path}`);
@@ -596,11 +600,22 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
       .sort((left, right) => right.timestampMs - left.timestampMs)[0] ?? null;
   };
 
-  const eventDetails = async (matchId: string | null): Promise<Json> => {
-    if (!matchId) return {};
-    const payload = object(await persisted('getEventDetails', { id: matchId }));
-    const data = object(payload.data);
-    return object(data.event ?? payload.event ?? data);
+  const eventDetails = (matchId: string | null): Promise<Json> => {
+    if (!matchId) return Promise.resolve({});
+    const cached = eventDetailsCache.get(matchId);
+    if (cached) return cached;
+    const request = persisted('getEventDetails', { id: matchId })
+      .then(payloadValue => {
+        const payload = object(payloadValue);
+        const data = object(payload.data);
+        return object(data.event ?? payload.event ?? data);
+      })
+      .catch(error => {
+        eventDetailsCache.delete(matchId);
+        throw error;
+      });
+    eventDetailsCache.set(matchId, request);
+    return request;
   };
 
   return {
@@ -642,11 +657,16 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
         };
       }
 
-      const detail = candidate.gameplay ? await details(gameId, candidate.timestamp) : null;
+      const candidateMetadata = object(candidate.payload.gameMetadata ?? candidate.frame.gameMetadata);
+      const matchId = firstString(candidate.payload, ['esportsMatchId'])
+        ?? firstString(candidateMetadata, ['esportsMatchId']);
+      const detailRequest: Promise<TimedFrame | null> = includeDetails && candidate.gameplay
+        ? details(gameId, candidate.timestamp)
+        : Promise.resolve(null);
+      const eventRequest = eventDetails(matchId).catch(() => ({}));
+      const [detail, event] = await Promise.all([detailRequest, eventRequest]);
       const effectiveCandidate = detail ? alignWindowCandidate(candidate, detail) : candidate;
       const metadata = object(effectiveCandidate.payload.gameMetadata ?? effectiveCandidate.frame.gameMetadata);
-      const matchId = firstString(candidate.payload, ['esportsMatchId']) ?? firstString(metadata, ['esportsMatchId']);
-      const event = await eventDetails(matchId).catch(() => ({}));
       const baseSeries = normalizeRiotSeries(event, observedAt, gameId);
       const existing = baseSeries.games.find(game => game.id === gameId)
         ?? { id: gameId, number: baseSeries.games.length || 1, state: 'unknown' as const };

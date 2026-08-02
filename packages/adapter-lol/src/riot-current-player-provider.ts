@@ -18,6 +18,8 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 
 export interface RiotCurrentPlayerProviderOptions {
   fetcher?: FetchLike;
+  now?: () => Date;
+  useWindowOverlay?: boolean;
 }
 
 interface TimedFrame {
@@ -226,6 +228,30 @@ function mergeInventories(
   };
 }
 
+function unresolvedItemFields(stats: LolStats): ReadonlySet<string> {
+  const unresolved = new Set<string>();
+  for (const team of [stats.blue, stats.red]) {
+    team.players.forEach((player, index) => {
+      if (player.items === null) unresolved.add(`${team.side}.players.${index}.items`);
+    });
+  }
+  return unresolved;
+}
+
+function withResolvedItemReasons(snapshot: LolProviderSnapshot, stats: LolStats): LolProviderSnapshot {
+  const unresolved = unresolvedItemFields(stats);
+  const reasons = (snapshot.reasons ?? []).filter(reason => (
+    !reason.field?.endsWith('.items') || unresolved.has(reason.field)
+  ));
+  const { reasons: _oldReasons, ...base } = snapshot;
+  return {
+    ...base,
+    stats,
+    complete: reasons.length === 0,
+    ...(reasons.length ? { reasons } : {})
+  };
+}
+
 async function requestLive(
   fetcher: FetchLike,
   path: 'window' | 'details',
@@ -299,6 +325,8 @@ export function createRiotCurrentPlayerProvider(
   options: RiotCurrentPlayerProviderOptions = {}
 ): LolProviderClient {
   const fetcher = options.fetcher ?? fetch;
+  const now = options.now ?? (() => new Date());
+  const useWindowOverlay = options.useWindowOverlay ?? true;
   const detailProbeStates = new Map<string, DetailProbeState>();
   const inventoryStates = new Map<string, Map<string, InventoryObservation>>();
   const inventoryProbes = new Map<string, Promise<ReadonlyMap<string, InventoryObservation>>>();
@@ -332,35 +360,41 @@ export function createRiotCurrentPlayerProvider(
   return {
     ...base,
     async getSnapshot(gameId: string, after?: string): Promise<LolProviderSnapshot> {
-      const latestWindowRequest = requestLive(fetcher, 'window', gameId);
-      const latestInventoryRequest = latestWindowRequest.then(payload => {
-        const latest = newestFrame(payload);
-        return latest ? loadInventories(gameId, latest.timestampMs) : null;
-      });
+      const latestWindowRequest = useWindowOverlay
+        ? requestLive(fetcher, 'window', gameId)
+        : null;
+      const latestInventoryRequest = latestWindowRequest
+        ? latestWindowRequest.then(payload => {
+            const latest = newestFrame(payload);
+            return latest ? loadInventories(gameId, latest.timestampMs) : null;
+          })
+        : loadInventories(gameId, now().getTime());
       const snapshot = await base.getSnapshot(gameId, after);
       if (!snapshot.stats || !snapshot.sourceTimestamp) return snapshot;
 
       const sourceMs = parseTime(snapshot.sourceTimestamp);
       if (sourceMs === null) return snapshot;
 
-      const latestWindow = await latestWindowRequest;
-      const latest = newestFrame(latestWindow);
-      let frame = alignedFrame(latestWindow, sourceMs);
-      if (!frame) {
-        const targeted = await requestLive(fetcher, 'window', gameId, roundedIso(sourceMs - 30_000));
-        frame = alignedFrame(targeted, sourceMs);
+      let stats = snapshot.stats;
+      let latest: TimedFrame | null = null;
+      if (latestWindowRequest) {
+        const latestWindow = await latestWindowRequest;
+        latest = newestFrame(latestWindow);
+        let frame = alignedFrame(latestWindow, sourceMs);
+        if (!frame) {
+          const targeted = await requestLive(fetcher, 'window', gameId, roundedIso(sourceMs - 30_000));
+          frame = alignedFrame(targeted, sourceMs);
+        }
+        if (frame) stats = mergeStats(stats, frame);
       }
 
-      let stats = frame ? mergeStats(snapshot.stats, frame) : snapshot.stats;
       const observations = await latestInventoryRequest;
-      if (observations && latest) {
-        stats = mergeInventories(stats, observations, latest.timestampMs + DETAIL_CEILING_MS);
+      if (observations) {
+        const ceilingMs = (latest?.timestampMs ?? sourceMs) + DETAIL_CEILING_MS;
+        stats = mergeInventories(stats, observations, ceilingMs);
       }
 
-      return {
-        ...snapshot,
-        stats
-      };
+      return withResolvedItemReasons(snapshot, stats);
     }
   };
 }

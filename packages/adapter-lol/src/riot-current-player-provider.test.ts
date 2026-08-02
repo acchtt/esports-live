@@ -289,3 +289,30 @@ test('does not roll a near-current inventory backward when Riot later returns an
   assert.deepEqual(second.stats?.blue.players[0]?.items, ['3078']);
   assert.deepEqual(second.stats?.red.players[0]?.items, ['3157']);
 });
+
+
+test('uses the wall-clock details frontier without issuing a duplicate window request', async () => {
+  const observedNow = new Date(Date.parse(SOURCE) + 60_000);
+  const requestedDetails: string[] = [];
+  let windowRequests = 0;
+  const provider = createRiotCurrentPlayerProvider(baseProvider(snapshot()), {
+    now: () => observedNow,
+    useWindowOverlay: false,
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/window/')) {
+        windowRequests += 1;
+        return new Response(JSON.stringify(windowPayload(SOURCE)), { status: 200 });
+      }
+      requestedDetails.push(url.searchParams.get('startingTime') ?? '');
+      return new Response(JSON.stringify(detailPayload(SOURCE, 3078, 3157)), { status: 200 });
+    }
+  });
+
+  const result = await provider.getSnapshot('game-1');
+
+  assert.equal(windowRequests, 0);
+  assert.deepEqual(requestedDetails, [SOURCE]);
+  assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
+});

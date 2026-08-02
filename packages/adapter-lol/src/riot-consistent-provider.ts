@@ -366,6 +366,7 @@ export function createRiotLolConsistentProvider(options: RiotLolProviderOptions)
   const base = createRiotLolHistoryProvider(options);
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? (() => new Date());
+  const useDetailItemFallback = options.useDetailItemFallback ?? true;
   const latestSnapshots = new Map<string, LolProviderSnapshot>();
   const snapshotInFlight = new Map<string, Promise<LolProviderSnapshot>>();
   const detailCache = new Map<string, DetailItemsCacheEntry>();
@@ -416,7 +417,7 @@ export function createRiotLolConsistentProvider(options: RiotLolProviderOptions)
     const pending = snapshotInFlight.get(gameId);
     if (pending) return pending;
     const request = base.getSnapshot(gameId, after)
-      .then(snapshot => loadItems(gameId, snapshot))
+      .then(snapshot => useDetailItemFallback ? loadItems(gameId, snapshot) : snapshot)
       .then(snapshot => {
         const merged = mergeMonotonicSnapshot(latestSnapshots.get(gameId), snapshot);
         latestSnapshots.set(gameId, merged);

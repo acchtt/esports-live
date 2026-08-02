@@ -1,4 +1,4 @@
-import { expect, test, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 async function fulfillJson(route: Route, value: unknown): Promise<void> {
   await route.fulfill({
@@ -8,7 +8,7 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
   });
 }
 
-test('gives cold live snapshots a longer deadline without relaxing other API calls', async ({ page }) => {
+async function installShellFixtures(page: Page): Promise<void> {
   await page.route('**/health', route => fulfillJson(route, {
     ok: true,
     service: 'esports-live-api',
@@ -19,6 +19,10 @@ test('gives cold live snapshots a longer deadline without relaxing other API cal
     esport: 'lol',
     events: []
   }));
+}
+
+test('gives cold live snapshots a longer deadline without relaxing other API calls', async ({ page }) => {
+  await installShellFixtures(page);
   await page.goto('/');
 
   const timeouts = await page.evaluate(async () => {
@@ -35,4 +39,21 @@ test('gives cold live snapshots a longer deadline without relaxing other API cal
     schedule: 10_000,
     context: 10_000
   });
+});
+
+test('accepts a cold live response that arrives after the former ten-second deadline', async ({ page }) => {
+  test.setTimeout(20_000);
+  await installShellFixtures(page);
+  await page.route('**/v1/lol/games/cold-game/live', async route => {
+    await new Promise(resolve => setTimeout(resolve, 10_500));
+    await fulfillJson(route, { ready: true });
+  });
+  await page.goto('/');
+
+  const result = await page.evaluate(async () => {
+    const { apiJson } = await import('/src/api-client.ts');
+    return apiJson<{ ready: boolean }>('', '/v1/lol/games/cold-game/live');
+  });
+
+  expect(result).toEqual({ ready: true });
 });

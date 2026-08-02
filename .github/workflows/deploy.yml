@@ -72,12 +72,19 @@ jobs:
           projects_json="$(npx wrangler pages project list --json)"
           if PROJECTS_JSON="$projects_json" node -e '
             const parsed = JSON.parse(process.env.PROJECTS_JSON || "[]");
-            const projects = Array.isArray(parsed) ? parsed : (parsed.result || []);
+            const projects = Array.isArray(parsed) ? parsed : (parsed.result || parsed.items || []);
             process.exit(projects.some(project => project.name === "esports-live") ? 0 : 1);
           '; then
             echo "Pages project esports-live already exists."
           else
-            npx wrangler pages project create esports-live --production-branch main
+            create_output="$(npx wrangler pages project create esports-live --production-branch main 2>&1)" || {
+              if grep -qi 'already exists' <<<"$create_output"; then
+                echo "Pages project esports-live already exists."
+              else
+                echo "$create_output"
+                exit 1
+              fi
+            }
           fi
       - name: Build web application
         run: npm run build:web

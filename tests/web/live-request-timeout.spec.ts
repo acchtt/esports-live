@@ -1,5 +1,10 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+interface BrowserApiClient {
+  apiTimeoutForPath(path: string): number;
+  apiJson(baseUrl: string, path: string): Promise<unknown>;
+}
+
 async function fulfillJson(route: Route, value: unknown): Promise<void> {
   await route.fulfill({
     status: 200,
@@ -26,7 +31,8 @@ test('gives cold live snapshots a longer deadline without relaxing other API cal
   await page.goto('/');
 
   const timeouts = await page.evaluate(async () => {
-    const { apiTimeoutForPath } = await import('/src/api-client.ts');
+    const load = new Function('return import("/src/api-client.ts")');
+    const { apiTimeoutForPath } = await load() as BrowserApiClient;
     return {
       live: apiTimeoutForPath('/v1/lol/games/game-1/live?after=2026-08-02T15%3A00%3A00.000Z'),
       schedule: apiTimeoutForPath('/v1/lol/schedule?limit=80'),
@@ -51,8 +57,9 @@ test('accepts a cold live response that arrives after the former ten-second dead
   await page.goto('/');
 
   const result = await page.evaluate(async () => {
-    const { apiJson } = await import('/src/api-client.ts');
-    return apiJson<{ ready: boolean }>('', '/v1/lol/games/cold-game/live');
+    const load = new Function('return import("/src/api-client.ts")');
+    const { apiJson } = await load() as BrowserApiClient;
+    return apiJson('', '/v1/lol/games/cold-game/live');
   });
 
   expect(result).toEqual({ ready: true });

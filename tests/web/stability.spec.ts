@@ -89,7 +89,12 @@ const completedHistory = {
 
 function context(seriesId: string) {
   const isCompleted = seriesId === completedSeries.id;
-  const teams = isCompleted ? [completedBlue, completedRed] : [blue, red];
+  const isUpcoming = seriesId === upcomingSeries.id;
+  const teams = isCompleted
+    ? [completedBlue, completedRed]
+    : isUpcoming
+      ? [upcomingBlue, upcomingRed]
+      : [blue, red];
   return {
     schemaVersion: '1.0',
     esport: 'lol',
@@ -98,7 +103,7 @@ function context(seriesId: string) {
     observedAt: iso(),
     rosters: teams.map(team => ({ team, players: [] })),
     standings: teams.map((team, index) => ({ rank: index + 1, team, wins: 1, losses: 0 })),
-    history: isCompleted ? completedHistory : liveHistory,
+    history: isCompleted ? completedHistory : isUpcoming ? null : liveHistory,
     complete: true,
     reasons: []
   };

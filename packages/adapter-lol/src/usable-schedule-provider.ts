@@ -4,8 +4,12 @@ function hasPlaceholderTeam(series: LolProviderSeries): boolean {
   return series.teams.some((team, index) => team.name === `Team ${index + 1}`);
 }
 
+function hasUsableTeams(series: LolProviderSeries): boolean {
+  return !hasPlaceholderTeam(series);
+}
+
 function isUsableLiveSeries(series: LolProviderSeries): boolean {
-  return !hasPlaceholderTeam(series) && series.games.length > 0;
+  return hasUsableTeams(series) && series.games.length > 0;
 }
 
 async function reconcileLiveGameState(
@@ -38,12 +42,17 @@ async function resolveSparseEntry(
   const { series } = entry;
   if (series.state !== 'live' && series.state !== 'paused') return entry;
   if (isUsableLiveSeries(series)) return entry;
-  if (!provider.getSeriesContext) return null;
+
+  // Riot can mark a match live before publishing its game IDs. Keep a live
+  // listing with real teams visible while the feed catches up, rather than
+  // deleting the match from the schedule entirely.
+  const pendingEntry = hasUsableTeams(series) ? entry : null;
+  if (!provider.getSeriesContext) return pendingEntry;
 
   try {
     const context = await provider.getSeriesContext(series.id);
     const history = context.history;
-    if (!history || history.score.length < 2 || !history.games.length) return null;
+    if (!history || history.score.length < 2 || !history.games.length) return pendingEntry;
 
     const historyGames = history.games
       .map(game => ({ id: game.id, number: game.number, state: game.state }))
@@ -55,9 +64,9 @@ async function resolveSparseEntry(
       bestOf: history.bestOf,
       games
     };
-    return isUsableLiveSeries(resolvedSeries) ? { ...entry, series: resolvedSeries } : null;
+    return isUsableLiveSeries(resolvedSeries) ? { ...entry, series: resolvedSeries } : pendingEntry;
   } catch {
-    return null;
+    return pendingEntry;
   }
 }
 

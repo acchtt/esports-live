@@ -41,7 +41,7 @@ function team(side: 'blue' | 'red', participant: LolPlayerState): LolTeamState {
   };
 }
 
-function snapshot(): LolProviderSnapshot {
+function snapshot(sourceTimestamp = SOURCE): LolProviderSnapshot {
   return {
     series: {
       id: 'series-1',
@@ -56,8 +56,8 @@ function snapshot(): LolProviderSnapshot {
       games: [{ id: 'game-1', number: 1, state: 'live' }]
     },
     game: { id: 'game-1', number: 1, state: 'live' },
-    sourceTimestamp: SOURCE,
-    observedAt: '2026-08-02T09:00:02.000Z',
+    sourceTimestamp,
+    observedAt: new Date(Date.parse(sourceTimestamp) + 2_000).toISOString(),
     advancing: true,
     complete: true,
     stats: {
@@ -75,6 +75,20 @@ function baseProvider(value: LolProviderSnapshot): LolProviderClient {
     name: 'Base provider',
     async getSchedule() { return []; },
     async getSnapshot() { return value; }
+  };
+}
+
+function sequenceProvider(values: readonly LolProviderSnapshot[]): LolProviderClient {
+  let index = 0;
+  return {
+    id: 'base',
+    name: 'Base provider',
+    async getSchedule() { return []; },
+    async getSnapshot() {
+      const value = values[Math.min(index, values.length - 1)]!;
+      index += 1;
+      return value;
+    }
   };
 }
 
@@ -165,8 +179,10 @@ test('rejects player counters from a different telemetry timestamp', async () =>
   assert.deepEqual(blue?.items, ['3006']);
 });
 
-test('uses the freshest near-current details frame for inventories', async () => {
+test('probes the Riot details availability frontier and uses the freshest frame', async () => {
   const older = new Date(Date.parse(SOURCE) - 20_000).toISOString();
+  const primaryAnchor = new Date(Date.parse(SOURCE) - 60_000).toISOString();
+  const fallbackAnchor = new Date(Date.parse(SOURCE) - 90_000).toISOString();
   const requestedDetails: string[] = [];
   const provider = createRiotCurrentPlayerProvider(baseProvider(snapshot()), {
     fetcher: async (input: RequestInfo | URL): Promise<Response> => {
@@ -174,9 +190,9 @@ test('uses the freshest near-current details frame for inventories', async () =>
       if (url.pathname.includes('/window/')) {
         return new Response(JSON.stringify(windowPayload(SOURCE)), { status: 200 });
       }
-      requestedDetails.push(url.searchParams.get('startingTime') ?? '');
-      const currentAnchor = url.searchParams.get('startingTime') === SOURCE;
-      const payload = currentAnchor
+      const anchor = url.searchParams.get('startingTime') ?? '';
+      requestedDetails.push(anchor);
+      const payload = anchor === primaryAnchor
         ? detailPayload(SOURCE, 3078, 3157)
         : detailPayload(older, 1001, 1004);
       return new Response(JSON.stringify(payload), { status: 200 });
@@ -188,5 +204,35 @@ test('uses the freshest near-current details frame for inventories', async () =>
   assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
   assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
   assert.equal(result.stats?.blue.players[0]?.kills, 3);
-  assert.deepEqual(requestedDetails.sort(), [older, SOURCE].sort());
+  assert.deepEqual(requestedDetails.sort(), [primaryAnchor, fallbackAnchor].sort());
+});
+
+test('does not roll a near-current inventory backward when Riot later returns an older frame', async () => {
+  const later = new Date(Date.parse(SOURCE) + 10_000).toISOString();
+  const nearCurrent = new Date(Date.parse(SOURCE) - 5_000).toISOString();
+  const stale = new Date(Date.parse(SOURCE) - 20_000).toISOString();
+  let poll = 0;
+  const provider = createRiotCurrentPlayerProvider(
+    sequenceProvider([snapshot(SOURCE), snapshot(later)]),
+    {
+      fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+        const url = new URL(String(input));
+        if (url.pathname.includes('/window/')) {
+          poll += 1;
+          return new Response(JSON.stringify(windowPayload(poll === 1 ? SOURCE : later)), { status: 200 });
+        }
+        const payload = poll === 1
+          ? detailPayload(nearCurrent, 3078, 3157)
+          : detailPayload(stale, 1001, 1004);
+        return new Response(JSON.stringify(payload), { status: 200 });
+      }
+    }
+  );
+
+  const first = await provider.getSnapshot('game-1');
+  const second = await provider.getSnapshot('game-1', SOURCE);
+
+  assert.deepEqual(first.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(second.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(second.stats?.red.players[0]?.items, ['3157']);
 });

@@ -62,7 +62,6 @@ function teamMarkup(team: TeamRef, side: 'left' | 'right'): string {
     <div class="series-hero-team ${side}">
       ${teamLogoMarkup(team)}
       <div class="series-hero-team-copy">
-        <span>${side === 'left' ? 'Blue side' : 'Red side'}</span>
         <strong>${escapeHtml(team.name)}</strong>
         <small>${escapeHtml(team.code ?? initials(team))}</small>
       </div>
@@ -143,6 +142,7 @@ function render(): void {
   const [leftWins, rightWins] = scoreFromHeader();
   const progress = completedGames(event);
   const status = statusFromHeader(event);
+  const statusClass = status.toLowerCase().replaceAll(' ', '-');
   const winsRequired = Math.floor(event.series.bestOf / 2) + 1;
   const competition = event.series.competition.stage
     ? `${event.series.competition.name} · ${event.series.competition.stage}`
@@ -160,6 +160,7 @@ function render(): void {
   });
   if (key === renderKey) return;
   renderKey = key;
+  hero.dataset.status = statusClass;
 
   hero.innerHTML = `
     <div class="series-hero-topline">
@@ -170,7 +171,7 @@ function render(): void {
           <strong>${escapeHtml(competition)}</strong>
         </div>
       </div>
-      <span class="series-hero-status ${escapeHtml(status.toLowerCase().replaceAll(' ', '-'))}">
+      <span class="series-hero-status ${escapeHtml(statusClass)}">
         ${escapeHtml(status)}
       </span>
     </div>

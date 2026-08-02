@@ -98,6 +98,8 @@ test('keeps a valid active selection when schedule entries change', async ({ pag
   await expect(page.locator('#selected-series')).toHaveText('Upcoming Blue vs Upcoming Red');
   await expect(page.locator('#schedule-list [data-series-id="series-upcoming-fallback"]')).toHaveClass(/selected/);
   await expect(page.locator('#schedule-list .match-card.selected')).toHaveCount(1);
-  await expect(page.getByText('Match scheduled')).toBeVisible();
+  await expect(
+    page.locator('.prematch-overview[data-series-id="series-upcoming-fallback"]')
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });

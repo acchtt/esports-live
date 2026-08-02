@@ -90,3 +90,18 @@ jobs:
           --branch main
           --commit-hash "$GITHUB_SHA"
           --commit-message "${{ github.event.head_commit.message || 'Manual production deployment' }}"
+      - name: Verify production shell
+        shell: bash
+        run: |
+          url="https://esports-live.pages.dev/?commit=$GITHUB_SHA"
+          for attempt in {1..12}; do
+            html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$url" || true)"
+            if grep -q '<title>Esports Live</title>' <<<"$html" && grep -q 'class="app-frame"' <<<"$html"; then
+              echo "Production shell is available at $url"
+              exit 0
+            fi
+            echo "Production shell not ready (attempt $attempt/12)."
+            sleep 5
+          done
+          echo "Production shell verification failed."
+          exit 1

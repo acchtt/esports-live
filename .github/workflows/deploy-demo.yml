@@ -52,6 +52,9 @@ jobs:
       - name: Validate application
         run: npm run check
 
+      - name: Enable Worker preview URLs
+        run: npx wrangler triggers deploy
+
       - name: Upload demo API Worker version
         id: api-preview
         shell: bash
@@ -71,12 +74,15 @@ jobs:
         shell: bash
         run: |
           for attempt in {1..12}; do
-            health="$(curl -fsSL --connect-timeout 10 --max-time 30 "$API_BASE_URL/health?commit=$DEMO_COMMIT_SHA" || true)"
-            if grep -q '"ok":true' <<<"$health" && grep -q '"service":"esports-live-api"' <<<"$health"; then
+            response="$(curl -sS --connect-timeout 10 --max-time 30 -w $'\n%{http_code}' "$API_BASE_URL/health?commit=$DEMO_COMMIT_SHA" || true)"
+            status="${response##*$'\n'}"
+            body="${response%$'\n'*}"
+            if [[ "$status" == "200" ]] && grep -q '"ok":true' <<<"$body" && grep -q '"service":"esports-live-api"' <<<"$body"; then
               echo "Demo API is available at $API_BASE_URL"
               exit 0
             fi
-            echo "Demo API not ready (attempt $attempt/12)."
+            echo "Demo API not ready (attempt $attempt/12, status ${status:-none})."
+            [[ -n "$body" ]] && echo "$body"
             sleep 5
           done
           echo "Demo API verification failed."

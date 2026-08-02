@@ -1,3 +1,5 @@
+export {};
+
 const workspace = document.querySelector<HTMLElement>('#workspace');
 const platformPanel = document.querySelector<HTMLElement>('#platform-panel');
 const gameContent = document.querySelector<HTMLElement>('#game-content');

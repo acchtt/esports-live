@@ -17,6 +17,7 @@
       }
     </style>
     <link rel="stylesheet" href="/src/role-scoreboard-refinements.css" />
+    <link rel="stylesheet" href="/src/workspace-layout.css" />
   </head>
   <body>
     <div class="app-frame">
@@ -38,7 +39,7 @@
         </div>
       </header>
 
-      <main class="workspace">
+      <main id="workspace" class="workspace platform-collapsed">
         <aside class="panel schedule-panel" aria-labelledby="schedule-heading">
           <div class="panel-heading">
             <div>
@@ -83,24 +84,38 @@
           </div>
         </section>
 
-        <aside class="panel platform-panel" aria-labelledby="platform-heading">
-          <div class="panel-heading compact">
-            <div>
+        <aside id="platform-panel" class="panel platform-panel" aria-labelledby="platform-heading" data-collapsed="true">
+          <div class="panel-heading compact platform-panel-heading">
+            <div class="platform-panel-title">
               <p class="eyebrow">PLATFORM</p>
               <h2 id="platform-heading">Adapter status</h2>
             </div>
+            <button
+              id="platform-panel-toggle"
+              class="platform-panel-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="platform-panel-content"
+              aria-label="Expand platform status"
+            >
+              <span class="platform-panel-toggle-icon" aria-hidden="true">‹</span>
+              <span class="platform-panel-toggle-label" aria-hidden="true">Platform</span>
+            </button>
           </div>
-          <div id="adapter-list" class="adapter-list"></div>
 
-          <section class="policy-card">
-            <p class="eyebrow">QUALITY POLICY</p>
-            <dl>
-              <div><dt>0–30s</dt><dd>Fresh</dd></div>
-              <div><dt>31–90s</dt><dd>Context only</dd></div>
-              <div><dt>&gt;90s</dt><dd>Stale</dd></div>
-            </dl>
-            <p>Only fresh, complete, advancing telemetry is marked safe for live analysis.</p>
-          </section>
+          <div id="platform-panel-content" class="platform-panel-content" aria-hidden="true">
+            <div id="adapter-list" class="adapter-list"></div>
+
+            <section class="policy-card">
+              <p class="eyebrow">QUALITY POLICY</p>
+              <dl>
+                <div><dt>0–30s</dt><dd>Fresh</dd></div>
+                <div><dt>31–90s</dt><dd>Context only</dd></div>
+                <div><dt>&gt;90s</dt><dd>Stale</dd></div>
+              </dl>
+              <p>Only fresh, complete, advancing telemetry is marked safe for live analysis.</p>
+            </section>
+          </div>
         </aside>
       </main>
 
@@ -119,5 +134,6 @@
     <script type="module" src="/src/series-history-results-view.ts"></script>
     <script type="module" src="/src/completed-match-stats-view.ts"></script>
     <script type="module" src="/src/completed-match-player-board-view.ts"></script>
+    <script type="module" src="/src/platform-panel-toggle.ts"></script>
   </body>
 </html>

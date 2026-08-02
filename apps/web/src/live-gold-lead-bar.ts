@@ -1,6 +1,7 @@
 import type { LiveSnapshot } from '@esports-live/core';
 import type { LolStats } from '@esports-live/adapter-lol';
 import './live-gold-lead-bar.css';
+import './completed-history-dashboard-v2.ts';
 
 const gameContent = document.querySelector<HTMLElement>('#game-content');
 

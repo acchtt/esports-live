@@ -138,8 +138,12 @@ test('renders a cold live response that arrives after the former ten-second dead
   const liveRequests = await installFixtures(page);
   await page.goto('/');
 
+  const match = page.locator('[data-series-id="series-cold"]');
+  await expect(match).toBeVisible();
+  await match.click();
+  await expect.poll(liveRequests, { timeout: 3_000 }).toBeGreaterThanOrEqual(1);
+
   await expect(page.locator('.role-scoreboard-board')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Live feed unavailable')).toHaveCount(0);
   await expect(page.getByText('Blue Player 1')).toBeVisible();
-  expect(liveRequests()).toBeGreaterThanOrEqual(1);
 });

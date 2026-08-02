@@ -74,19 +74,59 @@ jobs:
         shell: bash
         run: |
           for attempt in {1..12}; do
-            response="$(curl -sS --connect-timeout 10 --max-time 30 -w $'\n%{http_code}' "$API_BASE_URL/health?commit=$DEMO_COMMIT_SHA" || true)"
-            status="${response##*$'\n'}"
-            body="${response%$'\n'*}"
-            if [[ "$status" == "200" ]] && grep -q '"ok":true' <<<"$body" && grep -q '"service":"esports-live-api"' <<<"$body"; then
+            if curl -fsSL --connect-timeout 10 --max-time 30 "$API_BASE_URL/health?commit=$DEMO_COMMIT_SHA" > /tmp/demo-health.json \
+              && node -e '
+                const fs = require("node:fs");
+                const value = JSON.parse(fs.readFileSync("/tmp/demo-health.json", "utf8"));
+                process.exit(value.ok === true && value.service === "esports-live-api" && value.adapters?.includes("lol") ? 0 : 1);
+              '; then
               echo "Demo API is available at $API_BASE_URL"
               exit 0
             fi
-            echo "Demo API not ready (attempt $attempt/12, status ${status:-none})."
-            [[ -n "$body" ]] && echo "$body"
+            echo "Demo API not ready (attempt $attempt/12)."
+            cat /tmp/demo-health.json 2>/dev/null || true
             sleep 5
           done
           echo "Demo API verification failed."
           exit 1
+
+      - name: Smoke test current live snapshot
+        env:
+          API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+        shell: bash
+        run: |
+          curl -fsSL --connect-timeout 10 --max-time 30 \
+            "$API_BASE_URL/v1/lol/schedule?states=live,paused,scheduled" > /tmp/demo-schedule.json
+          game_id="$(node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync("/tmp/demo-schedule.json", "utf8"));
+            const event = value.events?.find(entry => ["live", "paused"].includes(entry.series?.state)
+              && entry.series?.games?.some(game => game.state !== "completed"));
+            const game = event?.series?.games?.find(entry => entry.state !== "completed");
+            if (game?.id) process.stdout.write(String(game.id));
+          ')"
+          if [[ -z "$game_id" ]]; then
+            echo "No active game with a published game ID; live smoke test skipped."
+            exit 0
+          fi
+
+          curl -fsSL --connect-timeout 10 --max-time 12 \
+            "$API_BASE_URL/v1/lol/games/$game_id/live" > /tmp/demo-live-first.json
+          source_timestamp="$(node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync("/tmp/demo-live-first.json", "utf8"));
+            if (!value.stats || !value.quality?.sourceTimestamp) process.exit(1);
+            process.stdout.write(value.quality.sourceTimestamp);
+          ')"
+          encoded_after="$(node -p 'encodeURIComponent(process.argv[1])' "$source_timestamp")"
+          curl -fsSL --connect-timeout 10 --max-time 12 \
+            "$API_BASE_URL/v1/lol/games/$game_id/live?after=$encoded_after" > /tmp/demo-live-second.json
+          node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync("/tmp/demo-live-second.json", "utf8"));
+            if (!value.stats || !value.quality?.sourceTimestamp) process.exit(1);
+          '
+          echo "Live snapshot and repeated-cursor snapshot both succeeded for game $game_id."
 
       - name: Build demo application
         run: npm run build:web

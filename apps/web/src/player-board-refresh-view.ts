@@ -135,13 +135,15 @@ function updatedLabel(): string {
 function updateControl(toolbar: HTMLElement): void {
   const detail = toolbar.querySelector<HTMLElement>('[data-player-board-refresh-detail]');
   const button = toolbar.querySelector<HTMLButtonElement>('[data-player-board-refresh]');
-  if (detail) detail.textContent = refreshing ? 'Requesting a fresh verified snapshot…' : updatedLabel();
+  const detailText = refreshing ? 'Requesting a fresh verified snapshot…' : updatedLabel();
+  if (detail && detail.textContent !== detailText) detail.textContent = detailText;
   if (!button) return;
 
   button.disabled = refreshing;
   button.setAttribute('aria-busy', String(refreshing));
   const label = button.querySelector<HTMLElement>('[data-player-board-refresh-label]');
-  if (label) label.textContent = refreshing ? 'Refreshing…' : 'Refresh board';
+  const labelText = refreshing ? 'Refreshing…' : 'Refresh board';
+  if (label && label.textContent !== labelText) label.textContent = labelText;
 }
 
 function installControl(): void {

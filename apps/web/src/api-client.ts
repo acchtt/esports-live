@@ -1,8 +1,16 @@
 const DEFAULT_TIMEOUT_MS = 10_000;
+const LIVE_SNAPSHOT_TIMEOUT_MS = 25_000;
 
 interface ApiRequestOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
+}
+
+export function apiTimeoutForPath(path: string): number {
+  const pathname = path.split('?', 1)[0] ?? path;
+  return /^\/v1\/lol\/games\/[^/]+\/live$/.test(pathname)
+    ? LIVE_SNAPSHOT_TIMEOUT_MS
+    : DEFAULT_TIMEOUT_MS;
 }
 
 export async function apiJson<T>(
@@ -13,7 +21,7 @@ export async function apiJson<T>(
   const controller = new AbortController();
   const timeout = window.setTimeout(
     () => controller.abort(new Error('Request timed out.')),
-    options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    options.timeoutMs ?? apiTimeoutForPath(path)
   );
   const abort = (): void => controller.abort(options.signal?.reason);
   options.signal?.addEventListener('abort', abort, { once: true });

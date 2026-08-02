@@ -2,16 +2,16 @@ import type { LolProviderClient, LolProviderSnapshot } from './provider.ts';
 import type { LolPlayerState, LolSide, LolStats, LolTeamState } from './types.ts';
 
 const LIVE_BASE = 'https://feed.lolesports.com/livestats/v1';
-const REQUEST_TIMEOUT_MS = 5_000;
+const REQUEST_TIMEOUT_MS = 3_000;
 const FRAME_ALIGNMENT_MS = 1_500;
 const DETAIL_CEILING_MS = 10_000;
 const DETAIL_INITIAL_DELAY_MS = 60_000;
-const DETAIL_MIN_DELAY_MS = 20_000;
+const DETAIL_MIN_DELAY_MS = 0;
 const DETAIL_MAX_DELAY_MS = 180_000;
 const DETAIL_STEP_MS = 10_000;
 const DETAIL_FALLBACK_GAP_MS = 30_000;
-const DETAIL_SUCCESS_STREAK = 6;
-const MIN_USABLE_INVENTORY_PLAYERS = 5;
+const DETAIL_SUCCESS_STREAK = 2;
+const DETAIL_FAILURE_STREAK = 2;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -33,6 +33,7 @@ interface InventoryObservation {
 interface DetailProbeState {
   delayMs: number;
   successStreak: number;
+  failureStreak: number;
 }
 
 const object = (value: unknown): Json => (
@@ -251,6 +252,22 @@ async function requestLive(
   }
 }
 
+function advanceDetailFrontier(state: DetailProbeState): void {
+  state.failureStreak = 0;
+  state.successStreak += 1;
+  if (state.successStreak < DETAIL_SUCCESS_STREAK) return;
+  state.delayMs = Math.max(DETAIL_MIN_DELAY_MS, state.delayMs - DETAIL_STEP_MS);
+  state.successStreak = 0;
+}
+
+function backOffDetailFrontier(state: DetailProbeState): void {
+  state.successStreak = 0;
+  state.failureStreak += 1;
+  if (state.failureStreak < DETAIL_FAILURE_STREAK) return;
+  state.delayMs = Math.min(DETAIL_MAX_DELAY_MS, state.delayMs + DETAIL_STEP_MS);
+  state.failureStreak = 0;
+}
+
 async function probeInventories(
   fetcher: FetchLike,
   gameId: string,
@@ -258,32 +275,23 @@ async function probeInventories(
   state: DetailProbeState
 ): Promise<Map<string, InventoryObservation>> {
   const primaryDelay = state.delayMs;
-  const fallbackDelay = Math.min(DETAIL_MAX_DELAY_MS, primaryDelay + DETAIL_FALLBACK_GAP_MS);
-  const anchors = [...new Set([
-    roundedIso(targetMs - primaryDelay),
-    roundedIso(targetMs - fallbackDelay)
-  ])];
-  const payloads = await Promise.all(anchors.map(startingTime => (
-    requestLive(fetcher, 'details', gameId, startingTime)
-  )));
+  const primaryAnchor = roundedIso(targetMs - primaryDelay);
   const ceilingMs = targetMs + DETAIL_CEILING_MS;
-  const primary = inventoryObservations(payloads[0], ceilingMs);
-  const primaryUsable = primary.size >= MIN_USABLE_INVENTORY_PLAYERS;
+  const primaryPayload = await requestLive(fetcher, 'details', gameId, primaryAnchor);
+  const primary = inventoryObservations(primaryPayload, ceilingMs);
 
-  if (primaryUsable) {
-    state.successStreak += 1;
-    if (state.successStreak >= DETAIL_SUCCESS_STREAK) {
-      state.delayMs = Math.max(DETAIL_MIN_DELAY_MS, state.delayMs - DETAIL_STEP_MS);
-      state.successStreak = 0;
-    }
-  } else {
-    state.delayMs = Math.min(DETAIL_MAX_DELAY_MS, state.delayMs + DETAIL_STEP_MS);
-    state.successStreak = 0;
+  if (primary.size > 0) {
+    advanceDetailFrontier(state);
+    return primary;
   }
 
-  const combined = new Map<string, InventoryObservation>();
-  payloads.forEach(payload => mergeObservationMaps(combined, inventoryObservations(payload, ceilingMs)));
-  return combined;
+  backOffDetailFrontier(state);
+  const fallbackDelay = Math.min(DETAIL_MAX_DELAY_MS, primaryDelay + DETAIL_FALLBACK_GAP_MS);
+  const fallbackAnchor = roundedIso(targetMs - fallbackDelay);
+  if (fallbackAnchor === primaryAnchor) return primary;
+
+  const fallbackPayload = await requestLive(fetcher, 'details', gameId, fallbackAnchor);
+  return inventoryObservations(fallbackPayload, ceilingMs);
 }
 
 export function createRiotCurrentPlayerProvider(
@@ -303,7 +311,8 @@ export function createRiotCurrentPlayerProvider(
     if (pending) return pending;
     const state = detailProbeStates.get(gameId) ?? {
       delayMs: DETAIL_INITIAL_DELAY_MS,
-      successStreak: 0
+      successStreak: 0,
+      failureStreak: 0
     };
     detailProbeStates.set(gameId, state);
     const request = probeInventories(fetcher, gameId, targetMs, state)

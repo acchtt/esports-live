@@ -7,19 +7,19 @@ style.textContent = `
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
+    column-gap: 16px;
   }
   .completed-final-game-header.live-match-clock-header > strong {
     grid-column: 1;
     justify-self: start;
   }
   .completed-final-game-header .live-match-clock-group {
-    display: flex;
+    display: grid;
     grid-column: 2;
-    align-items: center;
-    justify-content: center;
+    place-items: center;
     justify-self: center;
-    gap: 7px;
-    min-width: 0;
+    gap: 4px;
+    min-width: 76px;
     color: #8fa0b7;
     font-size: 0.62rem;
     white-space: nowrap;
@@ -32,20 +32,41 @@ style.textContent = `
     letter-spacing: 0.08em;
   }
   .completed-final-game-header #live-game-clock.live-match-clock {
-    min-width: 54px;
+    min-width: 58px;
     color: #f8fafc;
-    font-size: 1.08rem;
+    font-size: 1.12rem;
     font-weight: 950;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.015em;
     line-height: 1;
     text-align: center;
   }
+  .completed-final-game-header .live-match-clock-patch {
+    grid-column: 3;
+    justify-self: end;
+    color: #8fa0b7;
+    font-size: 0.62rem;
+    white-space: nowrap;
+  }
   @media (max-width: 620px) {
-    .completed-final-game-header .live-match-clock-group::before { display: none; }
+    .completed-final-game-header.live-match-clock-header {
+      column-gap: 8px;
+    }
+    .completed-final-game-header .live-match-clock-group {
+      min-width: 58px;
+    }
+    .completed-final-game-header .live-match-clock-group::before {
+      font-size: 0.42rem;
+    }
     .completed-final-game-header #live-game-clock.live-match-clock {
       min-width: 48px;
-      font-size: 0.94rem;
+      font-size: 0.96rem;
+    }
+    .completed-final-game-header .live-match-clock-patch {
+      max-width: 82px;
+      overflow: hidden;
+      font-size: 0.54rem;
+      text-overflow: ellipsis;
     }
   }
 `;
@@ -57,6 +78,36 @@ function formatClock(seconds: number | null): string {
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
 }
 
+function patchTextFromGroup(group: HTMLElement, clock: HTMLElement): string {
+  return Array.from(group.childNodes)
+    .filter(node => node !== clock)
+    .map(node => node.textContent ?? '')
+    .join(' ')
+    .replace(/^[\s·]+/, '')
+    .trim();
+}
+
+function centerClock(element: HTMLElement): void {
+  const group = element.parentElement;
+  const header = element.closest<HTMLElement>('.completed-final-game-header');
+  if (!group || !header) return;
+
+  const patchText = patchTextFromGroup(group, element);
+  group.replaceChildren(element);
+  group.classList.add('live-match-clock-group');
+  header.classList.add('live-match-clock-header');
+  element.classList.add('live-match-clock');
+
+  let patch = header.querySelector<HTMLElement>('.live-match-clock-patch');
+  if (!patch) {
+    patch = document.createElement('span');
+    patch.className = 'live-match-clock-patch';
+    header.append(patch);
+  }
+  if (patchText) patch.textContent = patchText;
+  if (!patch.textContent?.trim()) patch.textContent = 'Patch unavailable';
+}
+
 function renderSnapshotClock(snapshot: LiveSnapshot<LolStats>): void {
   const seconds = snapshot.stats?.gameClockSeconds ?? null;
 
@@ -65,10 +116,7 @@ function renderSnapshotClock(snapshot: LiveSnapshot<LolStats>): void {
   queueMicrotask(() => {
     const element = document.querySelector<HTMLElement>('#live-game-clock');
     if (!element) return;
-    const header = element.closest<HTMLElement>('.completed-final-game-header');
-    header?.classList.add('live-match-clock-header');
-    element.classList.add('live-match-clock');
-    element.parentElement?.classList.add('live-match-clock-group');
+    centerClock(element);
     element.textContent = formatClock(seconds);
     element.setAttribute('aria-label', `Game time at latest snapshot ${element.textContent}`);
   });

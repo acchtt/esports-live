@@ -48,6 +48,12 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
 }
 
 async function installFixtures(page: Page): Promise<void> {
+  await page.route('https://www.riotgames.com/darkroom/800/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 100"><rect width="160" height="100" fill="#c8a456"/></svg>'
+  }));
+
   await page.route('**/health', route => fulfillJson(route, {
     ok: true,
     service: 'esports-live-api',
@@ -114,7 +120,15 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
 
   const hero = page.locator('#series-hero');
   await expect(hero).toBeVisible();
-  await expect(hero.locator('.series-hero-game-mark')).toContainText('LoL');
+
+  const gameMark = hero.locator('.series-hero-game-mark');
+  await expect(gameMark).toContainText('LoL');
+  await expect(gameMark.locator('img')).toHaveCount(1);
+  await expect(gameMark.locator('img')).toHaveAttribute(
+    'src',
+    /riotgames\.com\/darkroom\/800\/.*lol-logo-rendered-hi-res\.png/
+  );
+
   await expect(hero.locator('.series-hero-competition')).toContainText('LPL · Week 2');
   await expect(hero.locator('.series-hero-status')).toHaveText('LIVE');
 

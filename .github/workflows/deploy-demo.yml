@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - demo
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -16,9 +19,11 @@ permissions:
 env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  DEMO_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   validate:
+    if: github.event_name != 'pull_request' || github.head_ref == 'demo'
     runs-on: ubuntu-latest
     steps:
       - name: Check deployment configuration
@@ -34,6 +39,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: demo
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -56,13 +63,13 @@ jobs:
           npx wrangler pages deploy apps/web/dist
           --project-name esports-live
           --branch demo
-          --commit-hash "$GITHUB_SHA"
-          --commit-message "${{ github.event.head_commit.message || 'Manual demo deployment' }}"
+          --commit-hash "$DEMO_COMMIT_SHA"
+          --commit-message "${{ github.event.head_commit.message || github.event.pull_request.title || 'Manual demo deployment' }}"
 
       - name: Verify demo shell
         shell: bash
         run: |
-          url="https://demo.esports-live.pages.dev/?commit=$GITHUB_SHA"
+          url="https://demo.esports-live.pages.dev/?commit=$DEMO_COMMIT_SHA"
           for attempt in {1..12}; do
             html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$url" || true)"
             if grep -q '<title>Esports Live</title>' <<<"$html" && grep -q 'class="app-frame"' <<<"$html"; then

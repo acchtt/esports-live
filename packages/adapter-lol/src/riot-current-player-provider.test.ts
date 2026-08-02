@@ -179,7 +179,29 @@ test('rejects player counters from a different telemetry timestamp', async () =>
   assert.deepEqual(blue?.items, ['3006']);
 });
 
-test('probes the Riot details availability frontier and uses the freshest frame', async () => {
+test('returns a usable primary inventory frame without waiting for a fallback probe', async () => {
+  const primaryAnchor = new Date(Date.parse(SOURCE) - 60_000).toISOString();
+  const requestedDetails: string[] = [];
+  const provider = createRiotCurrentPlayerProvider(baseProvider(snapshot()), {
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/window/')) {
+        return new Response(JSON.stringify(windowPayload(SOURCE)), { status: 200 });
+      }
+      requestedDetails.push(url.searchParams.get('startingTime') ?? '');
+      return new Response(JSON.stringify(detailPayload(SOURCE, 3078, 3157)), { status: 200 });
+    }
+  });
+
+  const result = await provider.getSnapshot('game-1');
+
+  assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
+  assert.equal(result.stats?.blue.players[0]?.kills, 3);
+  assert.deepEqual(requestedDetails, [primaryAnchor]);
+});
+
+test('uses a fallback inventory probe only when the primary frontier is empty', async () => {
   const older = new Date(Date.parse(SOURCE) - 20_000).toISOString();
   const primaryAnchor = new Date(Date.parse(SOURCE) - 60_000).toISOString();
   const fallbackAnchor = new Date(Date.parse(SOURCE) - 90_000).toISOString();
@@ -192,19 +214,50 @@ test('probes the Riot details availability frontier and uses the freshest frame'
       }
       const anchor = url.searchParams.get('startingTime') ?? '';
       requestedDetails.push(anchor);
-      const payload = anchor === primaryAnchor
-        ? detailPayload(SOURCE, 3078, 3157)
-        : detailPayload(older, 1001, 1004);
-      return new Response(JSON.stringify(payload), { status: 200 });
+      if (anchor === primaryAnchor) return new Response(null, { status: 204 });
+      return new Response(JSON.stringify(detailPayload(older, 1001, 1004)), { status: 200 });
     }
   });
 
   const result = await provider.getSnapshot('game-1');
 
-  assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
-  assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
-  assert.equal(result.stats?.blue.players[0]?.kills, 3);
-  assert.deepEqual(requestedDetails.sort(), [primaryAnchor, fallbackAnchor].sort());
+  assert.deepEqual(result.stats?.blue.players[0]?.items, ['1001']);
+  assert.deepEqual(result.stats?.red.players[0]?.items, ['1004']);
+  assert.deepEqual(requestedDetails, [primaryAnchor, fallbackAnchor]);
+});
+
+test('moves the details frontier closer after consecutive successful probes', async () => {
+  const second = new Date(Date.parse(SOURCE) + 10_000).toISOString();
+  const third = new Date(Date.parse(SOURCE) + 20_000).toISOString();
+  const timestamps = [SOURCE, second, third];
+  const requestedDetails: string[] = [];
+  let windowIndex = 0;
+  let latestTimestamp = SOURCE;
+  const provider = createRiotCurrentPlayerProvider(
+    sequenceProvider(timestamps.map(value => snapshot(value))),
+    {
+      fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+        const url = new URL(String(input));
+        if (url.pathname.includes('/window/')) {
+          latestTimestamp = timestamps[Math.min(windowIndex, timestamps.length - 1)]!;
+          windowIndex += 1;
+          return new Response(JSON.stringify(windowPayload(latestTimestamp)), { status: 200 });
+        }
+        requestedDetails.push(url.searchParams.get('startingTime') ?? '');
+        return new Response(JSON.stringify(detailPayload(latestTimestamp, 3078, 3157)), { status: 200 });
+      }
+    }
+  );
+
+  await provider.getSnapshot('game-1');
+  await provider.getSnapshot('game-1', SOURCE);
+  await provider.getSnapshot('game-1', second);
+
+  assert.deepEqual(requestedDetails, [
+    new Date(Date.parse(SOURCE) - 60_000).toISOString(),
+    new Date(Date.parse(second) - 60_000).toISOString(),
+    new Date(Date.parse(third) - 50_000).toISOString()
+  ]);
 });
 
 test('does not roll a near-current inventory backward when Riot later returns an older frame', async () => {

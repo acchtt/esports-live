@@ -45,7 +45,10 @@
               <p class="eyebrow">MATCHES</p>
               <h1 id="schedule-heading">League of Legends</h1>
             </div>
-            <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
+            <div class="refresh-controls">
+              <span id="polling-countdown" aria-live="polite">Starting…</span>
+              <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
+            </div>
           </div>
 
           <div class="sport-tabs" aria-label="Esports">
@@ -114,6 +117,5 @@
     <script type="module" src="/src/completed-matches-view.ts"></script>
     <script type="module" src="/src/completed-match-stats-view.ts"></script>
     <script type="module" src="/src/completed-match-player-board-view.ts"></script>
-    <script type="module" src="/src/view-mode-guard.ts"></script>
   </body>
 </html>

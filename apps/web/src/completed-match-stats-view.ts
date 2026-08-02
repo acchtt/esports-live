@@ -1,5 +1,6 @@
 import type { LiveSnapshot, SeriesContext, SeriesGameHistoryRef } from '@esports-live/core';
 import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapter-lol';
+import { apiJson } from './api-client.ts';
 
 interface CachedValue<T> {
   expiresAt: number;
@@ -419,12 +420,7 @@ function formatTimestamp(value: string | null): string {
 }
 
 async function api<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(body?.message ?? `API returned ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+  return apiJson<T>(API_BASE, path);
 }
 
 async function contextFor(seriesId: string): Promise<SeriesContext> {
@@ -696,17 +692,16 @@ async function loadSelectedSeries(seriesId: string): Promise<void> {
   }
 }
 
-function syncSelectedSeries(): void {
-  const selected = resultsList.querySelector<HTMLElement>('[data-completed-series-id].selected');
-  const seriesId = selected?.dataset.completedSeriesId ?? null;
+function syncSelectedSeries(seriesId: string | null): void {
   if (!seriesId || seriesId === selectedSeriesId) return;
   selectedSeriesId = seriesId;
   void loadSelectedSeries(seriesId);
 }
 
-const observer = new MutationObserver(syncSelectedSeries);
-observer.observe(resultsList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-syncSelectedSeries();
+window.addEventListener('esports-live:completed-selection', event => {
+  const detail = (event as CustomEvent<{ seriesId?: string }>).detail;
+  syncSelectedSeries(detail?.seriesId ?? null);
+});
 
 resultsList.addEventListener('click', event => {
   const target = event.target instanceof Element

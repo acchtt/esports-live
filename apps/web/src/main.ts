@@ -1,5 +1,6 @@
 import type { LiveSnapshot, ScheduleEvent, SeriesContext, SeriesGameRef } from '@esports-live/core';
 import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapter-lol';
+import { apiJson } from './api-client.ts';
 import './styles.css';
 
 interface HealthResponse {
@@ -15,8 +16,8 @@ interface ScheduleResponse {
 }
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-const SNAPSHOT_POLL_MS = 3_000;
-const SCHEDULE_POLL_MS = 15_000;
+const SNAPSHOT_POLL_MS = 5_000;
+const SCHEDULE_POLL_MS = 30_000;
 const ACTIVE_SCHEDULE_GRACE_MS = 6 * 60 * 60 * 1_000;
 const COMPLETED_SNAPSHOT_CACHE_MS = 30 * 60 * 1_000;
 const SERIES_CONTEXT_CACHE_MS = 45_000;
@@ -32,6 +33,7 @@ const connectionDetail = requiredElement<HTMLElement>('#connection-detail');
 const statusBadge = requiredElement<HTMLElement>('#status-badge');
 const statusDot = requiredElement<HTMLElement>('#status-dot');
 const refreshButton = requiredElement<HTMLButtonElement>('#refresh-schedule');
+const pollingCountdown = requiredElement<HTMLElement>('#polling-countdown');
 const scheduleList = requiredElement<HTMLElement>('#schedule-list');
 const selectedCompetition = requiredElement<HTMLElement>('#selected-competition');
 const selectedSeries = requiredElement<HTMLElement>('#selected-series');
@@ -46,7 +48,13 @@ let selectedGameId: string | null = null;
 let lastSourceTimestamp: string | null = null;
 let renderedGameId: string | null = null;
 let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
-let scheduleTimer: ReturnType<typeof setInterval> | null = null;
+let scheduleTimer: ReturnType<typeof setTimeout> | null = null;
+let countdownTimer: ReturnType<typeof setInterval> | null = null;
+let nextScheduleRefreshAt: number | null = null;
+let scheduleRequest: Promise<void> | null = null;
+let snapshotRefreshing = false;
+let scheduleRenderKey = '';
+let selectionEventKey = '';
 let liveClockBaseSeconds: number | null = null;
 const completedSnapshotCache = new Map<string, { expiresAt: number; value: LiveSnapshot<LolStats> }>();
 const completedSnapshotRequests = new Map<string, Promise<LiveSnapshot<LolStats>>>();
@@ -63,12 +71,7 @@ function escapeHtml(value: unknown): string {
 }
 
 async function api<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(body?.message ?? `API returned ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+  return apiJson<T>(API_BASE, path);
 }
 
 async function seriesContextFor(seriesId: string): Promise<SeriesContext> {
@@ -232,6 +235,19 @@ function renderAdapters(enabled: readonly string[]): void {
 }
 
 function renderSchedule(): void {
+  const nextRenderKey = JSON.stringify({
+    selectedSeriesId,
+    events: events.map(event => ({
+      id: event.series.id,
+      state: event.series.state,
+      start: event.series.scheduledStart,
+      teams: event.series.teams.map(team => team.name),
+      games: event.series.games.map(game => `${game.id}:${game.state}`)
+    }))
+  });
+  if (nextRenderKey === scheduleRenderKey) return;
+  scheduleRenderKey = nextRenderKey;
+
   if (!events.length) {
     scheduleList.innerHTML = '<div class="empty-state"><strong>No active matches</strong><span>The schedule will refresh automatically.</span></div>';
     return;
@@ -279,6 +295,19 @@ function renderSeriesHeader(event: ScheduleEvent): void {
   selectedSeries.textContent = `${left.name} vs ${right.name}`;
   selectedMeta.textContent = `${stateLabel(event)} · Best of ${event.series.bestOf}`;
   renderGameSelector(event);
+}
+
+function publishSelection(event: ScheduleEvent): void {
+  const nextKey = JSON.stringify({
+    id: event.series.id,
+    state: event.series.state,
+    start: event.series.scheduledStart,
+    teams: event.series.teams,
+    games: event.series.games
+  });
+  if (nextKey === selectionEventKey) return;
+  selectionEventKey = nextKey;
+  window.dispatchEvent(new CustomEvent<ScheduleEvent>('esports-live:selection', { detail: event }));
 }
 
 function objectiveMarkup(team: LolTeamState): string {
@@ -527,12 +556,18 @@ function clearSnapshotTimer(): void {
 }
 
 async function refreshSnapshot(): Promise<void> {
+  if (snapshotRefreshing || document.hidden) return;
+  snapshotRefreshing = true;
   clearSnapshotTimer();
   const event = currentEvent();
   const game = event ? selectedGame(event) : null;
-  if (!event) return;
+  if (!event) {
+    snapshotRefreshing = false;
+    return;
+  }
   if (!game) {
     renderMissingGame(event);
+    snapshotRefreshing = false;
     return;
   }
 
@@ -551,9 +586,10 @@ async function refreshSnapshot(): Promise<void> {
     }
   }
 
+  snapshotRefreshing = false;
   const current = currentEvent();
   const currentGame = current ? selectedGame(current) : null;
-  if (current?.series.state === 'live' && currentGame?.state !== 'completed') {
+  if (!document.hidden && current?.series.state === 'live' && currentGame?.state !== 'completed') {
     snapshotTimer = setTimeout(() => void refreshSnapshot(), SNAPSHOT_POLL_MS);
   }
 }
@@ -579,17 +615,14 @@ function selectSeries(seriesId: string): void {
   clearLiveClock();
   renderSchedule();
   renderSeriesHeader(event);
+  publishSelection(event);
   if (selectedGameId) void refreshSnapshot();
   else renderMissingGame(event);
 }
 
 function syncSelection(): void {
   const event = currentEvent();
-  if (!event) {
-    const first = events.find(item => item.series.state === 'live') ?? events[0];
-    if (first) selectSeries(first.series.id);
-    return;
-  }
+  if (!event) return;
 
   const game = selectedGame(event);
   const preferred = bestGame(event);
@@ -598,11 +631,46 @@ function syncSelection(): void {
     lastSourceTimestamp = null;
   }
   renderSeriesHeader(event);
+  publishSelection(event);
   if (selectedGameId) void refreshSnapshot();
   else renderMissingGame(event);
 }
 
-async function refreshSchedule(): Promise<void> {
+function updatePollingCountdown(): void {
+  if (document.hidden) {
+    pollingCountdown.textContent = 'Polling paused';
+    return;
+  }
+  if (scheduleRequest) {
+    pollingCountdown.textContent = 'Refreshing…';
+    return;
+  }
+  if (nextScheduleRefreshAt === null) {
+    pollingCountdown.textContent = 'Refresh pending';
+    return;
+  }
+  const seconds = Math.max(0, Math.ceil((nextScheduleRefreshAt - Date.now()) / 1_000));
+  pollingCountdown.textContent = `Refresh in ${seconds}s`;
+}
+
+function clearScheduleTimer(): void {
+  if (scheduleTimer !== null) clearTimeout(scheduleTimer);
+  scheduleTimer = null;
+  nextScheduleRefreshAt = null;
+}
+
+function scheduleNextRefresh(delay = SCHEDULE_POLL_MS): void {
+  clearScheduleTimer();
+  if (document.hidden) {
+    updatePollingCountdown();
+    return;
+  }
+  nextScheduleRefreshAt = Date.now() + delay;
+  scheduleTimer = setTimeout(() => void refreshSchedule(), delay);
+  updatePollingCountdown();
+}
+
+async function performScheduleRefresh(): Promise<void> {
   refreshButton.disabled = true;
   try {
     const payload = await api<ScheduleResponse>('/v1/lol/schedule?states=live,paused,scheduled');
@@ -619,6 +687,18 @@ async function refreshSchedule(): Promise<void> {
   } finally {
     refreshButton.disabled = false;
   }
+}
+
+function refreshSchedule(): Promise<void> {
+  if (scheduleRequest) return scheduleRequest;
+  clearScheduleTimer();
+  updatePollingCountdown();
+  const request = performScheduleRefresh().finally(() => {
+    if (scheduleRequest === request) scheduleRequest = null;
+    scheduleNextRefresh();
+  });
+  scheduleRequest = request;
+  return request;
 }
 
 async function connect(): Promise<void> {
@@ -638,7 +718,9 @@ async function connect(): Promise<void> {
     }
 
     await refreshSchedule();
-    scheduleTimer = setInterval(() => void refreshSchedule(), SCHEDULE_POLL_MS);
+    if (countdownTimer === null) {
+      countdownTimer = setInterval(updatePollingCountdown, 1_000);
+    }
   } catch (error) {
     statusHeading.textContent = 'API unavailable';
     connectionDetail.textContent = error instanceof Error ? error.message : 'Unknown connection error';
@@ -650,10 +732,21 @@ async function connect(): Promise<void> {
 }
 
 refreshButton.addEventListener('click', () => void refreshSchedule());
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    clearScheduleTimer();
+    clearSnapshotTimer();
+    updatePollingCountdown();
+    return;
+  }
+  void refreshSchedule();
+  if (selectedSeriesId) void refreshSnapshot();
+});
 window.addEventListener('beforeunload', () => {
   clearSnapshotTimer();
   clearLiveClock();
-  if (scheduleTimer !== null) clearInterval(scheduleTimer);
+  clearScheduleTimer();
+  if (countdownTimer !== null) clearInterval(countdownTimer);
 });
 
 void connect();

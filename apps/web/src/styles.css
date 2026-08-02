@@ -29,6 +29,8 @@ body {
 }
 
 button { font: inherit; }
+.refresh-controls { display: grid; justify-items: end; gap: 5px; }
+.refresh-controls > span { color: var(--muted); font-size: 0.62rem; font-variant-numeric: tabular-nums; }
 button:disabled { cursor: not-allowed; }
 
 .app-frame { min-height: 100vh; }

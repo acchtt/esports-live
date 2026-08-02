@@ -770,13 +770,6 @@ function renderSnapshot(snapshot: LiveSnapshot<LolStats>): void {
   bindImageFallbacks();
 }
 
-function renameHistoryControl(): void {
-  const button = document.querySelector<HTMLButtonElement>('[data-mode="results"]');
-  if (!button) return;
-  if (button.textContent !== 'Match History') button.textContent = 'Match History';
-  button.setAttribute('aria-label', 'Open match history');
-}
-
 window.addEventListener('esports-live:snapshot', event => {
   renderSnapshot((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
 });
@@ -788,15 +781,3 @@ window.addEventListener('esports-live:ended-snapshot', event => {
   renderRoleBoard(detail.snapshot.stats.blue, detail.snapshot.stats.red, patch, detail.root);
   bindImageFallbacks(detail.root);
 });
-
-const controlObserver = new MutationObserver(mutations => {
-  const needsRename = mutations.some(mutation =>
-    [...mutation.addedNodes].some(node =>
-      node instanceof Element
-      && (node.matches('[data-mode="results"]') || Boolean(node.querySelector('[data-mode="results"]')))
-    )
-  );
-  if (needsRename) renameHistoryControl();
-});
-controlObserver.observe(document.body, { childList: true, subtree: true });
-renameHistoryControl();

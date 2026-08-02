@@ -22,7 +22,10 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const registry = new AdapterRegistry();
   if (apiKey) {
     const provider = createUsableScheduleProvider(createRiotLolConsistentProvider({ apiKey }));
-    registry.register(new CachedAdapter(new LolAdapter(provider), { seriesContextTtlMs: 15_000 }));
+    registry.register(new CachedAdapter(new LolAdapter(provider), {
+      scheduleTtlMs: 45_000,
+      seriesContextTtlMs: 45_000
+    }));
   }
 
   cachedApiKey = apiKey;

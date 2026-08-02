@@ -1,0 +1,162 @@
+name: Deploy Demo
+
+on:
+  push:
+    branches:
+      - demo
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: demo-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  DEMO_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  validate:
+    if: github.event_name != 'pull_request' || github.head_ref == 'demo'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+
+  deploy-web:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: demo
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate application
+        run: npm run check
+
+      - name: Enable Worker preview URLs
+        run: npx wrangler triggers deploy
+
+      - name: Upload demo API Worker version
+        id: api-preview
+        shell: bash
+        run: |
+          output="$(npx wrangler versions upload \
+            --preview-alias demo \
+            --keep-vars \
+            --message "Demo $DEMO_COMMIT_SHA" 2>&1)"
+          echo "$output"
+          url="$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' <<<"$output" | tail -n 1)"
+          test -n "$url" || { echo "Wrangler did not return a Worker preview URL."; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify demo API
+        env:
+          API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if curl -fsSL --connect-timeout 10 --max-time 30 "$API_BASE_URL/health?commit=$DEMO_COMMIT_SHA" > /tmp/demo-health.json \
+              && node -e '
+                const fs = require("node:fs");
+                const value = JSON.parse(fs.readFileSync("/tmp/demo-health.json", "utf8"));
+                process.exit(value.ok === true && value.service === "esports-live-api" && value.adapters?.includes("lol") ? 0 : 1);
+              '; then
+              echo "Demo API is available at $API_BASE_URL"
+              exit 0
+            fi
+            echo "Demo API not ready (attempt $attempt/12)."
+            cat /tmp/demo-health.json 2>/dev/null || true
+            sleep 5
+          done
+          echo "Demo API verification failed."
+          exit 1
+
+      - name: Smoke test current live snapshot
+        env:
+          API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+        shell: bash
+        run: |
+          curl -fsSL --connect-timeout 10 --max-time 30 \
+            "$API_BASE_URL/v1/lol/schedule?states=live,paused,scheduled" > /tmp/demo-schedule.json
+          game_id="$(node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync("/tmp/demo-schedule.json", "utf8"));
+            const event = value.events?.find(entry => ["live", "paused"].includes(entry.series?.state)
+              && entry.series?.games?.some(game => game.state !== "completed"));
+            const game = event?.series?.games?.find(entry => entry.state !== "completed");
+            if (game?.id) process.stdout.write(String(game.id));
+          ')"
+          if [[ -z "$game_id" ]]; then
+            echo "No active game with a published game ID; live smoke test skipped."
+            exit 0
+          fi
+
+          curl -fsSL --connect-timeout 10 --max-time 12 \
+            "$API_BASE_URL/v1/lol/games/$game_id/live" > /tmp/demo-live-first.json
+          source_timestamp="$(node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync("/tmp/demo-live-first.json", "utf8"));
+            if (!value.stats || !value.quality?.sourceTimestamp) process.exit(1);
+            process.stdout.write(value.quality.sourceTimestamp);
+          ')"
+          encoded_after="$(node -p 'encodeURIComponent(process.argv[1])' "$source_timestamp")"
+          curl -fsSL --connect-timeout 10 --max-time 12 \
+            "$API_BASE_URL/v1/lol/games/$game_id/live?after=$encoded_after" > /tmp/demo-live-second.json
+          node -e '
+            const fs = require("node:fs");
+            const value = JSON.parse(fs.readFileSync("/tmp/demo-live-second.json", "utf8"));
+            if (!value.stats || !value.quality?.sourceTimestamp) process.exit(1);
+          '
+          echo "Live snapshot and repeated-cursor snapshot both succeeded for game $game_id."
+
+      - name: Build demo application
+        run: npm run build:web
+        env:
+          VITE_API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+
+      - name: Confirm preview API is embedded
+        shell: bash
+        run: grep -R "${{ steps.api-preview.outputs.url }}" apps/web/dist/assets
+
+      - name: Deploy demo Pages preview
+        run: >-
+          npx wrangler pages deploy apps/web/dist
+          --project-name esports-live
+          --branch demo
+          --commit-hash "$DEMO_COMMIT_SHA"
+          --commit-message "${{ github.event.head_commit.message || github.event.pull_request.title || 'Manual demo deployment' }}"
+
+      - name: Verify demo shell
+        shell: bash
+        run: |
+          url="https://demo.esports-live.pages.dev/?commit=$DEMO_COMMIT_SHA"
+          for attempt in {1..12}; do
+            html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$url" || true)"
+            if grep -q '<title>Esports Live</title>' <<<"$html" && grep -q 'class="app-frame"' <<<"$html"; then
+              echo "Demo is available at $url"
+              exit 0
+            fi
+            echo "Demo not ready (attempt $attempt/12)."
+            sleep 5
+          done
+          echo "Demo verification failed."
+          exit 1

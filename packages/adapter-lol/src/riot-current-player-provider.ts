@@ -3,6 +3,7 @@ import type { LolPlayerState, LolSide, LolStats, LolTeamState } from './types.ts
 
 const LIVE_BASE = 'https://feed.lolesports.com/livestats/v1';
 const REQUEST_TIMEOUT_MS = 3_000;
+const INVENTORY_WAIT_BUDGET_MS = 500;
 const FRAME_ALIGNMENT_MS = 1_500;
 const DETAIL_CEILING_MS = 10_000;
 const DETAIL_INITIAL_DELAY_MS = 60_000;
@@ -20,6 +21,7 @@ export interface RiotCurrentPlayerProviderOptions {
   fetcher?: FetchLike;
   now?: () => Date;
   useWindowOverlay?: boolean;
+  inventoryWaitBudgetMs?: number;
 }
 
 interface TimedFrame {
@@ -78,6 +80,20 @@ function parseTime(value: unknown): number | null {
 
 function roundedIso(value: number): string {
   return new Date(Math.floor(value / 10_000) * 10_000).toISOString();
+}
+
+async function withinBudget<T>(request: Promise<T>, budgetMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      request,
+      new Promise<null>(resolve => {
+        timer = setTimeout(() => resolve(null), budgetMs);
+      })
+    ]);
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+  }
 }
 
 function frames(value: unknown): readonly Json[] {
@@ -327,6 +343,7 @@ export function createRiotCurrentPlayerProvider(
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? (() => new Date());
   const useWindowOverlay = options.useWindowOverlay ?? true;
+  const inventoryWaitBudgetMs = options.inventoryWaitBudgetMs ?? INVENTORY_WAIT_BUDGET_MS;
   const detailProbeStates = new Map<string, DetailProbeState>();
   const inventoryStates = new Map<string, Map<string, InventoryObservation>>();
   const inventoryProbes = new Map<string, Promise<ReadonlyMap<string, InventoryObservation>>>();
@@ -388,10 +405,11 @@ export function createRiotCurrentPlayerProvider(
         if (frame) stats = mergeStats(stats, frame);
       }
 
-      const observations = await latestInventoryRequest;
-      if (observations) {
+      const observations = await withinBudget(latestInventoryRequest.catch(() => null), inventoryWaitBudgetMs);
+      const availableObservations = observations ?? inventoryStates.get(gameId) ?? null;
+      if (availableObservations) {
         const ceilingMs = (latest?.timestampMs ?? sourceMs) + DETAIL_CEILING_MS;
-        stats = mergeInventories(stats, observations, ceilingMs);
+        stats = mergeInventories(stats, availableObservations, ceilingMs);
       }
 
       return withResolvedItemReasons(snapshot, stats);

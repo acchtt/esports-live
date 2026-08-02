@@ -17,6 +17,7 @@ import type { LolPlayerState, LolSide, LolStats, LolTeamState } from './types.ts
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const LIVE_BASE = 'https://feed.lolesports.com/livestats/v1';
 const REQUEST_TIMEOUT_MS = 8_000;
+const EVENT_DETAILS_WAIT_BUDGET_MS = 500;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -28,6 +29,7 @@ export interface RiotLolProviderOptions {
   now?: () => Date;
   includeDetails?: boolean;
   useDetailItemFallback?: boolean;
+  eventDetailsWaitBudgetMs?: number;
 }
 
 interface Candidate {
@@ -525,8 +527,10 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
   const locale = options.locale ?? 'en-US';
   const now = options.now ?? (() => new Date());
   const includeDetails = options.includeDetails ?? true;
+  const eventDetailsWaitBudgetMs = options.eventDetailsWaitBudgetMs ?? EVENT_DETAILS_WAIT_BUDGET_MS;
   const gameStartTimes = new Map<string, number>();
-  const eventDetailsCache = new Map<string, Promise<Json>>();
+  const eventDetailsCache = new Map<string, Json>();
+  const eventDetailsInFlight = new Map<string, Promise<Json>>();
 
   const persisted = async (path: string, params: Record<string, string | string[] | undefined>): Promise<unknown> => {
     const url = new URL(`${PERSISTED_BASE}/${path}`);
@@ -559,7 +563,11 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
     }
     const first = windowCandidate(openingPayload);
     const afterMs = parseTime(after);
-    if (first?.gameplay && observedMs - first.timestampMs <= 30_000 && (afterMs === null || first.timestampMs > afterMs)) {
+    if (
+      first?.gameplay
+      && observedMs - first.timestampMs <= 30_000
+      && (afterMs === null || first.timestampMs >= afterMs)
+    ) {
       return first;
     }
     const candidates = first ? [first] : [];
@@ -600,22 +608,40 @@ export function createRiotLolProvider(options: RiotLolProviderOptions): LolProvi
       .sort((left, right) => right.timestampMs - left.timestampMs)[0] ?? null;
   };
 
-  const eventDetails = (matchId: string | null): Promise<Json> => {
-    if (!matchId) return Promise.resolve({});
-    const cached = eventDetailsCache.get(matchId);
-    if (cached) return cached;
+  const loadEventDetails = (matchId: string): Promise<Json> => {
+    const pending = eventDetailsInFlight.get(matchId);
+    if (pending) return pending;
     const request = persisted('getEventDetails', { id: matchId })
       .then(payloadValue => {
         const payload = object(payloadValue);
         const data = object(payload.data);
-        return object(data.event ?? payload.event ?? data);
+        const event = object(data.event ?? payload.event ?? data);
+        eventDetailsCache.set(matchId, event);
+        return event;
       })
-      .catch(error => {
-        eventDetailsCache.delete(matchId);
-        throw error;
+      .finally(() => {
+        if (eventDetailsInFlight.get(matchId) === request) eventDetailsInFlight.delete(matchId);
       });
-    eventDetailsCache.set(matchId, request);
+    eventDetailsInFlight.set(matchId, request);
     return request;
+  };
+
+  const eventDetails = async (matchId: string | null): Promise<Json> => {
+    if (!matchId) return {};
+    const cached = eventDetailsCache.get(matchId);
+    if (cached) return cached;
+    const request = loadEventDetails(matchId).catch(() => ({}));
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      return await Promise.race([
+        request,
+        new Promise<Json>(resolve => {
+          timer = setTimeout(() => resolve({}), eventDetailsWaitBudgetMs);
+        })
+      ]);
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
   };
 
   return {

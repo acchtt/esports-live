@@ -367,3 +367,53 @@ test('uses the opening Riot window frame as a game-clock fallback', async () => 
   const snapshot = await adapter.getLiveSnapshot('game-1');
   assert.equal(snapshot.stats?.gameClockSeconds, 590);
 });
+
+test('reuses the direct opening frame when the cursor has not advanced', async () => {
+  let windowRequests = 0;
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    includeDetails: false,
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getEventDetails')) return json(eventPayload());
+      if (url.pathname.includes('/window/game-1')) {
+        windowRequests += 1;
+        return json(windowPayload());
+      }
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  await provider.getSnapshot('game-1');
+  const repeated = await provider.getSnapshot('game-1', SOURCE);
+
+  assert.equal(windowRequests, 2);
+  assert.equal(repeated.sourceTimestamp, SOURCE);
+  assert.ok(repeated.stats);
+});
+
+test('returns live telemetry before slow event metadata enrichment finishes', async () => {
+  const provider = createRiotLolProvider({
+    apiKey: 'test-key',
+    includeDetails: false,
+    eventDetailsWaitBudgetMs: 5,
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/getEventDetails')) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return json(eventPayload());
+      }
+      if (url.pathname.includes('/window/game-1')) return json(windowPayload());
+      return json({ error: 'unexpected_url', url: url.toString() }, 500);
+    },
+    now: () => new Date(NOW)
+  });
+
+  const started = Date.now();
+  const result = await provider.getSnapshot('game-1');
+
+  assert.ok(Date.now() - started < 40);
+  assert.equal(result.sourceTimestamp, SOURCE);
+  assert.ok(result.stats);
+});

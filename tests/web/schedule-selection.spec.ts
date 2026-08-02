@@ -87,16 +87,16 @@ test('keeps a valid active selection when schedule entries change', async ({ pag
   await page.goto('/');
 
   await expect(page.locator('#selected-series')).toHaveText('Live Blue vs Live Red');
-  await expect(page.locator('[data-series-id="series-live-pending"]')).toHaveClass(/selected/);
+  await expect(page.locator('#schedule-list [data-series-id="series-live-pending"]')).toHaveClass(/selected/);
   await expect(page.locator('#schedule-list .match-card.selected')).toHaveCount(1);
   await expect(page.getByText('Game feed pending')).toBeVisible();
 
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect.poll(scheduleRequests).toBeGreaterThanOrEqual(2);
 
-  await expect(page.locator('[data-series-id="series-live-pending"]')).toHaveCount(0);
+  await expect(page.locator('#schedule-list [data-series-id="series-live-pending"]')).toHaveCount(0);
   await expect(page.locator('#selected-series')).toHaveText('Upcoming Blue vs Upcoming Red');
-  await expect(page.locator('[data-series-id="series-upcoming-fallback"]')).toHaveClass(/selected/);
+  await expect(page.locator('#schedule-list [data-series-id="series-upcoming-fallback"]')).toHaveClass(/selected/);
   await expect(page.locator('#schedule-list .match-card.selected')).toHaveCount(1);
   await expect(page.getByText('Match scheduled')).toBeVisible();
   expect(errors).toEqual([]);

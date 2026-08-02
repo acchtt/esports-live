@@ -263,6 +263,11 @@ body .completed-match-detail .completed-result > span {
   display: none !important;
 }
 
+/* Keep the completed result card stable until final scoreboard data is ready. */
+body #completed-final-telemetry:has(> .completed-telemetry-loading) {
+  display: none;
+}
+
 @media (max-width: 720px) {
   body .completed-match-detail > .completed-series-hero + .completed-games-panel {
     padding: 17px;

@@ -316,3 +316,30 @@ test('uses the wall-clock details frontier without issuing a duplicate window re
   assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
   assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
 });
+
+test('returns live counters before slow inventory enrichment finishes', async () => {
+  const delayedSnapshot = structuredClone(snapshot());
+  delayedSnapshot.stats!.blue.players[0]!.items = null;
+  delayedSnapshot.stats!.red.players[0]!.items = null;
+  const provider = createRiotCurrentPlayerProvider(baseProvider(delayedSnapshot), {
+    now: () => new Date(Date.parse(SOURCE) + 60_000),
+    useWindowOverlay: false,
+    inventoryWaitBudgetMs: 5,
+    fetcher: async (): Promise<Response> => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return new Response(JSON.stringify(detailPayload(SOURCE, 3078, 3157)), { status: 200 });
+    }
+  });
+
+  const started = Date.now();
+  const first = await provider.getSnapshot('game-1');
+
+  assert.ok(Date.now() - started < 40);
+  assert.ok(first.stats);
+  assert.equal(first.stats?.blue.players[0]?.items, null);
+
+  await new Promise(resolve => setTimeout(resolve, 60));
+  const second = await provider.getSnapshot('game-1', SOURCE);
+  assert.deepEqual(second.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(second.stats?.red.players[0]?.items, ['3157']);
+});

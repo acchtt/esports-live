@@ -54,7 +54,7 @@ test('keeps the live series board hidden while Match History owns the analysis p
 
   await matchHistoryMode.click();
   await expect(completedDetail).toBeVisible();
-  await expect(page.locator('body')).toHaveAttribute('data-esports-view-mode', 'match-history');
+  await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'match-history');
   await expect(liveHistoryPanel).toBeHidden();
 
   await seedLiveHistoryBoard(page, 50);
@@ -62,7 +62,7 @@ test('keeps the live series board hidden while Match History owns the analysis p
   await expect(liveHistoryPanel).toBeHidden();
 
   await activeMode.click();
-  await expect(page.locator('body')).toHaveAttribute('data-esports-view-mode', 'active');
+  await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'active');
   await expect(liveHistoryPanel).toBeVisible();
 
   await matchHistoryMode.click();

@@ -31,7 +31,13 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
             includeDetails: false,
             useDetailItemFallback: false
           }),
-          { useWindowOverlay: false }
+          {
+            // Derive the inventory probe from Riot's newest live-window timestamp.
+            // Wall-clock anchors can be ahead of delayed broadcasts and return no
+            // detail frames, leaving every player inventory empty.
+            useWindowOverlay: true,
+            inventoryWaitBudgetMs: 1_000
+          }
         )
       )
     );

@@ -1,5 +1,9 @@
 import type { ScheduleEvent, TeamRef } from '@esports-live/core';
 import './series-hero-view.css';
+import './official-lol-logo.css';
+
+const OFFICIAL_LOL_LOGO_URL =
+  'https://www.riotgames.com/darkroom/800/9c08e3b3ce6281f252a4dfbf61357a11%3A75ab7e60b85225c6c7f19ae4024e27a6/lol-logo-rendered-hi-res.png';
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -116,21 +120,25 @@ function formatStart(value: string): string {
 
 function gameMark(): string {
   return `
-    <span class="series-hero-game-mark" aria-hidden="true">
-      <svg viewBox="0 0 32 32" focusable="false">
-        <path d="M16 2.5 27.5 9v14L16 29.5 4.5 23V9L16 2.5Z" />
-        <path d="M11 9.5v13h10.5" />
-      </svg>
+    <span class="series-hero-game-mark official-lol-logo" aria-hidden="true">
+      <img
+        src="${OFFICIAL_LOL_LOGO_URL}"
+        alt=""
+        decoding="async"
+        referrerpolicy="no-referrer"
+      />
       <b>LoL</b>
     </span>`;
 }
 
 function bindLogoFallbacks(): void {
-  hero.querySelectorAll<HTMLImageElement>('.series-hero-team-logo img').forEach(image => {
-    image.addEventListener('error', () => {
-      image.closest('.series-hero-team-logo')?.classList.add('image-failed');
-    }, { once: true });
-  });
+  hero.querySelectorAll<HTMLImageElement>('.series-hero-team-logo img, .series-hero-game-mark img')
+    .forEach(image => {
+      const container = image.closest('.series-hero-team-logo, .series-hero-game-mark');
+      const markFailed = (): void => container?.classList.add('image-failed');
+      image.addEventListener('error', markFailed, { once: true });
+      if (image.complete && image.naturalWidth === 0) markFailed();
+    });
 }
 
 function render(): void {

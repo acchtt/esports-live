@@ -135,6 +135,8 @@ async function installFixtures(page: Page): Promise<() => number> {
 
 test('renders a cold live response that arrives after the former ten-second deadline', async ({ page }) => {
   test.setTimeout(25_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
   const liveRequests = await installFixtures(page);
   await page.goto('/');
 
@@ -142,8 +144,21 @@ test('renders a cold live response that arrives after the former ten-second dead
   await expect(match).toBeVisible();
   await match.click();
   await expect.poll(liveRequests, { timeout: 3_000 }).toBeGreaterThanOrEqual(1);
+  await page.waitForTimeout(12_000);
 
-  await expect(page.locator('.role-scoreboard-board')).toBeVisible({ timeout: 15_000 });
+  const state = await page.locator('#game-content').evaluate(element => ({
+    html: element.innerHTML,
+    text: element.textContent?.trim() ?? '',
+    hasBoard: Boolean(element.querySelector('.role-scoreboard-board'))
+  }));
+  expect({
+    liveRequests: liveRequests(),
+    pageErrors,
+    ...state
+  }).toMatchObject({
+    hasBoard: true,
+    pageErrors: []
+  });
   await expect(page.getByText('Live feed unavailable')).toHaveCount(0);
   await expect(page.getByText('Blue Player 1')).toBeVisible();
 });

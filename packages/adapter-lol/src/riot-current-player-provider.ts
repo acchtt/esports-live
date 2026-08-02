@@ -5,6 +5,13 @@ const LIVE_BASE = 'https://feed.lolesports.com/livestats/v1';
 const REQUEST_TIMEOUT_MS = 5_000;
 const FRAME_ALIGNMENT_MS = 1_500;
 const DETAIL_CEILING_MS = 10_000;
+const DETAIL_INITIAL_DELAY_MS = 60_000;
+const DETAIL_MIN_DELAY_MS = 20_000;
+const DETAIL_MAX_DELAY_MS = 180_000;
+const DETAIL_STEP_MS = 10_000;
+const DETAIL_FALLBACK_GAP_MS = 30_000;
+const DETAIL_SUCCESS_STREAK = 6;
+const MIN_USABLE_INVENTORY_PLAYERS = 5;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -16,6 +23,16 @@ export interface RiotCurrentPlayerProviderOptions {
 interface TimedFrame {
   frame: Json;
   timestampMs: number;
+}
+
+interface InventoryObservation {
+  timestampMs: number;
+  items: readonly string[];
+}
+
+interface DetailProbeState {
+  delayMs: number;
+  successStreak: number;
 }
 
 const object = (value: unknown): Json => (
@@ -89,19 +106,6 @@ function alignedFrame(value: unknown, sourceMs: number): Json | null {
   return selected?.frame ?? null;
 }
 
-function freshestDetailFrame(payloads: readonly unknown[], sourceMs: number): Json | null {
-  let selected: TimedFrame | null = null;
-  for (const payload of payloads) {
-    for (const frame of frames(payload)) {
-      const timestampMs = frameTime(frame);
-      if (timestampMs === null || timestampMs > sourceMs + DETAIL_CEILING_MS) continue;
-      if (!array(frame.participants).length) continue;
-      if (!selected || timestampMs > selected.timestampMs) selected = { frame, timestampMs };
-    }
-  }
-  return selected?.frame ?? null;
-}
-
 function frameTeam(frame: Json, side: LolSide): Json {
   const direct = object(frame[side === 'blue' ? 'blueTeam' : 'redTeam']);
   if (Object.keys(direct).length) return direct;
@@ -118,10 +122,12 @@ function participantId(value: Json, fallback: number): string {
 
 function itemIds(value: unknown): readonly string[] | null {
   if (!Array.isArray(value)) return null;
-  return value.map(entry => {
-    const item = object(entry);
-    return stringValue(entry) ?? firstString(item, ['itemID', 'itemId', 'id']) ?? 'unknown';
-  });
+  return value
+    .map(entry => {
+      const item = object(entry);
+      return stringValue(entry) ?? firstString(item, ['itemID', 'itemId', 'id']) ?? 'unknown';
+    })
+    .filter(item => item !== '0' && item !== 'unknown');
 }
 
 function mergePlayer(player: LolPlayerState, rawValue: unknown): LolPlayerState {
@@ -155,30 +161,67 @@ function mergeStats(stats: LolStats, frame: Json): LolStats {
   };
 }
 
-function mergeInventoryPlayer(player: LolPlayerState, rawValue: Json | undefined): LolPlayerState {
-  if (!rawValue) return player;
-  const incoming = itemIds(rawValue.items);
-  return incoming === null ? player : { ...player, items: incoming };
+function inventoryObservations(value: unknown, ceilingMs: number): Map<string, InventoryObservation> {
+  const observations = new Map<string, InventoryObservation>();
+  for (const frame of frames(value)) {
+    const timestampMs = frameTime(frame);
+    if (timestampMs === null || timestampMs > ceilingMs) continue;
+    array(frame.participants).forEach((entry, index) => {
+      const participant = object(entry);
+      const items = itemIds(participant.items);
+      if (items === null) return;
+      const id = participantId(participant, index + 1);
+      const previous = observations.get(id);
+      if (!previous || timestampMs >= previous.timestampMs) {
+        observations.set(id, { timestampMs, items });
+      }
+    });
+  }
+  return observations;
 }
 
-function mergeInventoryTeam(team: LolTeamState, participants: ReadonlyMap<string, Json>): LolTeamState {
+function mergeObservationMaps(
+  target: Map<string, InventoryObservation>,
+  incoming: ReadonlyMap<string, InventoryObservation>
+): void {
+  for (const [id, observation] of incoming) {
+    const previous = target.get(id);
+    if (!previous || observation.timestampMs >= previous.timestampMs) target.set(id, observation);
+  }
+}
+
+function mergeInventoryPlayer(
+  player: LolPlayerState,
+  observation: InventoryObservation | undefined,
+  ceilingMs: number
+): LolPlayerState {
+  if (!observation || observation.timestampMs > ceilingMs) return player;
+  if (!observation.items.length && player.items?.length) return player;
+  return { ...player, items: observation.items };
+}
+
+function mergeInventoryTeam(
+  team: LolTeamState,
+  observations: ReadonlyMap<string, InventoryObservation>,
+  ceilingMs: number
+): LolTeamState {
   return {
     ...team,
-    players: team.players.map(player => mergeInventoryPlayer(player, participants.get(player.id)))
+    players: team.players.map(player => (
+      mergeInventoryPlayer(player, observations.get(player.id), ceilingMs)
+    ))
   };
 }
 
-function mergeInventories(stats: LolStats, frame: Json): LolStats {
-  const participants = new Map(
-    array(frame.participants).map((entry, index) => {
-      const participant = object(entry);
-      return [participantId(participant, index + 1), participant] as const;
-    })
-  );
+function mergeInventories(
+  stats: LolStats,
+  observations: ReadonlyMap<string, InventoryObservation>,
+  ceilingMs: number
+): LolStats {
   return {
     ...stats,
-    blue: mergeInventoryTeam(stats.blue, participants),
-    red: mergeInventoryTeam(stats.red, participants)
+    blue: mergeInventoryTeam(stats.blue, observations, ceilingMs),
+    red: mergeInventoryTeam(stats.red, observations, ceilingMs)
   };
 }
 
@@ -208,22 +251,39 @@ async function requestLive(
   }
 }
 
-function freshDetailRequests(
+async function probeInventories(
   fetcher: FetchLike,
   gameId: string,
-  windowRequest: Promise<unknown>
-): Promise<readonly unknown[]> {
-  return windowRequest.then(async payload => {
-    const latest = newestFrame(payload);
-    if (!latest) return [];
-    const anchors = [...new Set([
-      roundedIso(latest.timestampMs),
-      roundedIso(latest.timestampMs - 20_000)
-    ])];
-    return Promise.all(anchors.map(startingTime => (
-      requestLive(fetcher, 'details', gameId, startingTime)
-    )));
-  });
+  targetMs: number,
+  state: DetailProbeState
+): Promise<Map<string, InventoryObservation>> {
+  const primaryDelay = state.delayMs;
+  const fallbackDelay = Math.min(DETAIL_MAX_DELAY_MS, primaryDelay + DETAIL_FALLBACK_GAP_MS);
+  const anchors = [...new Set([
+    roundedIso(targetMs - primaryDelay),
+    roundedIso(targetMs - fallbackDelay)
+  ])];
+  const payloads = await Promise.all(anchors.map(startingTime => (
+    requestLive(fetcher, 'details', gameId, startingTime)
+  )));
+  const ceilingMs = targetMs + DETAIL_CEILING_MS;
+  const primary = inventoryObservations(payloads[0], ceilingMs);
+  const primaryUsable = primary.size >= MIN_USABLE_INVENTORY_PLAYERS;
+
+  if (primaryUsable) {
+    state.successStreak += 1;
+    if (state.successStreak >= DETAIL_SUCCESS_STREAK) {
+      state.delayMs = Math.max(DETAIL_MIN_DELAY_MS, state.delayMs - DETAIL_STEP_MS);
+      state.successStreak = 0;
+    }
+  } else {
+    state.delayMs = Math.min(DETAIL_MAX_DELAY_MS, state.delayMs + DETAIL_STEP_MS);
+    state.successStreak = 0;
+  }
+
+  const combined = new Map<string, InventoryObservation>();
+  payloads.forEach(payload => mergeObservationMaps(combined, inventoryObservations(payload, ceilingMs)));
+  return combined;
 }
 
 export function createRiotCurrentPlayerProvider(
@@ -231,12 +291,43 @@ export function createRiotCurrentPlayerProvider(
   options: RiotCurrentPlayerProviderOptions = {}
 ): LolProviderClient {
   const fetcher = options.fetcher ?? fetch;
+  const detailProbeStates = new Map<string, DetailProbeState>();
+  const inventoryStates = new Map<string, Map<string, InventoryObservation>>();
+  const inventoryProbes = new Map<string, Promise<ReadonlyMap<string, InventoryObservation>>>();
+
+  const loadInventories = (
+    gameId: string,
+    targetMs: number
+  ): Promise<ReadonlyMap<string, InventoryObservation>> => {
+    const pending = inventoryProbes.get(gameId);
+    if (pending) return pending;
+    const state = detailProbeStates.get(gameId) ?? {
+      delayMs: DETAIL_INITIAL_DELAY_MS,
+      successStreak: 0
+    };
+    detailProbeStates.set(gameId, state);
+    const request = probeInventories(fetcher, gameId, targetMs, state)
+      .then(incoming => {
+        const stored = inventoryStates.get(gameId) ?? new Map<string, InventoryObservation>();
+        mergeObservationMaps(stored, incoming);
+        inventoryStates.set(gameId, stored);
+        return stored;
+      })
+      .finally(() => {
+        if (inventoryProbes.get(gameId) === request) inventoryProbes.delete(gameId);
+      });
+    inventoryProbes.set(gameId, request);
+    return request;
+  };
 
   return {
     ...base,
     async getSnapshot(gameId: string, after?: string): Promise<LolProviderSnapshot> {
       const latestWindowRequest = requestLive(fetcher, 'window', gameId);
-      const latestDetailsRequest = freshDetailRequests(fetcher, gameId, latestWindowRequest);
+      const latestInventoryRequest = latestWindowRequest.then(payload => {
+        const latest = newestFrame(payload);
+        return latest ? loadInventories(gameId, latest.timestampMs) : null;
+      });
       const snapshot = await base.getSnapshot(gameId, after);
       if (!snapshot.stats || !snapshot.sourceTimestamp) return snapshot;
 
@@ -244,6 +335,7 @@ export function createRiotCurrentPlayerProvider(
       if (sourceMs === null) return snapshot;
 
       const latestWindow = await latestWindowRequest;
+      const latest = newestFrame(latestWindow);
       let frame = alignedFrame(latestWindow, sourceMs);
       if (!frame) {
         const targeted = await requestLive(fetcher, 'window', gameId, roundedIso(sourceMs - 30_000));
@@ -251,8 +343,10 @@ export function createRiotCurrentPlayerProvider(
       }
 
       let stats = frame ? mergeStats(snapshot.stats, frame) : snapshot.stats;
-      const detailFrame = freshestDetailFrame(await latestDetailsRequest, sourceMs);
-      if (detailFrame) stats = mergeInventories(stats, detailFrame);
+      const observations = await latestInventoryRequest;
+      if (observations && latest) {
+        stats = mergeInventories(stats, observations, latest.timestampMs + DETAIL_CEILING_MS);
+      }
 
       return {
         ...snapshot,

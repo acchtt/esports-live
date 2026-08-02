@@ -1,13 +1,18 @@
 .analysis-header.series-hero-active {
+  --hero-bg: rgba(7, 13, 25, 0.98);
+  --hero-surface: rgba(13, 23, 40, 0.78);
+  --hero-surface-hover: rgba(16, 28, 48, 0.88);
+  --hero-border: rgba(125, 154, 190, 0.16);
+  --hero-border-strong: rgba(56, 189, 248, 0.28);
+  --hero-muted: #8190a7;
+  --hero-copy: #dbe7f7;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   min-height: 0;
   padding: 0;
   background:
-    radial-gradient(circle at 12% 0%, rgba(14, 165, 233, 0.13), transparent 34%),
-    radial-gradient(circle at 88% 8%, rgba(139, 92, 246, 0.11), transparent 30%),
-    linear-gradient(135deg, rgba(9, 18, 35, 0.98), rgba(11, 14, 30, 0.98));
+    linear-gradient(180deg, rgba(10, 18, 33, 0.98), var(--hero-bg));
 }
 
 .analysis-header.series-hero-active > .series-hero-legacy {
@@ -24,10 +29,13 @@
 
 .analysis-header.series-hero-active #game-selector {
   justify-content: center;
-  width: 100%;
-  padding: 12px 24px 15px;
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(2, 6, 16, 0.2);
+  width: auto;
+  margin: 0 18px 18px;
+  padding: 11px 14px;
+  border: 1px solid var(--hero-border);
+  border-radius: 13px;
+  background: var(--hero-surface);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .analysis-header.series-hero-active.history-summary-active #game-selector {
@@ -37,6 +45,7 @@
 .series-hero {
   width: 100%;
   min-width: 0;
+  color: var(--hero-copy);
 }
 
 .series-hero-topline,
@@ -53,14 +62,20 @@
 
 .series-hero-topline {
   justify-content: space-between;
-  gap: 20px;
-  padding: 18px 26px 15px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  gap: 18px;
+  margin: 14px 18px 0;
+  padding: 13px 15px;
+  border: 1px solid var(--hero-border);
+  border-radius: 14px;
+  background: var(--hero-surface);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.03),
+    0 12px 34px rgba(0, 0, 0, 0.12);
 }
 
 .series-hero-competition {
   min-width: 0;
-  gap: 12px;
+  gap: 11px;
 }
 
 .series-hero-competition > div {
@@ -70,8 +85,8 @@
 .series-hero-competition span {
   display: block;
   margin-bottom: 2px;
-  color: #7f8da4;
-  font-size: 0.58rem;
+  color: var(--hero-muted);
+  font-size: 0.56rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -80,10 +95,10 @@
 .series-hero-competition strong {
   display: block;
   overflow: hidden;
-  color: #dcecff;
+  color: #e4edf9;
   font-size: 0.77rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.075em;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -94,23 +109,23 @@
   gap: 7px;
   min-height: 34px;
   padding: 5px 10px 5px 7px;
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  border-radius: 11px;
-  color: #d8f4ff;
-  background: linear-gradient(145deg, rgba(56, 189, 248, 0.13), rgba(37, 99, 235, 0.07));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hero-border-strong);
+  border-radius: 10px;
+  color: #bfeaff;
+  background: rgba(56, 189, 248, 0.065);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
 }
 
 .series-hero-game-mark svg {
-  width: 23px;
-  height: 23px;
+  width: 22px;
+  height: 22px;
   overflow: visible;
 }
 
 .series-hero-game-mark svg path:first-child {
-  fill: rgba(56, 189, 248, 0.12);
+  fill: rgba(56, 189, 248, 0.08);
   stroke: #38bdf8;
-  stroke-width: 1.4;
+  stroke-width: 1.35;
 }
 
 .series-hero-game-mark svg path:last-child {
@@ -118,86 +133,92 @@
   stroke: #dff6ff;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.2;
+  stroke-width: 2.1;
 }
 
 .series-hero-game-mark b {
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  letter-spacing: 0.075em;
 }
 
 .series-hero-status {
   flex: 0 0 auto;
   justify-content: center;
-  min-height: 29px;
+  min-height: 28px;
   padding: 0 11px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--hero-border);
   border-radius: 999px;
   color: #aab6c9;
   background: rgba(255, 255, 255, 0.025);
-  font-size: 0.62rem;
+  font-size: 0.61rem;
   font-weight: 950;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.1em;
 }
 
 .series-hero-status.live,
 .series-hero-status.in-progress {
-  border-color: rgba(52, 211, 153, 0.3);
+  border-color: rgba(52, 211, 153, 0.26);
   color: #86efac;
-  background: rgba(16, 185, 129, 0.08);
+  background: rgba(16, 185, 129, 0.07);
 }
 
 .series-hero-status.paused {
-  border-color: rgba(251, 191, 36, 0.3);
+  border-color: rgba(251, 191, 36, 0.28);
   color: #fcd34d;
-  background: rgba(251, 191, 36, 0.07);
+  background: rgba(251, 191, 36, 0.065);
 }
 
 .series-hero-status.final {
-  border-color: rgba(56, 189, 248, 0.28);
+  border-color: var(--hero-border-strong);
   color: #7dd3fc;
-  background: rgba(14, 165, 233, 0.07);
+  background: rgba(14, 165, 233, 0.065);
 }
 
 .series-hero-matchup {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(170px, 0.62fr) minmax(0, 1fr);
   align-items: stretch;
-  gap: 22px;
-  padding: 26px;
+  gap: 16px;
+  padding: 16px 18px;
 }
 
 .series-hero-team {
   min-width: 0;
   gap: 15px;
-  padding: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.018);
+  padding: 15px;
+  border: 1px solid var(--hero-border);
+  border-radius: 14px;
+  background: var(--hero-surface);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .series-hero-team.left {
-  box-shadow: inset 3px 0 rgba(56, 189, 248, 0.52), inset 0 1px rgba(255, 255, 255, 0.025);
+  box-shadow:
+    inset 3px 0 rgba(56, 189, 248, 0.42),
+    inset 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .series-hero-team.right {
   flex-direction: row-reverse;
   text-align: right;
-  box-shadow: inset -3px 0 rgba(251, 113, 133, 0.48), inset 0 1px rgba(255, 255, 255, 0.025);
+  box-shadow:
+    inset -3px 0 rgba(251, 113, 133, 0.38),
+    inset 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .series-hero-team-logo {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 56px;
+  height: 56px;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.17);
-  border-radius: 16px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.018));
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18), inset 0 1px rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hero-border);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.16),
+    inset 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .series-hero-team-logo img,
@@ -206,14 +227,14 @@
 }
 
 .series-hero-team-logo img {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
 }
 
 .series-hero-team-fallback {
   color: #dce8f8;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 950;
   letter-spacing: -0.02em;
 }
@@ -232,7 +253,7 @@
 
 .series-hero-team-copy > small {
   display: block;
-  color: #718098;
+  color: var(--hero-muted);
   font-size: 0.56rem;
   font-weight: 850;
   letter-spacing: 0.11em;
@@ -256,13 +277,15 @@
   place-items: center;
   align-content: center;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-radius: 14px;
   text-align: center;
 }
 
 .series-hero-score > span {
-  color: #6f7f98;
-  font-size: 0.58rem;
+  color: var(--hero-muted);
+  font-size: 0.56rem;
   font-weight: 900;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -283,7 +306,7 @@
   font-weight: 900;
   letter-spacing: -0.06em;
   line-height: 1;
-  text-shadow: 0 0 24px rgba(56, 189, 248, 0.11);
+  text-shadow: 0 0 22px rgba(56, 189, 248, 0.1);
 }
 
 .series-hero-score i {
@@ -293,38 +316,69 @@
 }
 
 .series-hero-score small {
-  color: #8e9cb2;
+  color: #94a3b8;
   font-size: 0.66rem;
   font-weight: 750;
   white-space: nowrap;
 }
 
 .series-hero-footer {
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  padding: 13px 26px 15px;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
-  color: #8d9ab0;
-  background: rgba(2, 6, 16, 0.18);
-  font-size: 0.66rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 18px 18px;
+  color: #a9b6c9;
+  background: transparent;
+  font-size: 0.67rem;
 }
 
-.series-hero-footer > span:not(:first-child)::before,
+.series-hero-footer > span,
+.series-hero-footer > time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--hero-border);
+  border-radius: 12px;
+  background: var(--hero-surface);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.series-hero-footer > span:nth-child(2)::before {
+  content: 'GAMES';
+  flex: 0 0 auto;
+  margin-right: 9px;
+  color: #5f718b;
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
 .series-hero-footer time::before {
-  content: '•';
-  margin-right: 20px;
-  color: #3f4c62;
+  content: 'START';
+  flex: 0 0 auto;
+  margin-right: 9px;
+  color: #5f718b;
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
 }
 
 .series-hero-live-context {
-  gap: 7px;
-  color: #b6c4d8;
-  font-weight: 800;
+  gap: 8px;
+  color: #d7e2f0;
+  font-weight: 850;
   text-transform: capitalize;
 }
 
 .series-hero-live-context i {
+  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -335,19 +389,29 @@
 .series-hero[data-status='live'] .series-hero-live-context i,
 .series-hero[data-status='in-progress'] .series-hero-live-context i {
   background: #34d399;
-  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.1), 0 0 14px rgba(52, 211, 153, 0.38);
+  box-shadow:
+    0 0 0 4px rgba(52, 211, 153, 0.09),
+    0 0 12px rgba(52, 211, 153, 0.28);
 }
 
 .series-hero-footer time {
-  color: #7f8da3;
+  color: #9eacc0;
   font-variant-numeric: tabular-nums;
+}
+
+@media (hover: hover) {
+  .series-hero-topline:hover,
+  .series-hero-team:hover,
+  .series-hero-footer > span:hover,
+  .series-hero-footer > time:hover {
+    background: var(--hero-surface-hover);
+  }
 }
 
 @media (max-width: 980px) {
   .series-hero-matchup {
     grid-template-columns: minmax(0, 1fr) minmax(130px, 0.5fr) minmax(0, 1fr);
     gap: 12px;
-    padding: 20px;
   }
 
   .series-hero-team {
@@ -368,9 +432,20 @@
   }
 }
 
+@media (max-width: 760px) {
+  .series-hero-footer {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .series-hero-live-context {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 680px) {
   .series-hero-topline {
-    padding: 14px 15px 12px;
+    margin: 10px 12px 0;
+    padding: 11px 12px;
   }
 
   .series-hero-competition span {
@@ -388,7 +463,7 @@
   .series-hero-matchup {
     grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr);
     gap: 7px;
-    padding: 17px 12px;
+    padding: 13px 12px;
   }
 
   .series-hero-team {
@@ -445,17 +520,24 @@
   }
 
   .series-hero-footer {
-    justify-content: flex-start;
-    gap: 6px 12px;
-    padding: 11px 15px 13px;
+    gap: 7px;
+    padding: 0 12px 12px;
   }
 
-  .series-hero-footer > span:not(:first-child)::before,
+  .series-hero-footer > span,
+  .series-hero-footer > time {
+    min-height: 40px;
+    padding: 0 9px;
+    font-size: 0.6rem;
+  }
+
+  .series-hero-footer > span:nth-child(2)::before,
   .series-hero-footer time::before {
-    margin-right: 12px;
+    display: none;
   }
 
   .analysis-header.series-hero-active #game-selector {
-    padding: 10px 12px 13px;
+    margin: 0 12px 12px;
+    padding: 9px 10px;
   }
 }

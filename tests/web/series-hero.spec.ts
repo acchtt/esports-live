@@ -106,7 +106,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('renders team logos and a redesigned live series hero', async ({ page }) => {
+test('renders team logos and a cohesive live series hero', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -128,8 +128,34 @@ test('renders team logos and a redesigned live series hero', async ({ page }) =>
   await expect(score.nth(0)).toHaveText('1');
   await expect(score.nth(1)).toHaveText('0');
   await expect(hero.locator('.series-hero-score')).toContainText('Best of 3 · First to 2');
-  await expect(hero.locator('.series-hero-footer')).toContainText('Game 2 live');
-  await expect(hero.locator('.series-hero-footer')).toContainText('1 of 3 games completed');
+
+  const footer = hero.locator('.series-hero-footer');
+  await expect(footer).toContainText('Game 2 live');
+  await expect(footer).toContainText('1 of 3 games completed');
+  await expect(footer.locator(':scope > *')).toHaveCount(3);
+
+  const surfaces = await hero.evaluate(element => {
+    const top = element.querySelector<HTMLElement>('.series-hero-topline');
+    const footerCell = element.querySelector<HTMLElement>('.series-hero-footer > *');
+    const footerGrid = element.querySelector<HTMLElement>('.series-hero-footer');
+    if (!top || !footerCell || !footerGrid) return null;
+    const topStyle = getComputedStyle(top);
+    const footerStyle = getComputedStyle(footerCell);
+    const gridStyle = getComputedStyle(footerGrid);
+    return {
+      topBackground: topStyle.backgroundColor,
+      footerBackground: footerStyle.backgroundColor,
+      topBorder: topStyle.borderTopColor,
+      footerBorder: footerStyle.borderTopColor,
+      footerDisplay: gridStyle.display,
+      footerColumns: gridStyle.gridTemplateColumns.split(' ').length
+    };
+  });
+  expect(surfaces).not.toBeNull();
+  expect(surfaces?.topBackground).toBe(surfaces?.footerBackground);
+  expect(surfaces?.topBorder).toBe(surfaces?.footerBorder);
+  expect(surfaces?.footerDisplay).toBe('grid');
+  expect(surfaces?.footerColumns).toBe(3);
 
   const headerBox = await page.locator('.analysis-header').boundingBox();
   const scoreBox = await hero.locator('.series-hero-score').boundingBox();

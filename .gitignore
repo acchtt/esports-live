@@ -2,6 +2,8 @@ node_modules/
 dist/
 coverage/
 .vite/
+playwright-report/
+test-results/
 .dev.vars
 .env
 .env.*

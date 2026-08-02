@@ -144,6 +144,22 @@ test('suppresses a live placeholder that cannot be resolved', async () => {
   assert.deepEqual(await provider.getSchedule(), []);
 });
 
+test('retains a live event with real teams while Riot game IDs are pending', async () => {
+  const entry = sparseEntry();
+  entry.series.teams = [
+    { id: 'team-a', name: 'Anyone’s Legend', code: 'AL' },
+    { id: 'team-b', name: 'Bilibili Gaming', code: 'BLG' }
+  ];
+  const provider = createUsableScheduleProvider(baseProvider(entry, false));
+
+  const schedule = await provider.getSchedule();
+
+  assert.equal(schedule.length, 1);
+  assert.equal(schedule[0]?.series.state, 'live');
+  assert.equal(schedule[0]?.series.teams[0].name, 'Anyone’s Legend');
+  assert.deepEqual(schedule[0]?.series.games, []);
+});
+
 test('retains scheduled entries before Riot publishes game IDs', async () => {
   let contextCalls = 0;
   const base = baseProvider(sparseEntry('scheduled'), false);

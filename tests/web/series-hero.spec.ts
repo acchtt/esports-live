@@ -48,7 +48,7 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
 }
 
 async function installFixtures(page: Page): Promise<void> {
-  await page.route('https://www.riotgames.com/darkroom/800/**', route => route.fulfill({
+  await page.route('https://www.riotgames.com/darkroom/original/**', route => route.fulfill({
     status: 200,
     contentType: 'image/svg+xml',
     body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 100"><rect width="160" height="100" fill="#c8a456"/></svg>'
@@ -126,7 +126,7 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
   await expect(gameMark.locator('img')).toHaveCount(1);
   await expect(gameMark.locator('img')).toHaveAttribute(
     'src',
-    /riotgames\.com\/darkroom\/800\/.*lol-logo-rendered-hi-res\.png/
+    /riotgames\.com\/darkroom\/original\/.*lol-logo-rendered-hi-res\.png/
   );
 
   await expect(hero.locator('.series-hero-competition')).toContainText('LPL · Week 2');

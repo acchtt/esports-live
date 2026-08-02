@@ -31,7 +31,6 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
-          test -n "${{ vars.VITE_API_BASE_URL }}" || { echo "Missing repository variable VITE_API_BASE_URL"; exit 1; }
 
   deploy-web:
     needs: validate
@@ -53,10 +52,44 @@ jobs:
       - name: Validate application
         run: npm run check
 
+      - name: Upload demo API Worker version
+        id: api-preview
+        shell: bash
+        run: |
+          output="$(npx wrangler versions upload \
+            --preview-alias demo \
+            --keep-vars \
+            --message "Demo $DEMO_COMMIT_SHA" 2>&1)"
+          echo "$output"
+          url="$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' <<<"$output" | tail -n 1)"
+          test -n "$url" || { echo "Wrangler did not return a Worker preview URL."; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify demo API
+        env:
+          API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            health="$(curl -fsSL --connect-timeout 10 --max-time 30 "$API_BASE_URL/health?commit=$DEMO_COMMIT_SHA" || true)"
+            if grep -q '"ok":true' <<<"$health" && grep -q '"service":"esports-live-api"' <<<"$health"; then
+              echo "Demo API is available at $API_BASE_URL"
+              exit 0
+            fi
+            echo "Demo API not ready (attempt $attempt/12)."
+            sleep 5
+          done
+          echo "Demo API verification failed."
+          exit 1
+
       - name: Build demo application
         run: npm run build:web
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+
+      - name: Confirm preview API is embedded
+        shell: bash
+        run: grep -R "${{ steps.api-preview.outputs.url }}" apps/web/dist/assets
 
       - name: Deploy demo Pages preview
         run: >-

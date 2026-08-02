@@ -1,0 +1,49 @@
+name: Apply Demo Live Feed Fix
+
+on:
+  push:
+    branches:
+      - demo
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-demo-live-feed-fix
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out demo
+        uses: actions/checkout@v6
+        with:
+          ref: demo
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Apply source patch
+        run: node scripts/apply-demo-live-feed-fix.mjs
+
+      - name: Commit source changes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/adapter-lol/src/riot-provider.ts \
+                  packages/adapter-lol/src/riot-provider.test.ts \
+                  packages/adapter-lol/src/riot-current-player-provider.ts \
+                  packages/adapter-lol/src/riot-current-player-provider.test.ts
+          git commit -m "Keep live telemetry independent from enrichment"
+          git push origin HEAD:demo

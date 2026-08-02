@@ -1,8 +1,12 @@
 export {};
 
-const gameContent = document.querySelector<HTMLElement>('#game-content');
-if (!gameContent) throw new Error('Missing required element: #game-content');
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing required element: ${selector}`);
+  return element;
+}
 
+const gameContent = requiredElement<HTMLElement>('#game-content');
 const REFRESH_TIMEOUT_MS = 12_000;
 let refreshing = false;
 let lastUpdatedAt: string | null = null;

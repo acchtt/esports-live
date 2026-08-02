@@ -1,6 +1,11 @@
 # Cloudflare deployment
 
-Production releases are manual. Validation runs on every push and pull request, while `.github/workflows/deploy.yml` deploys only when explicitly started from GitHub Actions.
+Every push to `main` validates and deploys both production applications:
+
+- the `esports-live-api` Cloudflare Worker
+- the `esports-live` Pages application
+
+The **Deploy Cloudflare** workflow can also be started manually to redeploy `api`, `web`, or `all`.
 
 ## Cloudflare resources
 
@@ -39,18 +44,16 @@ Create this GitHub Actions repository variable after the first API deployment:
 
 The Riot API key is intentionally not stored in GitHub.
 
-## Release order
-
-For the first release:
+## Initial release order
 
 1. Configure the Cloudflare Worker secret.
 2. Run **Deploy Cloudflare** with target `api`.
 3. Verify `GET /health` and copy the Worker origin.
 4. Set the GitHub variable `VITE_API_BASE_URL` to that origin.
 5. Create the Pages project if it does not already exist.
-6. Run **Deploy Cloudflare** with target `web`.
+6. Run **Deploy Cloudflare** with target `all`.
 
-After initial setup, target `all` validates and deploys both applications.
+After initial setup, merging to `main` deploys both applications automatically. The workflow verifies the API health response and the Pages application shell before reporting success.
 
 ## Local commands
 

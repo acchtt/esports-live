@@ -71,7 +71,7 @@ Copy `.dev.vars.example` to `.dev.vars` for local API development. Configure `VI
 
 ## Deployment
 
-Cloudflare releases are manual through the **Deploy Cloudflare** GitHub Actions workflow. See `docs/deployment.md` for one-time secret, Worker, Pages, and repository-variable setup.
+Every push to `main` validates and deploys both the Cloudflare API Worker and Pages web application. The **Deploy Cloudflare** GitHub Actions workflow can also redeploy `api`, `web`, or `all` manually. See `docs/deployment.md` for one-time secret, Worker, Pages, and repository-variable setup.
 
 ## Clean-room policy
 

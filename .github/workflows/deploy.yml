@@ -41,7 +41,7 @@ jobs:
           fi
 
   deploy-api:
-    if: github.event_name == 'workflow_dispatch' && (inputs.target == 'api' || inputs.target == 'all')
+    if: github.event_name == 'push' || inputs.target == 'api' || inputs.target == 'all'
     needs: validate
     runs-on: ubuntu-latest
     environment: production
@@ -54,6 +54,23 @@ jobs:
       - run: npm run check
       - name: Deploy API Worker
         run: npm run deploy:api
+      - name: Verify production API
+        if: github.event_name == 'push' || inputs.target == 'all'
+        env:
+          API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            health="$(curl -fsSL --connect-timeout 10 --max-time 30 "$API_BASE_URL/health?commit=$GITHUB_SHA" || true)"
+            if grep -q '"ok":true' <<<"$health" && grep -q '"service":"esports-live-api"' <<<"$health"; then
+              echo "Production API is available at $API_BASE_URL"
+              exit 0
+            fi
+            echo "Production API not ready (attempt $attempt/12)."
+            sleep 5
+          done
+          echo "Production API verification failed."
+          exit 1
 
   deploy-web:
     if: github.event_name == 'push' || inputs.target == 'web' || inputs.target == 'all'

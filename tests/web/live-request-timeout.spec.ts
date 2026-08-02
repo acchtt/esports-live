@@ -144,21 +144,9 @@ test('renders a cold live response that arrives after the former ten-second dead
   await expect(match).toBeVisible();
   await match.click();
   await expect.poll(liveRequests, { timeout: 3_000 }).toBeGreaterThanOrEqual(1);
-  await page.waitForTimeout(12_000);
 
-  const state = await page.locator('#game-content').evaluate(element => ({
-    html: element.innerHTML,
-    text: element.textContent?.trim() ?? '',
-    hasBoard: Boolean(element.querySelector('.role-scoreboard-board'))
-  }));
-  expect({
-    liveRequests: liveRequests(),
-    pageErrors,
-    ...state
-  }).toMatchObject({
-    hasBoard: true,
-    pageErrors: []
-  });
+  await expect(page.locator('[data-live-history-game-id="cold-game"]')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Live feed unavailable')).toHaveCount(0);
   await expect(page.getByText('Blue Player 1')).toBeVisible();
+  expect(pageErrors).toEqual([]);
 });

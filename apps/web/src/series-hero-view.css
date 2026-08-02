@@ -230,7 +230,6 @@
   min-width: 0;
 }
 
-.series-hero-team-copy > span,
 .series-hero-team-copy > small {
   display: block;
   color: #718098;
@@ -333,8 +332,8 @@
   box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.1);
 }
 
-.series-hero-status.live ~ * .series-hero-live-context i,
-.analysis-header:has(.series-hero-status.live) .series-hero-live-context i {
+.series-hero[data-status='live'] .series-hero-live-context i,
+.series-hero[data-status='in-progress'] .series-hero-live-context i {
   background: #34d399;
   box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.1), 0 0 14px rgba(52, 211, 153, 0.38);
 }
@@ -366,10 +365,6 @@
 
   .series-hero-team-copy strong {
     max-width: 23vw;
-  }
-
-  .series-hero-team-copy > span {
-    display: none;
   }
 }
 

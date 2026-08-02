@@ -122,6 +122,9 @@ test('refreshes the selected live player board on demand', async ({ page }) => {
   const liveRequests = await installFixtures(page);
 
   await page.goto('/');
+  const liveCard = page.locator('[data-series-id="series-live-refresh"]');
+  await expect(liveCard).toBeVisible();
+  await liveCard.click();
   await expect(page.locator('[data-live-history-game-id="game-live-refresh"]')).toBeVisible();
   await expect.poll(liveRequests).toBeGreaterThan(0);
 

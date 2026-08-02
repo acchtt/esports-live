@@ -1,0 +1,236 @@
+.v2-objectives-card.objective-hud-v3 {
+  position: relative;
+  display: grid;
+  align-content: center;
+  min-height: 112px;
+  padding: 12px 20px 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(35, 164, 255, 0.05), transparent 24%, transparent 76%, rgba(255, 57, 87, 0.05)),
+    linear-gradient(180deg, rgba(10, 24, 42, 0.98), rgba(5, 14, 25, 0.98));
+}
+
+.v2-objectives-card.objective-hud-v3::before,
+.v2-objectives-card.objective-hud-v3::after {
+  position: absolute;
+  top: 0;
+  width: 44px;
+  height: 2px;
+  content: '';
+  pointer-events: none;
+}
+
+.v2-objectives-card.objective-hud-v3::before {
+  left: 0;
+  background: linear-gradient(90deg, #43bbff, transparent);
+  box-shadow: 0 0 14px rgba(67, 187, 255, 0.48);
+}
+
+.v2-objectives-card.objective-hud-v3::after {
+  right: 0;
+  background: linear-gradient(270deg, #ff4964, transparent);
+  box-shadow: 0 0 14px rgba(255, 73, 100, 0.45);
+}
+
+.v3-objective-title {
+  display: grid;
+  grid-template-columns: minmax(28px, 1fr) auto minmax(28px, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: min(240px, 42%);
+  margin: 0 auto 8px;
+  color: #8192a9;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+.v3-objective-title i {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(135, 160, 193, 0.45));
+}
+
+.v3-objective-title i:last-child {
+  background: linear-gradient(90deg, rgba(135, 160, 193, 0.45), transparent);
+}
+
+.v3-objective-hud {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+}
+
+.v3-objective-side {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
+  align-items: center;
+  min-width: 0;
+}
+
+.v3-objective-stat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 62px;
+  color: currentColor;
+}
+
+.v3-objective-stat + .v3-objective-stat::before {
+  position: absolute;
+  top: 13px;
+  bottom: 12px;
+  left: 0;
+  width: 1px;
+  content: '';
+  background: linear-gradient(180deg, transparent, rgba(132, 153, 182, 0.22), transparent);
+}
+
+.v3-objective-side.blue {
+  color: #39b8ff;
+}
+
+.v3-objective-side.red {
+  color: #ff4565;
+}
+
+.v3-objective-side.blue .v3-objective-stat {
+  text-shadow: 0 0 14px rgba(57, 184, 255, 0.2);
+}
+
+.v3-objective-side.red .v3-objective-stat {
+  text-shadow: 0 0 14px rgba(255, 69, 101, 0.18);
+}
+
+.v3-objective-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, currentColor 25%, transparent));
+}
+
+.v3-objective-icon svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.v3-objective-stat strong {
+  color: currentColor;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.v3-objective-center {
+  position: relative;
+  display: block;
+  width: 1px;
+  height: 46px;
+  margin: auto;
+  background: linear-gradient(180deg, transparent, rgba(143, 165, 194, 0.28), transparent);
+}
+
+.v3-objective-center::before,
+.v3-objective-center::after {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 1px;
+  content: '';
+  background: linear-gradient(90deg, transparent, rgba(129, 151, 181, 0.18));
+}
+
+.v3-objective-center::before {
+  right: 8px;
+}
+
+.v3-objective-center::after {
+  left: 8px;
+  transform: scaleX(-1);
+}
+
+.v3-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (max-width: 1180px) {
+  .v2-objectives-card.objective-hud-v3 {
+    padding-inline: 14px;
+  }
+
+  .v3-objective-hud {
+    grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
+  }
+
+  .v3-objective-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .v3-objective-stat strong {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .v2-objectives-card.objective-hud-v3 {
+    min-height: 104px;
+    padding: 10px 8px 8px;
+  }
+
+  .v3-objective-title {
+    width: min(220px, 64%);
+    margin-bottom: 5px;
+    font-size: 9px;
+  }
+
+  .v3-objective-hud {
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  }
+
+  .v3-objective-side {
+    grid-template-columns: repeat(4, minmax(32px, 1fr));
+  }
+
+  .v3-objective-stat {
+    min-height: 58px;
+  }
+
+  .v3-objective-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .v3-objective-stat strong {
+    font-size: 16px;
+  }
+
+  .v3-objective-stat + .v3-objective-stat::before {
+    top: 12px;
+    bottom: 10px;
+  }
+
+  .v3-objective-center {
+    height: 38px;
+  }
+}

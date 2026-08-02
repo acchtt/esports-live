@@ -7,39 +7,14 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
-    if: github.event_name == 'pull_request' && github.head_ref == 'fix/andy-cadence'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out feature branch
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-
-      - name: Apply focused live cadence changes
-        run: python scripts/agent-fast-cadence.py
-
-      - name: Commit feature changes
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git commit -m "Match AndyDanger live telemetry cadence"
-          git push origin HEAD:${{ github.head_ref }}
-
   validate:
-    needs: patch
-    if: always() && (needs.patch.result == 'success' || needs.patch.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6

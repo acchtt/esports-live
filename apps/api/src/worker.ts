@@ -25,11 +25,19 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   if (apiKey) {
     const provider = createUsableScheduleProvider(
       createLeaguepediaHistoryFallbackProvider(
-        createRiotCurrentPlayerProvider(createRiotLolConsistentProvider({ apiKey }))
+        createRiotCurrentPlayerProvider(
+          createRiotLolConsistentProvider({
+            apiKey,
+            includeDetails: false,
+            useDetailItemFallback: false
+          }),
+          { useWindowOverlay: false }
+        )
       )
     );
     registry.register(new CachedAdapter(new LolAdapter(provider), {
       scheduleTtlMs: 45_000,
+      liveSnapshotTtlMs: 400,
       seriesContextTtlMs: 45_000
     }));
   }

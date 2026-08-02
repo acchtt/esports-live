@@ -225,6 +225,8 @@ body .workspace .game-content {
 
 /* Unified completed-series summary and compact game results. */
 body .completed-match-detail {
+  align-content: start;
+  grid-auto-rows: max-content;
   gap: 0;
 }
 

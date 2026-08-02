@@ -3,7 +3,7 @@ import './series-hero-view.css';
 import './official-lol-logo.css';
 
 const OFFICIAL_LOL_LOGO_URL =
-  'https://www.riotgames.com/darkroom/800/9c08e3b3ce6281f252a4dfbf61357a11%3A75ab7e60b85225c6c7f19ae4024e27a6/lol-logo-rendered-hi-res.png';
+  'https://www.riotgames.com/darkroom/original/9a50f5b3bdcfb815580ef103ec9b6ee2%3Ad49b78b12cf185e10127cdf81b144a00/lol-logo-rendered-hi-res.png';
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -125,6 +125,7 @@ function gameMark(): string {
         src="${OFFICIAL_LOL_LOGO_URL}"
         alt=""
         decoding="async"
+        loading="eager"
         referrerpolicy="no-referrer"
       />
       <b>LoL</b>

@@ -270,8 +270,68 @@ body #completed-final-telemetry:has(> .completed-telemetry-loading) {
   display: none;
 }
 
+/* Align completed scoreboard controls with the game-result columns above. */
+body #completed-final-telemetry {
+  margin-top: 22px;
+}
+
+body #completed-final-telemetry .completed-telemetry-heading {
+  align-items: baseline;
+  min-height: 24px;
+  padding-inline: 2px;
+}
+
+body #completed-final-telemetry .completed-telemetry-heading h3,
+body #completed-final-telemetry .completed-telemetry-heading > span {
+  line-height: 1.25;
+}
+
+body #completed-final-telemetry .completed-telemetry-heading > span {
+  text-align: right;
+}
+
+body #completed-final-telemetry .completed-game-tabs {
+  gap: 10px;
+  padding: 5px;
+}
+
+body #completed-final-telemetry .completed-game-tab {
+  align-content: center;
+  min-height: 54px;
+  padding: 9px 13px;
+}
+
+@media (min-width: 921px) {
+  body .completed-match-detail:has(.completed-games > .completed-game:nth-child(1):last-child) #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  body .completed-match-detail:has(.completed-games > .completed-game:nth-child(3):last-child) #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body .completed-match-detail:has(.completed-games > .completed-game:nth-child(5):last-child) #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  body #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
   body .completed-match-detail > .completed-series-hero + .completed-games-panel {
     padding: 17px;
+  }
+
+  body #completed-final-telemetry .completed-telemetry-heading {
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  body #completed-final-telemetry .completed-telemetry-heading > span {
+    text-align: left;
   }
 }

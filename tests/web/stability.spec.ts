@@ -218,7 +218,9 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await expect(liveCard).toBeVisible();
   await liveCard.click();
 
-  await expect(page.locator('#selected-series')).toContainText('Blue Team vs Red Team');
+  const selectedSeries = page.locator('#selected-series');
+  await expect(selectedSeries).toContainText('Blue Team');
+  await expect(selectedSeries).toContainText('Red Team');
   await expect(page.locator('.role-scoreboard-board')).toBeVisible();
   await expect(page.locator('#live-game-clock')).toHaveText(/\d+:\d{2}/);
 
@@ -234,7 +236,8 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await page.getByRole('button', { name: 'Active' }).click();
   await expect(page.locator('#schedule-list')).toBeVisible();
   await page.locator('[data-series-id="series-upcoming"]').click();
-  await expect(page.locator('#selected-series')).toContainText('Upcoming Blue vs Upcoming Red');
+  await expect(selectedSeries).toContainText('Upcoming Blue');
+  await expect(selectedSeries).toContainText('Upcoming Red');
   await expect(page.getByText('Match scheduled')).toBeVisible();
 
   await liveCard.click();

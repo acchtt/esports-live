@@ -1,4 +1,5 @@
-import type { SeriesContext, StandingRef, TeamRosterRef } from '@esports-live/core';
+import type { ScheduleEvent, SeriesContext, StandingRef, TeamRosterRef } from '@esports-live/core';
+import { apiJson } from './api-client.ts';
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -10,7 +11,6 @@ const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, 
 const selectedCompetition = requiredElement<HTMLElement>('#selected-competition');
 const selectedSeries = requiredElement<HTMLElement>('#selected-series');
 const selectedMeta = requiredElement<HTMLElement>('#selected-meta');
-const scheduleList = requiredElement<HTMLElement>('#schedule-list');
 const gameContent = requiredElement<HTMLElement>('#game-content');
 
 let activeSignature = '';
@@ -19,6 +19,8 @@ let activeContext: SeriesContext | null = null;
 let contextError: string | null = null;
 let contextLoading = false;
 let contextRequest = 0;
+let contextController: AbortController | null = null;
+let selectedEvent: ScheduleEvent | null = null;
 
 const style = document.createElement('style');
 style.textContent = `
@@ -158,10 +160,6 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function selectedSeriesIdentifier(): string | null {
-  return scheduleList.querySelector<HTMLButtonElement>('.match-card.selected')?.dataset.seriesId ?? null;
-}
-
 function teamVisual(name: string, roster: TeamRosterRef | undefined): string {
   const image = roster?.team.imageUrl;
   return image
@@ -244,24 +242,24 @@ function contextMarkup(context: SeriesContext | null, left: string, right: strin
 
 async function loadContext(seriesId: string, signature: string): Promise<void> {
   const requestId = ++contextRequest;
+  contextController?.abort();
+  const controller = new AbortController();
+  contextController = controller;
   contextLoading = true;
   contextError = null;
   activeContext = null;
   renderPrematch();
 
   try {
-    const response = await fetch(
-      `${API_BASE}/v1/lol/series/${encodeURIComponent(seriesId)}/context`,
-      { cache: 'no-store' }
+    const body = await apiJson<SeriesContext>(
+      API_BASE,
+      `/v1/lol/series/${encodeURIComponent(seriesId)}/context`,
+      { signal: controller.signal }
     );
-    const body = await response.json().catch(() => null) as SeriesContext | { message?: string } | null;
-    if (!response.ok) {
-      const message = body && 'message' in body ? body.message : null;
-      throw new Error(message ?? `Context API returned ${response.status}.`);
-    }
     if (requestId !== contextRequest || activeSignature !== signature) return;
-    activeContext = body as SeriesContext;
+    activeContext = body;
   } catch (error) {
+    if (controller.signal.aborted) return;
     if (requestId !== contextRequest || activeSignature !== signature) return;
     contextError = error instanceof Error ? error.message : 'Unknown context error.';
   } finally {
@@ -273,6 +271,7 @@ async function loadContext(seriesId: string, signature: string): Promise<void> {
 }
 
 function renderPrematch(): void {
+  if (!selectedEvent) return;
   const title = selectedSeries.textContent?.trim() ?? '';
   const meta = selectedMeta.textContent?.trim() ?? '';
   const competition = selectedCompetition.textContent?.trim() ?? '';
@@ -284,7 +283,7 @@ function renderPrematch(): void {
 
   const [left = 'Team 1', right = 'Team 2'] = title.split(/\s+vs\s+/i, 2);
   const [start = 'Scheduled', format = 'Series format pending'] = meta.split(' · ', 2);
-  const seriesId = selectedSeriesIdentifier();
+  const seriesId = selectedEvent.series.id;
   const signature = `${seriesId ?? 'unknown'}|${title}|${meta}|${competition}`;
 
   if (activeSignature !== signature) {
@@ -334,10 +333,10 @@ function renderPrematch(): void {
     </section>`;
 }
 
-const observer = new MutationObserver(() => queueMicrotask(renderPrematch));
-observer.observe(selectedCompetition, { childList: true, characterData: true, subtree: true });
-observer.observe(selectedSeries, { childList: true, characterData: true, subtree: true });
-observer.observe(selectedMeta, { childList: true, characterData: true, subtree: true });
-observer.observe(scheduleList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-observer.observe(gameContent, { childList: true, subtree: true });
-renderPrematch();
+window.addEventListener('esports-live:selection', event => {
+  selectedEvent = (event as CustomEvent<ScheduleEvent>).detail;
+  activeSignature = '';
+  contextController?.abort();
+  contextController = null;
+  renderPrematch();
+});

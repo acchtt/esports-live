@@ -5,6 +5,7 @@ import type {
   SeriesHistoryRef,
   TeamRef
 } from '@esports-live/core';
+import { apiJson } from './api-client.ts';
 
 interface ScheduleResponse {
   esport: string;
@@ -55,7 +56,7 @@ const modeTabs = document.createElement('div');
 modeTabs.className = 'schedule-mode-tabs';
 modeTabs.innerHTML = `
   <button type="button" class="schedule-mode active" data-mode="active">Active</button>
-  <button type="button" class="schedule-mode" data-mode="results">Results</button>`;
+  <button type="button" class="schedule-mode" data-mode="results" aria-label="Open match history">Match History</button>`;
 sportTabs.insertAdjacentElement('afterend', modeTabs);
 
 const resultsList = document.createElement('div');
@@ -285,12 +286,7 @@ function escapeHtml(value: unknown): string {
 }
 
 async function api<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as { message?: string } | null;
-    throw new Error(body?.message ?? `API returned ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+  return apiJson<T>(API_BASE, path);
 }
 
 function formatDate(value: string): string {
@@ -453,6 +449,7 @@ function selectCompleted(seriesId: string): void {
   selectedSeriesId = seriesId;
   renderList();
   renderDetail(match);
+  window.dispatchEvent(new CustomEvent('esports-live:completed-selection', { detail: { seriesId } }));
 }
 
 function setMode(nextMode: 'active' | 'results'): void {
@@ -541,7 +538,7 @@ async function loadCompletedMatches(): Promise<void> {
       loadPromise = null;
       if (refreshTimer !== null) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
-        if (mode === 'results') void loadCompletedMatches();
+        if (mode === 'results' && !document.hidden) void loadCompletedMatches();
       }, RESULTS_REFRESH_MS);
     }
   })();
@@ -554,4 +551,12 @@ modeTabs.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button => {
 
 window.addEventListener('beforeunload', () => {
   if (refreshTimer !== null) clearTimeout(refreshTimer);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (refreshTimer !== null) clearTimeout(refreshTimer);
+    refreshTimer = null;
+    return;
+  }
+  if (mode === 'results') void loadCompletedMatches();
 });

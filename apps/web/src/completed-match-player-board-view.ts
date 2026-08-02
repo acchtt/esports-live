@@ -178,12 +178,6 @@ async function enhance(): Promise<void> {
   if (host.isConnected) installTabs(host);
 }
 
-function includesTelemetry(node: Node): boolean {
-  if (!(node instanceof Element)) return false;
-  return node.matches('#completed-final-telemetry,.completed-final-game,.completed-final-player')
-    || Boolean(node.querySelector('#completed-final-telemetry,.completed-final-game,.completed-final-player'));
-}
-
 let scheduled = false;
 let running = false;
 let rerun = false;
@@ -212,7 +206,5 @@ async function run(): Promise<void> {
   }
 }
 
-new MutationObserver(mutations => {
-  if (mutations.some(mutation => [...mutation.addedNodes].some(includesTelemetry))) queue();
-}).observe(document.body,{childList:true,subtree:true});
+window.addEventListener('esports-live:ended-snapshot', queue);
 queue();

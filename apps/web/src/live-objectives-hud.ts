@@ -65,8 +65,8 @@ function objectiveMarkup(team: LolTeamState, key: ObjectiveKey): string {
   return `
     <div class="v3-objective-stat" title="${label}" aria-label="${label}: ${formatted}">
       <span class="v3-objective-icon">${OBJECTIVE_ICONS[key]}</span>
+      <span class="v3-objective-label">${label}</span>
       <strong>${formatted}</strong>
-      <span class="v3-visually-hidden">${label}</span>
     </div>`;
 }
 

@@ -15,9 +15,11 @@
     "deploy:web": "npm run build:web && wrangler pages deploy apps/web/dist --project-name esports-live",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test packages/core/src/*.test.ts packages/adapter-lol/src/*.test.ts apps/api/src/*.test.ts",
+    "test:web": "npm run build:web && playwright test",
     "check": "npm run typecheck && npm test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
     "@types/node": "^24.0.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",

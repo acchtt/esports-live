@@ -5,7 +5,7 @@ import { apiJson } from './api-client.ts';
 export {};
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-const RETRY_MS = 1_000;
+const RETRY_MS = 2_000;
 
 const scheduleList = document.querySelector<HTMLElement>('#schedule-list');
 const gameSelector = document.querySelector<HTMLElement>('#game-selector');
@@ -52,6 +52,12 @@ function selectionStillMatches(seriesId: string, gameId: string): boolean {
   return selection?.seriesId === seriesId && selection.gameId === gameId;
 }
 
+function selectedGameIsRendered(gameId: string): boolean {
+  if (!gameContent) return false;
+  return [...gameContent.querySelectorAll<HTMLElement>('[data-live-dashboard-game-id]')]
+    .some(element => element.dataset.liveDashboardGameId === gameId);
+}
+
 function renderLoading(): void {
   if (!gameContent) return;
   gameContent.innerHTML = `
@@ -77,11 +83,11 @@ function scheduleRefresh(seriesId: string, gameId: string): void {
   refreshTimer = window.setTimeout(() => {
     refreshTimer = null;
     if (!selectionStillMatches(seriesId, gameId) || document.hidden) return;
-    void refreshSelectedSnapshot(true);
+    void refreshSelectedSnapshot(true, false);
   }, RETRY_MS);
 }
 
-async function refreshSelectedSnapshot(force = false): Promise<void> {
+async function refreshSelectedSnapshot(force = false, showLoading = true): Promise<void> {
   const selection = currentSelection();
   if (!selection || document.hidden) return;
 
@@ -91,7 +97,11 @@ async function refreshSelectedSnapshot(force = false): Promise<void> {
 
   const generation = ++requestGeneration;
   clearRefreshTimer();
-  renderLoading();
+
+  const hasCurrentPanel = selectedGameIsRendered(selection.gameId);
+  if (showLoading && !hasCurrentPanel) renderLoading();
+
+  let shouldRetry = false;
 
   try {
     const snapshot = await apiJson<LiveSnapshot<LolStats>>(
@@ -106,18 +116,25 @@ async function refreshSelectedSnapshot(force = false): Promise<void> {
         detail: snapshot
       }));
     } else {
-      const reason = snapshot.quality.reasons.map(item => item.message).join(' ')
-        || 'No normalized gameplay frame is available for this game yet.';
-      renderUnavailable(reason);
+      shouldRetry = selection.gameState !== 'completed';
+      if (!selectedGameIsRendered(selection.gameId)) {
+        const reason = snapshot.quality.reasons.map(item => item.message).join(' ')
+          || 'No normalized gameplay frame is available for this game yet.';
+        renderUnavailable(reason);
+      }
     }
   } catch (error) {
     if (generation !== requestGeneration) return;
     if (!selectionStillMatches(selection.seriesId, selection.gameId)) return;
-    renderUnavailable(error instanceof Error ? error.message : 'Unknown snapshot error.');
+
+    shouldRetry = selection.gameState !== 'completed';
+    if (!selectedGameIsRendered(selection.gameId)) {
+      renderUnavailable(error instanceof Error ? error.message : 'Unknown snapshot error.');
+    }
   } finally {
     if (generation !== requestGeneration) return;
     if (!selectionStillMatches(selection.seriesId, selection.gameId)) return;
-    if (selection.gameState !== 'completed') scheduleRefresh(selection.seriesId, selection.gameId);
+    if (shouldRetry) scheduleRefresh(selection.seriesId, selection.gameId);
   }
 }
 

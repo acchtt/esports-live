@@ -22,7 +22,7 @@ let contextError: string | null = null;
 let contextLoading = false;
 let contextRequest = 0;
 let contextController: AbortController | null = null;
-let contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let contextRetryTimer: number | null = null;
 let selectedEvent: ScheduleEvent | null = null;
 
 const style = document.createElement('style');

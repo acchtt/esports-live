@@ -1,160 +1,102 @@
-import type { LiveSnapshot } from '@esports-live/core';
-import type { LolStats } from '@esports-live/adapter-lol';
 import './live-gold-lead-bar.css';
 
+export {};
+
 const gameContent = document.querySelector<HTMLElement>('#game-content');
+const selectedSeries = document.querySelector<HTMLElement>('#selected-series');
+const scheduleList = document.querySelector<HTMLElement>('#schedule-list');
 
-let latestSnapshot: LiveSnapshot<LolStats> | null = null;
-let animationFrame: number | null = null;
+let cleanupFrame: number | null = null;
+let focusGuardUntil = 0;
+let stableSeriesId = '';
+let stableSeriesHtml = '';
 
-function formatCompact(value: number | null): string {
-  if (value === null) return '—';
-  return Math.abs(value) >= 1000
-    ? `${(value / 1000).toFixed(1)}K`
-    : value.toLocaleString();
+function currentSeriesId(): string {
+  return scheduleList
+    ?.querySelector<HTMLElement>('[data-series-id].selected')
+    ?.dataset.seriesId ?? '';
 }
 
-function sourceTime(snapshot: LiveSnapshot<LolStats>): number | null {
-  const parsed = Date.parse(snapshot.quality.sourceTimestamp ?? '');
-  return Number.isFinite(parsed) ? parsed : null;
+function captureStableSeriesScore(): void {
+  if (!selectedSeries?.querySelector('.history-header-score')) return;
+  const seriesId = currentSeriesId();
+  if (!seriesId) return;
+  stableSeriesId = seriesId;
+  stableSeriesHtml = selectedSeries.innerHTML;
 }
 
-function acceptsSnapshot(incoming: LiveSnapshot<LolStats>): boolean {
-  const previous = latestSnapshot;
-  if (!previous || previous.game.id !== incoming.game.id) return true;
+function restoreTransientSeriesReset(): void {
+  if (!selectedSeries) return;
 
-  const previousSource = sourceTime(previous);
-  const incomingSource = sourceTime(incoming);
-  if (previousSource !== null && incomingSource !== null && incomingSource < previousSource) {
-    return false;
+  if (selectedSeries.querySelector('.history-header-score')) {
+    captureStableSeriesScore();
+    return;
   }
 
-  const previousClock = previous.stats?.gameClockSeconds ?? null;
-  const incomingClock = incoming.stats?.gameClockSeconds ?? null;
-  return !(
-    previousClock !== null
-    && incomingClock !== null
-    && incomingClock + 2 < previousClock
-  );
+  const seriesId = currentSeriesId();
+  const legacyTitle = selectedSeries.textContent ?? '';
+  if (
+    Date.now() > focusGuardUntil
+    || !stableSeriesHtml
+    || seriesId !== stableSeriesId
+    || !/\s+vs\s+/i.test(legacyTitle)
+  ) {
+    return;
+  }
+
+  // The schedule refresh briefly replaces the enriched score header with the
+  // legacy "Team vs Team" title when a background tab becomes visible. Restore
+  // the last stable score before the series hero renders its next frame.
+  selectedSeries.innerHTML = stableSeriesHtml;
 }
 
-function goldLeadRatio(blueGold: number | null, redGold: number | null): number | null {
-  if (blueGold === null || redGold === null) return null;
-  const blue = Math.max(0, blueGold);
-  const red = Math.max(0, redGold);
-  const trailingGold = Math.max(10_000, Math.min(blue, red));
-  return Math.abs(blue - red) / trailingGold;
+function removeGoldLeadCard(): void {
+  cleanupFrame = null;
+  document.querySelectorAll<HTMLElement>('.live-dashboard-v2 .v2-summary-row')
+    .forEach(row => row.classList.add('gold-lead-removed'));
+  document.querySelectorAll<HTMLElement>('.live-dashboard-v2 .v2-gold-card')
+    .forEach(card => card.remove());
 }
 
-function goldShare(blueGold: number | null, redGold: number | null): number {
-  if (blueGold === null || redGold === null) return 50;
-  const difference = blueGold - redGold;
-  if (difference === 0) return 50;
-
-  const relativeLead = goldLeadRatio(blueGold, redGold) ?? 0;
-  const visualShift = Math.tanh(relativeLead * 5) * 36;
-  return Math.min(86, Math.max(14, 50 + Math.sign(difference) * visualShift));
+function queueGoldLeadRemoval(): void {
+  if (cleanupFrame !== null) return;
+  cleanupFrame = window.requestAnimationFrame(removeGoldLeadCard);
 }
 
-function leadIntensity(ratio: number | null): 'unknown' | 'close' | 'clear' | 'major' | 'dominant' {
-  if (ratio === null) return 'unknown';
-  if (ratio >= 0.2) return 'dominant';
-  if (ratio >= 0.1) return 'major';
-  if (ratio >= 0.05) return 'clear';
-  return 'close';
-}
+const gameObserver = gameContent
+  ? new MutationObserver(queueGoldLeadRemoval)
+  : null;
+gameObserver?.observe(gameContent as HTMLElement, { childList: true, subtree: true });
 
-function applyGoldLeadBar(): void {
-  animationFrame = null;
-  const snapshot = latestSnapshot;
-  if (!snapshot?.stats) return;
+const scoreObserver = selectedSeries
+  ? new MutationObserver(restoreTransientSeriesReset)
+  : null;
+scoreObserver?.observe(selectedSeries as HTMLElement, {
+  childList: true,
+  subtree: true,
+  characterData: true
+});
 
-  const dashboard = [...document.querySelectorAll<HTMLElement>('.live-dashboard-v2')]
-    .find(element => element.dataset.liveDashboardGameId === snapshot.game.id);
-  const card = dashboard?.querySelector<HTMLElement>('.v2-gold-card');
-  const leaderElement = card?.querySelector<HTMLElement>(':scope > strong');
-  const comparisonElement = card?.querySelector<HTMLElement>(':scope > small');
-  const bar = card?.querySelector<HTMLElement>('.v2-gold-bars');
-  if (!card || !leaderElement || !comparisonElement || !bar) return;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    captureStableSeriesScore();
+    return;
+  }
 
-  const { blue, red } = snapshot.stats;
-  const difference = blue.gold === null || red.gold === null
-    ? null
-    : blue.gold - red.gold;
-  const ratio = goldLeadRatio(blue.gold, red.gold);
-  const blueShare = goldShare(blue.gold, red.gold);
-  const redShare = 100 - blueShare;
-  const leader = difference === null
-    ? 'Gold unavailable'
-    : difference === 0
-      ? 'Gold even'
-      : `${difference > 0 ? blue.name : red.name} +${formatCompact(Math.abs(difference))}`;
-  const leaderClass = difference === null
-    ? 'neutral'
-    : difference > 0
-      ? 'blue'
-      : difference < 0
-        ? 'red'
-        : 'neutral';
-  const intensity = leadIntensity(ratio);
-  const comparison = `${formatCompact(blue.gold)} vs ${formatCompact(red.gold)}`;
-  const context = ratio === null || difference === 0
-    ? comparison
-    : `${comparison} · ${(ratio * 100).toFixed(1)}% lead`;
-  const signature = JSON.stringify([
-    snapshot.game.id,
-    blue.gold,
-    red.gold,
-    blue.name,
-    red.name,
-    intensity
-  ]);
-  if (card.dataset.dynamicGoldSignature === signature) return;
-
-  card.classList.remove(
-    'lead-unknown',
-    'lead-close',
-    'lead-clear',
-    'lead-major',
-    'lead-dominant'
-  );
-  card.classList.add('dynamic-gold-v3', `lead-${intensity}`);
-  card.dataset.dynamicGoldSignature = signature;
-  card.style.setProperty('--blue-gold-share', `${blueShare.toFixed(3)}%`);
-  card.style.setProperty('--red-gold-share', `${redShare.toFixed(3)}%`);
-
-  leaderElement.classList.remove('blue', 'red', 'neutral');
-  leaderElement.classList.add(leaderClass);
-  leaderElement.textContent = leader;
-  comparisonElement.textContent = context;
-  bar.setAttribute('role', 'img');
-  bar.setAttribute(
-    'aria-label',
-    `${blue.name} ${formatCompact(blue.gold)} versus ${red.name} ${formatCompact(red.gold)}. ${leader}.`
-  );
-}
-
-function queueGoldLeadBar(): void {
-  if (animationFrame !== null) return;
-  animationFrame = window.requestAnimationFrame(applyGoldLeadBar);
-}
-
-window.addEventListener('esports-live:snapshot', event => {
-  const snapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
-  if (!snapshot?.stats || !acceptsSnapshot(snapshot)) return;
-  latestSnapshot = snapshot;
-  queueGoldLeadBar();
+  focusGuardUntil = Date.now() + 4_000;
+  queueMicrotask(restoreTransientSeriesReset);
 });
 
 window.addEventListener('esports-live:selection', () => {
-  latestSnapshot = null;
-  if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
-  animationFrame = null;
+  focusGuardUntil = 0;
+  queueMicrotask(captureStableSeriesScore);
 });
 
-if (gameContent) {
-  const observer = new MutationObserver(queueGoldLeadBar);
-  observer.observe(gameContent, { childList: true });
-}
+window.addEventListener('beforeunload', () => {
+  gameObserver?.disconnect();
+  scoreObserver?.disconnect();
+  if (cleanupFrame !== null) window.cancelAnimationFrame(cleanupFrame);
+});
 
-export {};
+captureStableSeriesScore();
+queueGoldLeadRemoval();

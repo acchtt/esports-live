@@ -14,14 +14,14 @@
   text-shadow: 0 0 18px currentColor;
 }
 
-.v3-gold-comparison {
+.v2-gold-card.dynamic-gold-v3 .v2-gold-bars {
   position: relative;
   display: grid;
   grid-template-columns: var(--blue-gold-share) var(--red-gold-share);
-  align-items: stretch;
   width: 100%;
-  height: 12px;
+  height: 10px;
   margin-top: 2px;
+  gap: 0;
   overflow: hidden;
   border: 1px solid rgba(133, 164, 202, 0.18);
   border-radius: 999px;
@@ -31,48 +31,19 @@
     0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
-.lead-major .v3-gold-comparison,
-.lead-dominant .v3-gold-comparison {
-  border-color: rgba(198, 216, 239, 0.3);
-  box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.08),
-    0 0 18px rgba(84, 126, 178, 0.16),
-    0 4px 16px rgba(0, 0, 0, 0.2);
-}
-
-.v3-gold-segment {
-  display: block;
-  min-width: 0;
-  height: 100%;
-  transition: width 260ms ease, flex-basis 260ms ease;
-}
-
-.v3-gold-segment.blue {
-  background: linear-gradient(90deg, #1679d0 0%, #39b6ff 100%);
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.2),
-    0 0 14px rgba(58, 168, 255, 0.28);
-}
-
-.v3-gold-segment.red {
-  background: linear-gradient(90deg, #ff4964 0%, #ba263e 100%);
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.16),
-    0 0 14px rgba(255, 73, 100, 0.24);
-}
-
-.v3-gold-seam {
+.v2-gold-card.dynamic-gold-v3 .v2-gold-bars::after {
   position: absolute;
   top: 1px;
   bottom: 1px;
   left: var(--blue-gold-share);
-  width: 7px;
+  width: 6px;
   transform: translateX(-50%);
   border-radius: 999px;
+  content: '';
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.72),
-    rgba(255, 255, 255, 0.18)
+    rgba(255, 255, 255, 0.76),
+    rgba(255, 255, 255, 0.2)
   );
   box-shadow:
     0 0 8px rgba(255, 255, 255, 0.25),
@@ -82,8 +53,39 @@
   transition: left 260ms ease;
 }
 
-.lead-major .v3-gold-seam,
-.lead-dominant .v3-gold-seam {
+.v2-gold-card.dynamic-gold-v3 .v2-gold-bars i {
+  display: block;
+  min-width: 0;
+  height: 100%;
+  border-radius: 0;
+  opacity: 1;
+}
+
+.v2-gold-card.dynamic-gold-v3 .v2-gold-bars .blue {
+  background: linear-gradient(90deg, #1679d0 0%, #39b6ff 100%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.2),
+    0 0 14px rgba(58, 168, 255, 0.28);
+}
+
+.v2-gold-card.dynamic-gold-v3 .v2-gold-bars .red {
+  background: linear-gradient(90deg, #ff4964 0%, #ba263e 100%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.16),
+    0 0 14px rgba(255, 73, 100, 0.24);
+}
+
+.v2-gold-card.dynamic-gold-v3.lead-major .v2-gold-bars,
+.v2-gold-card.dynamic-gold-v3.lead-dominant .v2-gold-bars {
+  border-color: rgba(198, 216, 239, 0.3);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.08),
+    0 0 18px rgba(84, 126, 178, 0.16),
+    0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.v2-gold-card.dynamic-gold-v3.lead-major .v2-gold-bars::after,
+.v2-gold-card.dynamic-gold-v3.lead-dominant .v2-gold-bars::after {
   width: 8px;
   background: rgba(255, 255, 255, 0.9);
   box-shadow:
@@ -98,8 +100,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .v3-gold-segment,
-  .v3-gold-seam {
+  .v2-gold-card.dynamic-gold-v3 .v2-gold-bars::after {
     transition: none;
   }
 }

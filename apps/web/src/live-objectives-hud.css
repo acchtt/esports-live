@@ -2,7 +2,7 @@
   position: relative;
   display: grid;
   align-content: center;
-  min-height: 122px;
+  min-height: 132px;
   padding: 12px 20px;
   overflow: hidden;
   background:
@@ -38,7 +38,7 @@
   align-items: center;
   gap: 10px;
   width: min(240px, 42%);
-  margin: 0 auto 7px;
+  margin: 0 auto 5px;
   color: #8192a9;
   font-size: 10px;
   font-weight: 800;
@@ -75,7 +75,7 @@
   place-items: center;
   gap: 3px;
   min-width: 0;
-  min-height: 74px;
+  min-height: 84px;
   color: currentColor;
   text-align: center;
 }
@@ -90,13 +90,8 @@
   background: linear-gradient(180deg, transparent, rgba(132, 153, 182, 0.22), transparent);
 }
 
-.v3-objective-side.blue {
-  color: #39b8ff;
-}
-
-.v3-objective-side.red {
-  color: #ff4565;
-}
+.v3-objective-side.blue { color: #39b8ff; }
+.v3-objective-side.red { color: #ff4565; }
 
 .v3-objective-side.blue .v3-objective-stat {
   text-shadow: 0 0 14px rgba(57, 184, 255, 0.2);
@@ -107,31 +102,56 @@
 }
 
 .v3-objective-icon {
+  position: relative;
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  filter: drop-shadow(0 0 7px color-mix(in srgb, currentColor 25%, transparent));
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 35% 25%, color-mix(in srgb, currentColor 28%, transparent), transparent 46%),
+    color-mix(in srgb, currentColor 10%, #071321);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, currentColor 46%, transparent),
+    inset 0 -8px 18px rgba(0, 0, 0, 0.28),
+    0 0 16px color-mix(in srgb, currentColor 20%, transparent);
+  filter: drop-shadow(0 0 7px color-mix(in srgb, currentColor 24%, transparent));
+}
+
+.v3-objective-icon.towers { border-radius: 8px; }
+.v3-objective-icon.dragons { border-radius: 50%; }
+.v3-objective-icon.barons {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+}
+.v3-objective-icon.inhibitors {
+  clip-path: polygon(50% 0, 94% 50%, 50% 100%, 6% 50%);
 }
 
 .v3-objective-icon svg {
-  width: 100%;
-  height: 100%;
+  position: relative;
+  z-index: 1;
+  width: 29px;
+  height: 29px;
   overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+}
+
+.v3-objective-icon.dragons svg,
+.v3-objective-icon.barons svg {
+  width: 31px;
+  height: 31px;
+}
+
+.v3-objective-icon.inhibitors svg {
+  width: 27px;
+  height: 27px;
 }
 
 .v3-objective-label {
   max-width: 100%;
   overflow: hidden;
-  color: #c8d3e2;
+  color: #d0dae7;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 750;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -141,7 +161,7 @@
   color: currentColor;
   font-size: 18px;
   font-variant-numeric: tabular-nums;
-  font-weight: 750;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -149,7 +169,7 @@
   position: relative;
   display: block;
   width: 1px;
-  height: 54px;
+  height: 60px;
   margin: auto;
   background: linear-gradient(180deg, transparent, rgba(143, 165, 194, 0.28), transparent);
 }
@@ -164,41 +184,26 @@
   background: linear-gradient(90deg, transparent, rgba(129, 151, 181, 0.18));
 }
 
-.v3-objective-center::before {
-  right: 8px;
-}
-
+.v3-objective-center::before { right: 8px; }
 .v3-objective-center::after {
   left: 8px;
   transform: scaleX(-1);
 }
 
 @media (max-width: 1180px) {
-  .v2-objectives-card.objective-hud-v3 {
-    padding-inline: 14px;
-  }
-
-  .v3-objective-hud {
-    grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
-  }
-
-  .v3-objective-icon {
-    width: 25px;
-    height: 25px;
-  }
-
-  .v3-objective-label {
-    font-size: 9px;
-  }
-
-  .v3-objective-stat strong {
-    font-size: 17px;
-  }
+  .v2-objectives-card.objective-hud-v3 { padding-inline: 14px; }
+  .v3-objective-hud { grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr); }
+  .v3-objective-icon { width: 36px; height: 36px; }
+  .v3-objective-icon svg { width: 26px; height: 26px; }
+  .v3-objective-icon.dragons svg,
+  .v3-objective-icon.barons svg { width: 28px; height: 28px; }
+  .v3-objective-label { font-size: 9px; }
+  .v3-objective-stat strong { font-size: 17px; }
 }
 
 @media (max-width: 720px) {
   .v2-objectives-card.objective-hud-v3 {
-    min-height: 114px;
+    min-height: 120px;
     padding: 10px 8px 8px;
   }
 
@@ -208,37 +213,15 @@
     font-size: 9px;
   }
 
-  .v3-objective-hud {
-    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
-  }
-
-  .v3-objective-side {
-    grid-template-columns: repeat(4, minmax(32px, 1fr));
-  }
-
-  .v3-objective-stat {
-    min-height: 68px;
-  }
-
-  .v3-objective-icon {
-    width: 21px;
-    height: 21px;
-  }
-
-  .v3-objective-label {
-    font-size: 8px;
-  }
-
-  .v3-objective-stat strong {
-    font-size: 15px;
-  }
-
-  .v3-objective-stat + .v3-objective-stat::before {
-    top: 9px;
-    bottom: 7px;
-  }
-
-  .v3-objective-center {
-    height: 44px;
-  }
+  .v3-objective-hud { grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); }
+  .v3-objective-side { grid-template-columns: repeat(4, minmax(32px, 1fr)); }
+  .v3-objective-stat { min-height: 72px; }
+  .v3-objective-icon { width: 30px; height: 30px; }
+  .v3-objective-icon svg { width: 22px; height: 22px; }
+  .v3-objective-icon.dragons svg,
+  .v3-objective-icon.barons svg { width: 23px; height: 23px; }
+  .v3-objective-label { font-size: 8px; }
+  .v3-objective-stat strong { font-size: 15px; }
+  .v3-objective-stat + .v3-objective-stat::before { top: 9px; bottom: 7px; }
+  .v3-objective-center { height: 46px; }
 }

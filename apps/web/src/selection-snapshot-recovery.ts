@@ -36,8 +36,10 @@ function currentSelection(): {
 } | null {
   const series = selectedSeriesButton();
   const game = selectedGameButton();
-  const seriesId = series?.dataset.seriesId ?? '';
-  const gameId = game?.dataset.gameId ?? '';
+  if (!series || !game) return null;
+
+  const seriesId = series.dataset.seriesId ?? '';
+  const gameId = game.dataset.gameId ?? '';
   if (!seriesId || !gameId) return null;
 
   const gameState = ['completed', 'live', 'draft', 'unstarted', 'unknown']

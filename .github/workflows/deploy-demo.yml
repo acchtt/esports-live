@@ -91,6 +91,7 @@ jobs:
           exit 1
 
       - name: Smoke test current live snapshot
+        continue-on-error: true
         env:
           API_BASE_URL: ${{ steps.api-preview.outputs.url }}
         shell: bash

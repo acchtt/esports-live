@@ -2,11 +2,11 @@
   position: relative;
   display: grid;
   align-content: center;
-  min-height: 124px;
-  padding: 10px 16px 12px;
+  min-height: 98px;
+  padding: 8px 12px 9px;
   overflow: hidden;
   background:
-    linear-gradient(90deg, rgba(35, 164, 255, 0.05), transparent 24%, transparent 76%, rgba(255, 57, 87, 0.05)),
+    linear-gradient(90deg, rgba(35, 164, 255, 0.045), transparent 26%, transparent 74%, rgba(255, 57, 87, 0.045)),
     linear-gradient(180deg, rgba(10, 24, 42, 0.98), rgba(5, 14, 25, 0.98));
 }
 
@@ -23,24 +23,24 @@
 .v2-objectives-card.objective-hud-v3::before {
   left: 0;
   background: linear-gradient(90deg, #43bbff, transparent);
-  box-shadow: 0 0 14px rgba(67, 187, 255, 0.48);
+  box-shadow: 0 0 14px rgba(67, 187, 255, 0.42);
 }
 
 .v2-objectives-card.objective-hud-v3::after {
   right: 0;
   background: linear-gradient(270deg, #ff4964, transparent);
-  box-shadow: 0 0 14px rgba(255, 73, 100, 0.45);
+  box-shadow: 0 0 14px rgba(255, 73, 100, 0.4);
 }
 
 .v3-objective-title {
   display: grid;
-  grid-template-columns: minmax(28px, 1fr) auto minmax(28px, 1fr);
+  grid-template-columns: minmax(24px, 1fr) auto minmax(24px, 1fr);
   align-items: center;
-  gap: 10px;
-  width: min(220px, 42%);
-  margin: 0 auto 6px;
+  gap: 8px;
+  width: min(180px, 36%);
+  margin: 0 auto 3px;
   color: #8495ab;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 850;
   letter-spacing: 0.15em;
   text-align: center;
@@ -48,16 +48,16 @@
 
 .v3-objective-title i {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(135, 160, 193, 0.42));
+  background: linear-gradient(90deg, transparent, rgba(135, 160, 193, 0.36));
 }
 
 .v3-objective-title i:last-child {
-  background: linear-gradient(90deg, rgba(135, 160, 193, 0.42), transparent);
+  background: linear-gradient(90deg, rgba(135, 160, 193, 0.36), transparent);
 }
 
 .v3-objective-hud {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
   align-items: stretch;
   min-width: 0;
 }
@@ -65,30 +65,30 @@
 .v3-objective-side {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, minmax(52px, 1fr));
+  grid-template-columns: repeat(4, minmax(48px, 1fr));
   align-items: stretch;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
-  padding-top: 17px;
+  padding-top: 12px;
 }
 
 .v3-objective-side::before {
   position: absolute;
   top: 0;
   color: currentColor;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.13em;
   opacity: 0.72;
 }
 
 .v3-objective-side.blue::before {
-  left: 6px;
+  left: 5px;
   content: 'BLUE SIDE';
 }
 
 .v3-objective-side.red::before {
-  right: 6px;
+  right: 5px;
   content: 'RED SIDE';
 }
 
@@ -100,35 +100,35 @@
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 5px;
+  gap: 3px;
   min-width: 0;
-  min-height: 58px;
-  padding: 8px 5px;
+  min-height: 46px;
+  padding: 5px 4px;
   border: 1px solid rgba(112, 151, 196, 0.1);
-  border-radius: 8px;
+  border-radius: 7px;
   color: currentColor;
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(255, 255, 255, 0.016);
   text-align: center;
 }
 
 .v3-objective-side.blue .v3-objective-stat {
-  border-color: rgba(57, 184, 255, 0.1);
-  background: linear-gradient(180deg, rgba(57, 184, 255, 0.035), rgba(255, 255, 255, 0.012));
+  border-color: rgba(57, 184, 255, 0.11);
+  background: linear-gradient(180deg, rgba(57, 184, 255, 0.03), rgba(255, 255, 255, 0.01));
 }
 
 .v3-objective-side.red .v3-objective-stat {
-  border-color: rgba(255, 69, 101, 0.1);
-  background: linear-gradient(180deg, rgba(255, 69, 101, 0.035), rgba(255, 255, 255, 0.012));
+  border-color: rgba(255, 69, 101, 0.11);
+  background: linear-gradient(180deg, rgba(255, 69, 101, 0.03), rgba(255, 255, 255, 0.01));
 }
 
 .v3-objective-label {
   max-width: 100%;
   overflow: hidden;
   color: #b9c6d5;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 800;
-  letter-spacing: 0.035em;
-  line-height: 1.1;
+  letter-spacing: 0.025em;
+  line-height: 1;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -136,90 +136,50 @@
 
 .v3-objective-stat strong {
   color: currentColor;
-  font-size: 20px;
+  font-size: 17px;
   font-variant-numeric: tabular-nums;
   font-weight: 850;
   line-height: 1;
-  text-shadow: 0 0 14px color-mix(in srgb, currentColor 18%, transparent);
+  text-shadow: 0 0 12px color-mix(in srgb, currentColor 16%, transparent);
 }
 
 .v3-objective-center {
   position: relative;
   display: block;
   width: 1px;
-  height: 68px;
+  height: 52px;
   margin: auto;
-  background: linear-gradient(180deg, transparent, rgba(143, 165, 194, 0.3), transparent);
+  background: linear-gradient(180deg, transparent, rgba(143, 165, 194, 0.26), transparent);
 }
 
 .v3-objective-center::before,
 .v3-objective-center::after {
   position: absolute;
   top: 50%;
-  width: 10px;
+  width: 7px;
   height: 1px;
   content: '';
-  background: linear-gradient(90deg, transparent, rgba(129, 151, 181, 0.2));
+  background: linear-gradient(90deg, transparent, rgba(129, 151, 181, 0.18));
 }
 
-.v3-objective-center::before { right: 6px; }
+.v3-objective-center::before { right: 5px; }
 .v3-objective-center::after {
-  left: 6px;
+  left: 5px;
   transform: scaleX(-1);
 }
 
 @media (max-width: 1180px) {
   .v2-objectives-card.objective-hud-v3 {
-    padding-inline: 12px;
+    padding-inline: 9px;
   }
 
   .v3-objective-hud {
-    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
   }
 
   .v3-objective-side {
-    grid-template-columns: repeat(4, minmax(44px, 1fr));
-    gap: 4px;
-  }
-
-  .v3-objective-label {
-    font-size: 8px;
-  }
-
-  .v3-objective-stat strong {
-    font-size: 18px;
-  }
-}
-
-@media (max-width: 720px) {
-  .v2-objectives-card.objective-hud-v3 {
-    min-height: 116px;
-    padding: 9px 7px 8px;
-  }
-
-  .v3-objective-title {
-    width: min(200px, 62%);
-    margin-bottom: 4px;
-    font-size: 8px;
-  }
-
-  .v3-objective-hud {
-    grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr);
-  }
-
-  .v3-objective-side {
-    grid-template-columns: repeat(4, minmax(34px, 1fr));
+    grid-template-columns: repeat(4, minmax(42px, 1fr));
     gap: 3px;
-    padding-top: 15px;
-  }
-
-  .v3-objective-side::before {
-    font-size: 7px;
-  }
-
-  .v3-objective-stat {
-    min-height: 52px;
-    padding-inline: 2px;
   }
 
   .v3-objective-label {
@@ -229,8 +189,48 @@
   .v3-objective-stat strong {
     font-size: 16px;
   }
+}
+
+@media (max-width: 720px) {
+  .v2-objectives-card.objective-hud-v3 {
+    min-height: 92px;
+    padding: 7px 6px;
+  }
+
+  .v3-objective-title {
+    width: min(170px, 58%);
+    margin-bottom: 2px;
+    font-size: 7px;
+  }
+
+  .v3-objective-hud {
+    grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr);
+  }
+
+  .v3-objective-side {
+    grid-template-columns: repeat(4, minmax(31px, 1fr));
+    gap: 2px;
+    padding-top: 11px;
+  }
+
+  .v3-objective-side::before {
+    font-size: 6px;
+  }
+
+  .v3-objective-stat {
+    min-height: 43px;
+    padding-inline: 2px;
+  }
+
+  .v3-objective-label {
+    font-size: 6px;
+  }
+
+  .v3-objective-stat strong {
+    font-size: 14px;
+  }
 
   .v3-objective-center {
-    height: 58px;
+    height: 48px;
   }
 }

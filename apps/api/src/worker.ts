@@ -1,5 +1,6 @@
 import {
   LolAdapter,
+  createCompletedInventoryProvider,
   createLeaguepediaHistoryFallbackProvider,
   createRiotCurrentPlayerProvider,
   createRiotLolConsistentProvider,
@@ -25,19 +26,21 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   if (apiKey) {
     const provider = createUsableScheduleProvider(
       createLeaguepediaHistoryFallbackProvider(
-        createRiotCurrentPlayerProvider(
-          createRiotLolConsistentProvider({
-            apiKey,
-            includeDetails: false,
-            useDetailItemFallback: false
-          }),
-          {
-            // Derive the inventory probe from Riot's newest live-window timestamp.
-            // Wall-clock anchors can be ahead of delayed broadcasts and return no
-            // detail frames, leaving every player inventory empty.
-            useWindowOverlay: true,
-            inventoryWaitBudgetMs: 1_000
-          }
+        createCompletedInventoryProvider(
+          createRiotCurrentPlayerProvider(
+            createRiotLolConsistentProvider({
+              apiKey,
+              includeDetails: false,
+              useDetailItemFallback: false
+            }),
+            {
+              // Derive the inventory probe from Riot's newest live-window timestamp.
+              // Wall-clock anchors can be ahead of delayed broadcasts and return no
+              // detail frames, leaving every player inventory empty.
+              useWindowOverlay: true,
+              inventoryWaitBudgetMs: 1_000
+            }
+          )
         )
       )
     );

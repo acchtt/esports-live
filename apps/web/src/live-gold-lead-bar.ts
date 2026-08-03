@@ -1,27 +1,41 @@
 import type { LiveSnapshot } from '@esports-live/core';
 import type { LolStats } from '@esports-live/adapter-lol';
 import './live-gold-lead-bar.css';
-import './completed-history-dashboard-v2.ts';
 
 const gameContent = document.querySelector<HTMLElement>('#game-content');
 
 let latestSnapshot: LiveSnapshot<LolStats> | null = null;
-let renderQueued = false;
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
+let animationFrame: number | null = null;
 
 function formatCompact(value: number | null): string {
   if (value === null) return '—';
   return Math.abs(value) >= 1000
     ? `${(value / 1000).toFixed(1)}K`
     : value.toLocaleString();
+}
+
+function sourceTime(snapshot: LiveSnapshot<LolStats>): number | null {
+  const parsed = Date.parse(snapshot.quality.sourceTimestamp ?? '');
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function acceptsSnapshot(incoming: LiveSnapshot<LolStats>): boolean {
+  const previous = latestSnapshot;
+  if (!previous || previous.game.id !== incoming.game.id) return true;
+
+  const previousSource = sourceTime(previous);
+  const incomingSource = sourceTime(incoming);
+  if (previousSource !== null && incomingSource !== null && incomingSource < previousSource) {
+    return false;
+  }
+
+  const previousClock = previous.stats?.gameClockSeconds ?? null;
+  const incomingClock = incoming.stats?.gameClockSeconds ?? null;
+  return !(
+    previousClock !== null
+    && incomingClock !== null
+    && incomingClock + 2 < previousClock
+  );
 }
 
 function goldLeadRatio(blueGold: number | null, redGold: number | null): number | null {
@@ -34,15 +48,10 @@ function goldLeadRatio(blueGold: number | null, redGold: number | null): number 
 
 function goldShare(blueGold: number | null, redGold: number | null): number {
   if (blueGold === null || redGold === null) return 50;
-  const blue = Math.max(0, blueGold);
-  const red = Math.max(0, redGold);
-  const difference = blue - red;
+  const difference = blueGold - redGold;
   if (difference === 0) return 50;
 
-  // This is an advantage meter, not a literal share-of-total-gold chart.
-  // Scale the lead against the trailing team's economy, then use a smooth
-  // nonlinear curve so meaningful leads move visibly without hiding a side.
-  const relativeLead = goldLeadRatio(blue, red) ?? 0;
+  const relativeLead = goldLeadRatio(blueGold, redGold) ?? 0;
   const visualShift = Math.tanh(relativeLead * 5) * 36;
   return Math.min(86, Math.max(14, 50 + Math.sign(difference) * visualShift));
 }
@@ -56,14 +65,17 @@ function leadIntensity(ratio: number | null): 'unknown' | 'close' | 'clear' | 'm
 }
 
 function applyGoldLeadBar(): void {
-  renderQueued = false;
+  animationFrame = null;
   const snapshot = latestSnapshot;
   if (!snapshot?.stats) return;
 
   const dashboard = [...document.querySelectorAll<HTMLElement>('.live-dashboard-v2')]
     .find(element => element.dataset.liveDashboardGameId === snapshot.game.id);
   const card = dashboard?.querySelector<HTMLElement>('.v2-gold-card');
-  if (!card) return;
+  const leaderElement = card?.querySelector<HTMLElement>(':scope > strong');
+  const comparisonElement = card?.querySelector<HTMLElement>(':scope > small');
+  const bar = card?.querySelector<HTMLElement>('.v2-gold-bars');
+  if (!card || !leaderElement || !comparisonElement || !bar) return;
 
   const { blue, red } = snapshot.stats;
   const difference = blue.gold === null || red.gold === null
@@ -94,50 +106,55 @@ function applyGoldLeadBar(): void {
     blue.gold,
     red.gold,
     blue.name,
-    red.name
+    red.name,
+    intensity
   ]);
   if (card.dataset.dynamicGoldSignature === signature) return;
 
-  card.classList.remove('lead-unknown', 'lead-close', 'lead-clear', 'lead-major', 'lead-dominant');
+  card.classList.remove(
+    'lead-unknown',
+    'lead-close',
+    'lead-clear',
+    'lead-major',
+    'lead-dominant'
+  );
   card.classList.add('dynamic-gold-v3', `lead-${intensity}`);
   card.dataset.dynamicGoldSignature = signature;
   card.style.setProperty('--blue-gold-share', `${blueShare.toFixed(3)}%`);
   card.style.setProperty('--red-gold-share', `${redShare.toFixed(3)}%`);
-  card.innerHTML = `
-    <span>GOLD LEAD</span>
-    <strong class="${leaderClass}">${escapeHtml(leader)}</strong>
-    <div
-      class="v3-gold-comparison"
-      role="img"
-      aria-label="${escapeHtml(`${blue.name} ${formatCompact(blue.gold)} versus ${red.name} ${formatCompact(red.gold)}. ${leader}.`)}"
-    >
-      <span class="v3-gold-segment blue" aria-hidden="true"></span>
-      <span class="v3-gold-segment red" aria-hidden="true"></span>
-      <span class="v3-gold-seam" aria-hidden="true"></span>
-    </div>
-    <small>${escapeHtml(context)}</small>`;
+
+  leaderElement.classList.remove('blue', 'red', 'neutral');
+  leaderElement.classList.add(leaderClass);
+  leaderElement.textContent = leader;
+  comparisonElement.textContent = context;
+  bar.setAttribute('role', 'img');
+  bar.setAttribute(
+    'aria-label',
+    `${blue.name} ${formatCompact(blue.gold)} versus ${red.name} ${formatCompact(red.gold)}. ${leader}.`
+  );
 }
 
 function queueGoldLeadBar(): void {
-  if (renderQueued) return;
-  renderQueued = true;
-  queueMicrotask(applyGoldLeadBar);
+  if (animationFrame !== null) return;
+  animationFrame = window.requestAnimationFrame(applyGoldLeadBar);
 }
 
 window.addEventListener('esports-live:snapshot', event => {
   const snapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
-  if (!snapshot?.stats) return;
+  if (!snapshot?.stats || !acceptsSnapshot(snapshot)) return;
   latestSnapshot = snapshot;
   queueGoldLeadBar();
 });
 
 window.addEventListener('esports-live:selection', () => {
   latestSnapshot = null;
+  if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
+  animationFrame = null;
 });
 
 if (gameContent) {
   const observer = new MutationObserver(queueGoldLeadBar);
-  observer.observe(gameContent, { childList: true, subtree: true });
+  observer.observe(gameContent, { childList: true });
 }
 
 export {};

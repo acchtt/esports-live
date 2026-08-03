@@ -1,47 +1,54 @@
 .live-dashboard-v2 .v2-summary-row,
 .live-dashboard-v2 .v2-summary-row.gold-lead-removed {
-  grid-template-columns: minmax(280px, 0.38fr) minmax(0, 1fr) !important;
+  grid-template-columns: minmax(265px, 0.34fr) minmax(0, 1fr) !important;
+  gap: 10px;
 }
 
 .live-dashboard-v2 .v2-gold-card {
   position: relative;
   display: grid !important;
   align-content: center;
-  gap: 7px;
-  min-height: 124px;
-  padding: 18px 22px;
+  gap: 4px;
+  min-height: 98px;
+  padding: 14px 18px;
   overflow: hidden;
 }
 
 .live-dashboard-v2 .v2-gold-card::before {
   position: absolute;
-  top: 18px;
-  bottom: 18px;
+  top: 14px;
+  bottom: 14px;
   left: 0;
-  width: 3px;
+  width: 2px;
   border-radius: 0 999px 999px 0;
   content: '';
   background: linear-gradient(180deg, #43bbff, rgba(67, 187, 255, 0.12));
-  box-shadow: 0 0 18px rgba(67, 187, 255, 0.34);
+  box-shadow: 0 0 14px rgba(67, 187, 255, 0.3);
 }
 
 .live-dashboard-v2 .v2-gold-card:has(> strong.red)::before {
   background: linear-gradient(180deg, #ff4964, rgba(255, 73, 100, 0.12));
-  box-shadow: 0 0 18px rgba(255, 73, 100, 0.32);
+  box-shadow: 0 0 14px rgba(255, 73, 100, 0.28);
+}
+
+.live-dashboard-v2 .v2-gold-card > span {
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
 }
 
 .live-dashboard-v2 .v2-gold-card > strong {
   max-width: 100%;
   overflow: hidden;
-  font-size: clamp(19px, 1.45vw, 25px);
-  line-height: 1.12;
+  font-size: clamp(18px, 1.25vw, 22px);
+  line-height: 1.08;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .live-dashboard-v2 .v2-gold-card > small {
   color: #9fb0c5;
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -53,78 +60,78 @@
   display: none !important;
 }
 
-/* The board has one real view, so present it as a section rather than a tabset. */
 .live-dashboard-v2 .v2-board-tabs {
   display: none !important;
 }
 
 .live-dashboard-v2 .v2-board {
+  overflow: hidden;
   border-color: rgba(112, 151, 196, 0.2);
   box-shadow:
     inset 0 1px rgba(255, 255, 255, 0.025),
-    0 18px 45px rgba(0, 0, 0, 0.22);
+    0 16px 38px rgba(0, 0, 0, 0.2);
 }
 
 .live-dashboard-v2 .v2-board-head {
   position: relative;
-  grid-template-columns: minmax(170px, 1fr) auto 58px auto minmax(170px, 1fr);
-  gap: 12px;
-  min-height: 76px;
-  padding: 20px 22px 10px;
+  grid-template-columns: minmax(140px, 1fr) auto 30px auto minmax(140px, 1fr);
+  gap: 8px;
+  min-height: 58px;
+  padding: 8px 16px;
   background:
-    linear-gradient(90deg, rgba(58, 168, 255, 0.06), transparent 36%, transparent 64%, rgba(255, 73, 100, 0.06)),
+    linear-gradient(90deg, rgba(58, 168, 255, 0.055), transparent 38%, transparent 62%, rgba(255, 73, 100, 0.055)),
     rgba(7, 20, 35, 0.58);
 }
 
 .live-dashboard-v2 .v2-board-head::after {
-  position: absolute;
-  top: 8px;
-  left: 18px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  content: 'LIVE BOARD';
-  color: #8fcfff;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
+  display: none;
+  content: none;
 }
 
 .live-dashboard-v2 .v2-board-head::before {
   grid-column: 3;
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 26px;
+  height: 26px;
   place-items: center;
   justify-self: center;
-  border: 1px solid rgba(132, 153, 182, 0.2);
+  border: 1px solid rgba(132, 153, 182, 0.18);
   border-radius: 50%;
   content: 'VS';
-  color: #76889f;
-  background: rgba(3, 12, 22, 0.82);
-  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.015);
-  font-size: 9px;
+  color: #71839a;
+  background: rgba(3, 12, 22, 0.78);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.012);
+  font-size: 7px;
   font-weight: 900;
   letter-spacing: 0.08em;
 }
 
 .live-dashboard-v2 .v2-board-head > strong {
-  display: grid;
-  gap: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   min-width: 0;
   overflow: hidden;
   color: #f4f7fb;
-  font-size: 17px;
-  line-height: 1.08;
+  font-size: 15px;
+  line-height: 1.05;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .live-dashboard-v2 .v2-board-head > strong::before {
-  color: #708198;
-  font-size: 8px;
-  font-weight: 850;
-  letter-spacing: 0.12em;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid rgba(112, 151, 196, 0.14);
+  border-radius: 999px;
+  color: #71839a;
+  background: rgba(255, 255, 255, 0.018);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
 }
 
 .live-dashboard-v2 .v2-board-head > strong:first-child {
@@ -134,7 +141,9 @@
 }
 
 .live-dashboard-v2 .v2-board-head > strong:first-child::before {
-  content: 'BLUE TEAM';
+  content: 'BLUE';
+  border-color: rgba(58, 168, 255, 0.16);
+  color: #79c9ff;
 }
 
 .live-dashboard-v2 .v2-board-head > strong:last-child {
@@ -144,16 +153,20 @@
 }
 
 .live-dashboard-v2 .v2-board-head > strong:last-child::before {
-  content: 'RED TEAM';
+  order: 2;
+  content: 'RED';
+  border-color: rgba(255, 73, 100, 0.16);
+  color: #ff8a9b;
 }
 
 .live-dashboard-v2 .v2-board-head > span {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid rgba(112, 151, 196, 0.16);
-  border-radius: 9px;
-  background: rgba(3, 13, 24, 0.68);
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(112, 151, 196, 0.15);
+  border-radius: 8px;
+  background: rgba(3, 13, 24, 0.64);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.02);
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -170,20 +183,25 @@
   border-color: rgba(255, 73, 100, 0.2);
 }
 
+.live-dashboard-v2 .v2-board-head span svg {
+  width: 14px;
+  height: 14px;
+}
+
 .live-dashboard-v2 .v2-matchup-row {
-  min-height: 68px;
+  min-height: 64px;
 }
 
 .live-dashboard-v2 .v2-matchup-row:nth-child(even) {
-  background: rgba(255, 255, 255, 0.012);
+  background: rgba(255, 255, 255, 0.011);
 }
 
 .live-dashboard-v2 .v2-player {
-  padding-block: 8px;
+  padding-block: 6px;
 }
 
 .live-dashboard-v2 .v2-player-copy strong {
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .live-dashboard-v2 .v2-player-stat strong {
@@ -191,7 +209,7 @@
 }
 
 .live-dashboard-v2 .v2-footer {
-  min-height: 42px;
+  min-height: 38px;
 }
 
 /* Prioritize the live game by compressing the repeated series context above it. */
@@ -345,21 +363,30 @@
 @media (max-width: 1180px) {
   .live-dashboard-v2 .v2-summary-row,
   .live-dashboard-v2 .v2-summary-row.gold-lead-removed {
-    grid-template-columns: minmax(250px, 0.36fr) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(235px, 0.32fr) minmax(0, 1fr) !important;
   }
 
   .live-dashboard-v2 .v2-board-head {
-    grid-template-columns: minmax(125px, 1fr) auto 42px auto minmax(125px, 1fr);
-    gap: 8px;
-    padding-inline: 14px;
+    grid-template-columns: minmax(105px, 1fr) auto 28px auto minmax(105px, 1fr);
+    gap: 6px;
+    padding-inline: 10px;
   }
 
   .live-dashboard-v2 .v2-board-head > strong {
-    font-size: 15px;
+    gap: 5px;
+    font-size: 13.5px;
+  }
+
+  .live-dashboard-v2 .v2-board-head > strong::before {
+    min-height: 16px;
+    padding-inline: 5px;
+    font-size: 6px;
   }
 
   .live-dashboard-v2 .v2-board-head > span {
-    padding-inline: 9px;
+    min-height: 30px;
+    padding-inline: 8px;
+    font-size: 12px;
   }
 
   #workspace.dashboard-v2-active #series-history.live-series-results .completed-games {
@@ -373,8 +400,12 @@
     grid-template-columns: 1fr !important;
   }
 
+  .live-dashboard-v2 .v2-gold-card {
+    min-height: 90px;
+  }
+
   .live-dashboard-v2 .v2-gold-card > strong {
-    font-size: 22px;
+    font-size: 20px;
   }
 
   #workspace.dashboard-v2-active .analysis-header.series-hero-active .series-hero-footer {

@@ -1,8 +1,9 @@
 import type { LiveSnapshot } from '@esports-live/core';
 import type { LolStats, LolTeamState } from '@esports-live/adapter-lol';
+import { objectiveIcon, type ObjectiveIconKey } from './objective-icons.ts';
 import './live-objectives-hud.css';
 
-type ObjectiveKey = 'towers' | 'dragons' | 'barons' | 'inhibitors';
+type ObjectiveKey = ObjectiveIconKey;
 type Side = 'blue' | 'red';
 
 const OBJECTIVE_ORDER: readonly ObjectiveKey[] = [
@@ -17,33 +18,6 @@ const OBJECTIVE_LABELS: Record<ObjectiveKey, string> = {
   dragons: 'Dragons',
   barons: 'Barons',
   inhibitors: 'Inhibitors'
-};
-
-const outlineIcon = (paths: string): string => `
-  <svg viewBox="0 0 32 32" style="fill:none" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    ${paths}
-  </svg>`;
-
-const OBJECTIVE_ICONS: Record<ObjectiveKey, string> = {
-  towers: outlineIcon(`
-    <path d="M8 5v7l3 3v12h10V15l3-3V5h-4v4h-8V5H8Z" />
-    <path d="M11 13h10M13 18h6v9M9 27h14" />
-  `),
-  dragons: outlineIcon(`
-    <path d="M6 22c1-8 6-14 15-15l-3-4 8 2-2 8-3-3" />
-    <path d="M22 9c4 3 5 8 3 13-2 5-8 8-13 6-5-2-7-7-5-11 2-4 7-5 10-2l4 3-5 1" />
-    <path d="M13 17c-2 0-3 1-3 3 0 2 2 4 5 4 3 0 5-2 5-5" />
-  `),
-  barons: outlineIcon(`
-    <path d="m5 9 5-5 3 5 3-6 3 6 3-5 5 5-3 16-8 5-8-5L5 9Z" />
-    <path d="M11 16c3-3 7-3 10 0-3 4-7 4-10 0Z" />
-    <circle cx="16" cy="16" r="1.5" />
-  `),
-  inhibitors: outlineIcon(`
-    <path d="m16 3 8 8-3 14-5 4-5-4-3-14 8-8Z" />
-    <path d="m16 8 4 5-4 9-4-9 4-5Z" />
-    <path d="M10 25h12" />
-  `)
 };
 
 const gameContent = document.querySelector<HTMLElement>('#game-content');
@@ -66,8 +40,8 @@ function objectiveMarkup(team: LolTeamState, key: ObjectiveKey): string {
   const value = objectiveValue(team, key);
   const formatted = formatObjective(value);
   return `
-    <div class="v3-objective-stat" title="${label}" aria-label="${label}: ${formatted}">
-      <span class="v3-objective-icon">${OBJECTIVE_ICONS[key]}</span>
+    <div class="v3-objective-stat objective-${key}" title="${label}" aria-label="${label}: ${formatted}">
+      <span class="v3-objective-icon ${key}">${objectiveIcon(key)}</span>
       <span class="v3-objective-label">${label}</span>
       <strong>${formatted}</strong>
     </div>`;
@@ -94,10 +68,10 @@ function applyObjectiveHud(): void {
     objectiveValue(snapshot.stats!.blue, key),
     objectiveValue(snapshot.stats!.red, key)
   ]);
-  const signature = JSON.stringify([snapshot.game.id, ...values]);
+  const signature = JSON.stringify(['objective-emblems-v2', snapshot.game.id, ...values]);
   if (card.dataset.objectiveHudSignature === signature) return;
 
-  card.classList.add('objective-hud-v3');
+  card.classList.add('objective-hud-v3', 'objective-emblems-v2');
   card.dataset.objectiveHudSignature = signature;
   card.innerHTML = `
     <div class="v3-objective-title" aria-hidden="true">

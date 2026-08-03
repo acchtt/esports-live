@@ -23,8 +23,7 @@ const ICONS: Record<ObjectiveKey, string> = {
   inhibitors: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 3 8 8-3 14-5 4-5-4-3-14 8-8Z"/><path d="m16 8 4 5-4 9-4-9 4-5ZM10 25h12"/></svg>'
 };
 
-const completedDetail = document.querySelector<HTMLElement>('#completed-match-detail');
-let renderQueued = false;
+let scanQueued = false;
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -64,6 +63,27 @@ function formatCompact(value: number | null): string {
   return Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(1)}K` : value.toLocaleString();
 }
 
+function selectedSeriesTeams(): [string, string] | null {
+  const candidates = [
+    document.querySelector<HTMLElement>('.completed-result-card.selected strong'),
+    document.querySelector<HTMLElement>('#completed-match-list .selected strong'),
+    document.querySelector<HTMLElement>('.completed-scoreboard')
+  ];
+  for (const candidate of candidates) {
+    const text = candidate?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    const match = text.match(/^(.+?)\s+vs\s+(.+)$/i);
+    if (match?.[1] && match[2]) return [match[1].trim(), match[2].trim()];
+  }
+  return null;
+}
+
+function usableTeamName(value: string, fallback: string): string {
+  const normalized = value.trim();
+  return !normalized || /^team\s*[12]$/i.test(normalized) || /^unavailable$/i.test(normalized)
+    ? fallback
+    : normalized;
+}
+
 function objectiveMarkup(side: Side, values: Record<ObjectiveKey, number | null>): string {
   return `
     <div class="history-v2-objective-side ${side}" aria-label="${side === 'blue' ? 'Blue' : 'Red'} team objectives">
@@ -77,10 +97,14 @@ function objectiveMarkup(side: Side, values: Record<ObjectiveKey, number | null>
 }
 
 function redesignComparison(comparison: HTMLElement): void {
-  if (comparison.dataset.historyDashboardV2 === 'true') return;
+  if (comparison.querySelector('.history-v2-team-header')) return;
 
-  const blueName = comparison.querySelector<HTMLElement>('.completed-comparison-team.blue strong')?.textContent?.trim() ?? 'Blue team';
-  const redName = comparison.querySelector<HTMLElement>('.completed-comparison-team.red strong')?.textContent?.trim() ?? 'Red team';
+  const selectedTeams = selectedSeriesTeams();
+  const rawBlueName = comparison.querySelector<HTMLElement>('.completed-comparison-team.blue strong')?.textContent?.trim() ?? '';
+  const rawRedName = comparison.querySelector<HTMLElement>('.completed-comparison-team.red strong')?.textContent?.trim() ?? '';
+  const blueName = usableTeamName(rawBlueName, selectedTeams?.[0] ?? 'Blue team');
+  const redName = usableTeamName(rawRedName, selectedTeams?.[1] ?? 'Red team');
+
   const gold = metricPair(comparison, 'Gold');
   const kills = metricPair(comparison, 'Kills');
   const towers = metricPair(comparison, 'Towers');
@@ -144,21 +168,26 @@ function redesignComparison(comparison: HTMLElement): void {
     </section>`;
 }
 
-function applyCompletedHistoryV2(): void {
-  renderQueued = false;
-  completedDetail?.querySelectorAll<HTMLElement>('.completed-team-comparison:not([data-history-dashboard-v2="true"])')
+function scanCompletedHistory(): void {
+  scanQueued = false;
+  document.querySelectorAll<HTMLElement>('.completed-team-comparison')
     .forEach(redesignComparison);
 }
 
-function queueCompletedHistoryV2(): void {
-  if (renderQueued) return;
-  renderQueued = true;
-  queueMicrotask(applyCompletedHistoryV2);
+function queueScan(): void {
+  if (scanQueued) return;
+  scanQueued = true;
+  queueMicrotask(scanCompletedHistory);
 }
 
-if (completedDetail) {
-  new MutationObserver(queueCompletedHistoryV2).observe(completedDetail, { childList: true, subtree: true });
-  queueCompletedHistoryV2();
-}
+document.documentElement.dataset.demoHistoryDashboardV2 = 'loaded';
+new MutationObserver(queueScan).observe(document.body, { childList: true, subtree: true });
+document.addEventListener('click', event => {
+  const target = event.target as Element | null;
+  if (!target?.closest('[data-completed-series-id], .completed-game')) return;
+  [0, 50, 200, 600].forEach(delay => window.setTimeout(queueScan, delay));
+}, true);
+window.addEventListener('load', queueScan);
+queueScan();
 
 export {};

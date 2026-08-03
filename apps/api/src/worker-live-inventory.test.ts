@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createRiotCurrentPlayerProvider,
   type LolPlayerState,
   type LolProviderClient,
   type LolProviderSnapshot,
   type LolTeamState
 } from '@esports-live/adapter-lol';
-import { LIVE_INVENTORY_SETTLE_BUDGET_MS } from './worker.ts';
+import {
+  LIVE_INVENTORY_SETTLE_BUDGET_MS,
+  createProductionInventoryProvider
+} from './worker.ts';
 
 const SOURCE = '2026-08-03T05:00:00.000Z';
+const LIVE_NOW = '2026-08-03T05:02:00.000Z';
 
 function player(id: string): LolPlayerState {
   return {
@@ -46,7 +49,7 @@ function team(side: 'blue' | 'red', participant: LolPlayerState): LolTeamState {
   };
 }
 
-function snapshot(): LolProviderSnapshot {
+function snapshot(state: 'live' | 'completed'): LolProviderSnapshot {
   return {
     series: {
       id: 'series-1',
@@ -56,14 +59,14 @@ function snapshot(): LolProviderSnapshot {
         { id: 'red-team', name: 'red team' }
       ],
       bestOf: 3,
-      state: 'live',
+      state,
       scheduledStart: '2026-08-03T04:30:00.000Z',
-      games: [{ id: 'game-1', number: 1, state: 'live' }]
+      games: [{ id: 'game-1', number: 1, state }]
     },
-    game: { id: 'game-1', number: 1, state: 'live' },
+    game: { id: 'game-1', number: 1, state },
     sourceTimestamp: SOURCE,
     observedAt: new Date(Date.parse(SOURCE) + 2_000).toISOString(),
-    advancing: true,
+    advancing: state === 'live',
     complete: false,
     stats: {
       gameClockSeconds: 1_200,
@@ -78,12 +81,12 @@ function snapshot(): LolProviderSnapshot {
   };
 }
 
-function baseProvider(): LolProviderClient {
+function baseProvider(state: 'live' | 'completed'): LolProviderClient {
   return {
     id: 'base',
     name: 'Base provider',
     async getSchedule() { return []; },
-    async getSnapshot() { return snapshot(); }
+    async getSnapshot() { return snapshot(state); }
   };
 }
 
@@ -109,26 +112,69 @@ function detailsPayload() {
   };
 }
 
-test('production live budget waits for a bounded primary and fallback inventory probe', async () => {
-  let detailRequests = 0;
-  const provider = createRiotCurrentPlayerProvider(baseProvider(), {
+function roundedIso(value: number): string {
+  return new Date(Math.floor(value / 10_000) * 10_000).toISOString();
+}
+
+test('production live games use the wall-clock details frontier without an unanchored window probe', async () => {
+  const requestedDetails: string[] = [];
+  let windowRequests = 0;
+  const expectedAnchor = roundedIso(Date.parse(LIVE_NOW) - 60_000);
+  const provider = createProductionInventoryProvider(baseProvider('live'), {
+    now: () => new Date(LIVE_NOW),
     inventoryWaitBudgetMs: LIVE_INVENTORY_SETTLE_BUDGET_MS,
     fetcher: async (input: RequestInfo | URL): Promise<Response> => {
       const url = new URL(String(input));
       if (url.pathname.includes('/window/')) {
+        windowRequests += 1;
         return new Response(JSON.stringify(windowPayload()), { status: 200 });
       }
 
-      detailRequests += 1;
-      await new Promise(resolve => setTimeout(resolve, 550));
-      if (detailRequests === 1) return new Response(null, { status: 204 });
-      return new Response(JSON.stringify(detailsPayload()), { status: 200 });
+      const anchor = url.searchParams.get('startingTime') ?? '';
+      requestedDetails.push(anchor);
+      return new Response(
+        anchor === expectedAnchor ? JSON.stringify(detailsPayload()) : null,
+        { status: anchor === expectedAnchor ? 200 : 204 }
+      );
     }
   });
 
   const result = await provider.getSnapshot('game-1');
 
-  assert.equal(detailRequests, 2);
+  assert.equal(windowRequests, 0);
+  assert.deepEqual(requestedDetails, [expectedAnchor]);
+  assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
+  assert.equal(result.complete, true);
+});
+
+test('production completed games retain their final source-window inventory anchor', async () => {
+  const requestedDetails: string[] = [];
+  let windowRequests = 0;
+  const expectedAnchor = roundedIso(Date.parse(SOURCE) - 60_000);
+  const provider = createProductionInventoryProvider(baseProvider('completed'), {
+    now: () => new Date(Date.parse(SOURCE) + 24 * 60 * 60 * 1_000),
+    inventoryWaitBudgetMs: LIVE_INVENTORY_SETTLE_BUDGET_MS,
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      if (url.pathname.includes('/window/')) {
+        windowRequests += 1;
+        return new Response(JSON.stringify(windowPayload()), { status: 200 });
+      }
+
+      const anchor = url.searchParams.get('startingTime') ?? '';
+      requestedDetails.push(anchor);
+      return new Response(
+        anchor === expectedAnchor ? JSON.stringify(detailsPayload()) : null,
+        { status: anchor === expectedAnchor ? 200 : 204 }
+      );
+    }
+  });
+
+  const result = await provider.getSnapshot('game-1');
+
+  assert.ok(windowRequests >= 1);
+  assert.deepEqual(requestedDetails, [expectedAnchor]);
   assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
   assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
   assert.equal(result.complete, true);

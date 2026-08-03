@@ -15,6 +15,35 @@
       #completed-match-detail[hidden] {
         display: none !important;
       }
+
+      .build-version {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        gap: 5px;
+        padding: 0 9px;
+        border: 1px solid rgba(60, 185, 255, 0.35);
+        border-radius: 999px;
+        background: rgba(6, 35, 55, 0.72);
+        color: #8edcff;
+        font-size: 0.63rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+      }
+
+      .build-version strong {
+        color: #d8f4ff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.66rem;
+        letter-spacing: 0.02em;
+      }
+
+      @media (max-width: 680px) {
+        .build-version > span {
+          display: none;
+        }
+      }
     </style>
     <link rel="stylesheet" href="/src/role-scoreboard-refinements.css" />
     <link rel="stylesheet" href="/src/workspace-layout.css" />
@@ -36,6 +65,15 @@
             <small id="connection-detail">Checking API and adapters</small>
           </div>
           <span id="status-badge" class="badge">CHECKING</span>
+          <span
+            id="build-version"
+            class="build-version"
+            title="Demo build %VITE_BUILD_SHA% · workflow run %VITE_BUILD_RUN% · built %VITE_BUILD_TIME%"
+            aria-label="Demo build %VITE_BUILD_SHA_SHORT%, workflow run %VITE_BUILD_RUN%"
+          >
+            <span>DEMO R%VITE_BUILD_RUN%</span>
+            <strong>%VITE_BUILD_SHA_SHORT%</strong>
+          </span>
         </div>
       </header>
 

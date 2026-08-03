@@ -1,5 +1,6 @@
 import { objectiveIcon, type ObjectiveIconKey } from './objective-icons.ts';
 import './completed-history-dashboard-v2.css';
+import './objective-emblems.css';
 
 type ObjectiveKey = ObjectiveIconKey;
 type Side = 'blue' | 'red';

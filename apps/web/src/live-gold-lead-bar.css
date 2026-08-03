@@ -1,12 +1,17 @@
 .live-dashboard-v2 .v2-gold-card {
-  display: none !important;
+  display: grid !important;
+  gap: 6px;
 }
 
 .live-dashboard-v2 .v2-summary-row,
 .live-dashboard-v2 .v2-summary-row.gold-lead-removed {
-  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-columns: minmax(210px, 0.32fr) minmax(0, 1fr) !important;
 }
 
 .live-dashboard-v2 .v2-objectives-card {
-  grid-column: 1 / -1;
+  grid-column: auto;
+}
+
+.live-dashboard-v2 .v2-gold-bars {
+  display: none !important;
 }

@@ -1,10 +1,8 @@
 import type { LiveSnapshot } from '@esports-live/core';
 import type { LolStats, LolTeamState } from '@esports-live/adapter-lol';
-import { objectiveIcon, type ObjectiveIconKey } from './objective-icons.ts';
 import './live-objectives-hud.css';
-import './objective-emblems.css';
 
-type ObjectiveKey = ObjectiveIconKey;
+type ObjectiveKey = 'towers' | 'dragons' | 'barons' | 'inhibitors';
 type Side = 'blue' | 'red';
 
 const OBJECTIVE_ORDER: readonly ObjectiveKey[] = [
@@ -42,7 +40,6 @@ function objectiveMarkup(team: LolTeamState, key: ObjectiveKey): string {
   const formatted = formatObjective(value);
   return `
     <div class="v3-objective-stat objective-${key}" title="${label}" aria-label="${label}: ${formatted}">
-      <span class="v3-objective-icon ${key}">${objectiveIcon(key)}</span>
       <span class="v3-objective-label">${label}</span>
       <strong>${formatted}</strong>
     </div>`;
@@ -69,10 +66,11 @@ function applyObjectiveHud(): void {
     objectiveValue(snapshot.stats!.blue, key),
     objectiveValue(snapshot.stats!.red, key)
   ]);
-  const signature = JSON.stringify(['objective-emblems-v2', snapshot.game.id, ...values]);
+  const signature = JSON.stringify(['objective-text-v1', snapshot.game.id, ...values]);
   if (card.dataset.objectiveHudSignature === signature) return;
 
-  card.classList.add('objective-hud-v3', 'objective-emblems-v2');
+  card.classList.add('objective-hud-v3', 'objective-text-only');
+  card.classList.remove('objective-emblems-v2');
   card.dataset.objectiveHudSignature = signature;
   card.innerHTML = `
     <div class="v3-objective-title" aria-hidden="true">

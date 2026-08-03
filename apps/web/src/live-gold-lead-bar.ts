@@ -44,27 +44,24 @@ function restoreTransientSeriesReset(): void {
     return;
   }
 
-  // The schedule refresh briefly replaces the enriched score header with the
-  // legacy "Team vs Team" title when a background tab becomes visible. Restore
-  // the last stable score before the series hero renders its next frame.
   selectedSeries.innerHTML = stableSeriesHtml;
 }
 
-function removeGoldLeadCard(): void {
+function simplifyGoldLeadCard(): void {
   cleanupFrame = null;
   document.querySelectorAll<HTMLElement>('.live-dashboard-v2 .v2-summary-row')
-    .forEach(row => row.classList.add('gold-lead-removed'));
-  document.querySelectorAll<HTMLElement>('.live-dashboard-v2 .v2-gold-card')
-    .forEach(card => card.remove());
+    .forEach(row => row.classList.remove('gold-lead-removed'));
+  document.querySelectorAll<HTMLElement>('.live-dashboard-v2 .v2-gold-bars')
+    .forEach(bar => bar.remove());
 }
 
-function queueGoldLeadRemoval(): void {
+function queueGoldLeadSimplification(): void {
   if (cleanupFrame !== null) return;
-  cleanupFrame = window.requestAnimationFrame(removeGoldLeadCard);
+  cleanupFrame = window.requestAnimationFrame(simplifyGoldLeadCard);
 }
 
 const gameObserver = gameContent
-  ? new MutationObserver(queueGoldLeadRemoval)
+  ? new MutationObserver(queueGoldLeadSimplification)
   : null;
 gameObserver?.observe(gameContent as HTMLElement, { childList: true, subtree: true });
 
@@ -99,4 +96,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 captureStableSeriesScore();
-queueGoldLeadRemoval();
+queueGoldLeadSimplification();

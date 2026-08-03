@@ -15,6 +15,12 @@ export interface WorkerEnv {
 
 type ApiHandler = (request: Request) => Promise<Response>;
 
+// Riot inventory enrichment can issue one primary and one fallback details
+// request. Each request is capped at three seconds by the provider. Keep the
+// Worker invocation alive long enough for that bounded probe to settle so the
+// response does not leave a floating promise that Cloudflare may cancel.
+export const LIVE_INVENTORY_SETTLE_BUDGET_MS = 6_500;
+
 let cachedApiKey: string | null = null;
 let cachedHandler: ApiHandler | null = null;
 
@@ -38,7 +44,7 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
               // Wall-clock anchors can be ahead of delayed broadcasts and return no
               // detail frames, leaving every player inventory empty.
               useWindowOverlay: true,
-              inventoryWaitBudgetMs: 1_000
+              inventoryWaitBudgetMs: LIVE_INVENTORY_SETTLE_BUDGET_MS
             }
           )
         )

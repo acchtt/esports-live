@@ -1,5 +1,6 @@
 name: Deploy Demo
 
+# Deploy exactly once for each update pushed to the demo branch.
 on:
   push:
     branches:

@@ -53,6 +53,7 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null;
 let nextScheduleRefreshAt: number | null = null;
 let scheduleRequest: Promise<void> | null = null;
 let snapshotRefreshing = false;
+let snapshotRefreshQueued = false;
 let scheduleRenderKey = '';
 let selectionEventKey = '';
 let liveClockBaseSeconds: number | null = null;
@@ -556,41 +557,54 @@ function clearSnapshotTimer(): void {
 }
 
 async function refreshSnapshot(): Promise<void> {
-  if (snapshotRefreshing || document.hidden) return;
+  if (document.hidden) return;
+  if (snapshotRefreshing) {
+    snapshotRefreshQueued = true;
+    return;
+  }
+
   snapshotRefreshing = true;
+  snapshotRefreshQueued = false;
   clearSnapshotTimer();
-  const event = currentEvent();
-  const game = event ? selectedGame(event) : null;
-  if (!event) {
-    snapshotRefreshing = false;
-    return;
-  }
-  if (!game) {
-    renderMissingGame(event);
-    snapshotRefreshing = false;
-    return;
-  }
 
-  const requestedSeries = event.series.id;
-  const requestedGame = game.id;
   try {
-    const snapshot = await snapshotForGame(game, lastSourceTimestamp);
-    if (selectedSeriesId !== requestedSeries || selectedGameId !== requestedGame) return;
-    if (snapshot.quality.sourceTimestamp) lastSourceTimestamp = snapshot.quality.sourceTimestamp;
-    renderSnapshot(snapshot);
-  } catch (error) {
-    if (selectedSeriesId !== requestedSeries || selectedGameId !== requestedGame) return;
-    if (renderedGameId !== requestedGame) {
-      renderedGameId = null;
-      gameContent.innerHTML = `<div class="analysis-empty"><h3>Live feed unavailable</h3><p>${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</p></div>`;
+    const event = currentEvent();
+    const game = event ? selectedGame(event) : null;
+    if (!event) return;
+    if (!game) {
+      renderMissingGame(event);
+      return;
     }
-  }
 
-  snapshotRefreshing = false;
-  const current = currentEvent();
-  const currentGame = current ? selectedGame(current) : null;
-  if (!document.hidden && current?.series.state === 'live' && currentGame?.state !== 'completed') {
-    snapshotTimer = setTimeout(() => void refreshSnapshot(), SNAPSHOT_POLL_MS);
+    const requestedSeries = event.series.id;
+    const requestedGame = game.id;
+    try {
+      const snapshot = await snapshotForGame(game, lastSourceTimestamp);
+      if (selectedSeriesId !== requestedSeries || selectedGameId !== requestedGame) return;
+      if (snapshot.quality.sourceTimestamp) lastSourceTimestamp = snapshot.quality.sourceTimestamp;
+      renderSnapshot(snapshot);
+    } catch (error) {
+      if (selectedSeriesId !== requestedSeries || selectedGameId !== requestedGame) return;
+      if (renderedGameId !== requestedGame) {
+        renderedGameId = null;
+        gameContent.innerHTML = `<div class="analysis-empty"><h3>Live feed unavailable</h3><p>${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</p></div>`;
+      }
+    }
+  } finally {
+    snapshotRefreshing = false;
+    const queued = snapshotRefreshQueued;
+    snapshotRefreshQueued = false;
+
+    if (document.hidden) return;
+    const current = currentEvent();
+    const currentGame = current ? selectedGame(current) : null;
+    if (queued && currentGame) {
+      snapshotTimer = setTimeout(() => void refreshSnapshot(), 0);
+      return;
+    }
+    if (current?.series.state === 'live' && currentGame && currentGame.state !== 'completed') {
+      snapshotTimer = setTimeout(() => void refreshSnapshot(), SNAPSHOT_POLL_MS);
+    }
   }
 }
 

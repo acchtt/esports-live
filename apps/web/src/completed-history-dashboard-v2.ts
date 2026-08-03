@@ -1,8 +1,6 @@
-import { objectiveIcon, type ObjectiveIconKey } from './objective-icons.ts';
 import './completed-history-dashboard-v2.css';
-import './objective-emblems.css';
 
-type ObjectiveKey = ObjectiveIconKey;
+type ObjectiveKey = 'towers' | 'dragons' | 'barons' | 'inhibitors';
 type Side = 'blue' | 'red';
 
 interface MetricPair {
@@ -84,7 +82,6 @@ function objectiveMarkup(side: Side, values: Record<ObjectiveKey, number | null>
     <div class="history-v2-objective-side ${side}" aria-label="${side === 'blue' ? 'Blue' : 'Red'} team objectives">
       ${OBJECTIVES.map(key => `
         <div class="history-v2-objective-stat objective-${key}" aria-label="${LABELS[key]}: ${formatNumber(values[key])}">
-          <span class="history-v2-objective-icon ${key}">${objectiveIcon(key)}</span>
           <span class="history-v2-objective-label">${LABELS[key]}</span>
           <strong>${formatNumber(values[key])}</strong>
         </div>`).join('')}
@@ -129,7 +126,8 @@ function redesignComparison(comparison: HTMLElement): void {
   };
 
   comparison.dataset.historyDashboardV2 = 'true';
-  comparison.classList.add('completed-history-dashboard-v2', 'objective-emblems-v2');
+  comparison.classList.add('completed-history-dashboard-v2', 'objective-text-only');
+  comparison.classList.remove('objective-emblems-v2');
   comparison.innerHTML = `
     <header class="history-v2-team-header">
       <div class="history-v2-team blue"><span>BLUE SIDE</span><strong>${escapeHtml(blueName)}</strong></div>

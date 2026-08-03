@@ -15,3 +15,126 @@
 .live-dashboard-v2 .v2-gold-bars {
   display: none !important;
 }
+
+/* Keep only the active board view and turn it into a compact section label. */
+.live-dashboard-v2 .v2-board-tabs {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  padding: 0 22px;
+  border-bottom: 1px solid rgba(112, 151, 196, 0.14);
+  background: rgba(8, 21, 37, 0.72);
+}
+
+.live-dashboard-v2 .v2-board-tabs button {
+  display: none;
+}
+
+.live-dashboard-v2 .v2-board-tabs button.active {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  color: #b9e1ff;
+  background: transparent;
+  box-shadow: none;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+.live-dashboard-v2 .v2-board-tabs button.active::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  content: '';
+  background: #3aa8ff;
+  box-shadow: 0 0 10px rgba(58, 168, 255, 0.72);
+}
+
+/* Pull each team name toward its stats and balance both sides around a VS marker. */
+.live-dashboard-v2 .v2-board-head {
+  position: relative;
+  grid-template-columns: minmax(150px, 1fr) auto 46px auto minmax(150px, 1fr);
+  gap: 12px;
+  min-height: 64px;
+  padding: 0 24px;
+  background:
+    linear-gradient(90deg, rgba(58, 168, 255, 0.045), transparent 35%, transparent 65%, rgba(255, 73, 100, 0.045));
+}
+
+.live-dashboard-v2 .v2-board-head::before {
+  grid-column: 3;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  justify-self: center;
+  border: 1px solid rgba(132, 153, 182, 0.18);
+  border-radius: 50%;
+  content: 'VS';
+  color: #687a91;
+  background: rgba(4, 13, 24, 0.8);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.live-dashboard-v2 .v2-board-head > strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-dashboard-v2 .v2-board-head > strong:first-child {
+  grid-column: 1;
+  justify-self: end;
+  text-align: right;
+}
+
+.live-dashboard-v2 .v2-board-head > strong:last-child {
+  grid-column: 5;
+  justify-self: start;
+  text-align: left;
+}
+
+.live-dashboard-v2 .v2-board-head > span {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(112, 151, 196, 0.14);
+  border-radius: 9px;
+  background: rgba(3, 13, 24, 0.58);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.live-dashboard-v2 .v2-board-head > span.blue {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.live-dashboard-v2 .v2-board-head > span.red {
+  grid-column: 4;
+  justify-self: start;
+}
+
+@media (max-width: 1180px) {
+  .live-dashboard-v2 .v2-board-head {
+    grid-template-columns: minmax(110px, 1fr) auto 38px auto minmax(110px, 1fr);
+    gap: 8px;
+    padding-inline: 14px;
+  }
+
+  .live-dashboard-v2 .v2-board-head > strong {
+    font-size: 15px;
+  }
+
+  .live-dashboard-v2 .v2-board-head > span {
+    padding-inline: 9px;
+  }
+}

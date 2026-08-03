@@ -126,14 +126,27 @@ jobs:
           '
           echo "Live snapshot and repeated-cursor snapshot both succeeded for game $game_id."
 
+      - name: Prepare demo build metadata
+        shell: bash
+        run: |
+          echo "VITE_BUILD_SHA=$DEMO_COMMIT_SHA" >> "$GITHUB_ENV"
+          echo "VITE_BUILD_SHA_SHORT=${DEMO_COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+          echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+
       - name: Build demo application
         run: npm run build:web
         env:
           VITE_API_BASE_URL: ${{ steps.api-preview.outputs.url }}
 
-      - name: Confirm preview API is embedded
+      - name: Confirm preview API and build metadata are embedded
+        env:
+          API_BASE_URL: ${{ steps.api-preview.outputs.url }}
         shell: bash
-        run: grep -R "${{ steps.api-preview.outputs.url }}" apps/web/dist/assets
+        run: |
+          grep -R "$API_BASE_URL" apps/web/dist/assets
+          grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
+          grep -q "DEMO R$VITE_BUILD_RUN" apps/web/dist/index.html
 
       - name: Deploy demo Pages preview
         run: >-
@@ -143,18 +156,20 @@ jobs:
           --commit-hash "$DEMO_COMMIT_SHA"
           --commit-message "${{ github.event.head_commit.message || 'Manual demo deployment' }}"
 
-      - name: Verify demo shell
+      - name: Verify demo shell and version
         shell: bash
         run: |
           url="https://demo.esports-live.pages.dev/?commit=$DEMO_COMMIT_SHA"
           for attempt in {1..12}; do
             html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$url" || true)"
-            if grep -q '<title>Esports Live</title>' <<<"$html" && grep -q 'class="app-frame"' <<<"$html"; then
-              echo "Demo is available at $url"
+            if grep -q '<title>Esports Live</title>' <<<"$html" \
+              && grep -q 'class="app-frame"' <<<"$html" \
+              && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html"; then
+              echo "Demo build $VITE_BUILD_SHA_SHORT is available at $url"
               exit 0
             fi
-            echo "Demo not ready (attempt $attempt/12)."
+            echo "Demo build $VITE_BUILD_SHA_SHORT not ready (attempt $attempt/12)."
             sleep 5
           done
-          echo "Demo verification failed."
+          echo "Demo verification failed for build $VITE_BUILD_SHA_SHORT."
           exit 1

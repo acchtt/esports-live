@@ -2,6 +2,7 @@ import type { LiveSnapshot } from '@esports-live/core';
 import type { LolStats, LolTeamState } from '@esports-live/adapter-lol';
 import { objectiveIcon, type ObjectiveIconKey } from './objective-icons.ts';
 import './live-objectives-hud.css';
+import './objective-emblems.css';
 
 type ObjectiveKey = ObjectiveIconKey;
 type Side = 'blue' | 'red';

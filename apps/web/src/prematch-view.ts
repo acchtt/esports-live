@@ -8,6 +8,8 @@ function requiredElement<T extends Element>(selector: string): T {
 }
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const CONTEXT_LOADING_MESSAGE = 'Series context enrichment is still loading.';
+const CONTEXT_RETRY_MS = 900;
 const selectedCompetition = requiredElement<HTMLElement>('#selected-competition');
 const selectedSeries = requiredElement<HTMLElement>('#selected-series');
 const selectedMeta = requiredElement<HTMLElement>('#selected-meta');
@@ -20,6 +22,7 @@ let contextError: string | null = null;
 let contextLoading = false;
 let contextRequest = 0;
 let contextController: AbortController | null = null;
+let contextRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let selectedEvent: ScheduleEvent | null = null;
 
 const style = document.createElement('style');
@@ -152,6 +155,24 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", '&#039;');
 }
 
+function clearContextRetry(): void {
+  if (contextRetryTimer !== null) window.clearTimeout(contextRetryTimer);
+  contextRetryTimer = null;
+}
+
+function isContextStillLoading(message: string): boolean {
+  return message.includes(CONTEXT_LOADING_MESSAGE);
+}
+
+function scheduleContextRetry(seriesId: string, signature: string): void {
+  clearContextRetry();
+  contextRetryTimer = window.setTimeout(() => {
+    contextRetryTimer = null;
+    if (activeSeriesId !== seriesId || activeSignature !== signature) return;
+    void loadContext(seriesId, signature);
+  }, CONTEXT_RETRY_MS);
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return (parts.length > 1 ? parts.slice(0, 2).map(part => part[0]) : [parts[0]?.slice(0, 2)])
@@ -242,6 +263,7 @@ function contextMarkup(context: SeriesContext | null, left: string, right: strin
 
 async function loadContext(seriesId: string, signature: string): Promise<void> {
   const requestId = ++contextRequest;
+  clearContextRetry();
   contextController?.abort();
   const controller = new AbortController();
   contextController = controller;
@@ -249,6 +271,7 @@ async function loadContext(seriesId: string, signature: string): Promise<void> {
   contextError = null;
   activeContext = null;
   renderPrematch();
+  let retryScheduled = false;
 
   try {
     const body = await apiJson<SeriesContext>(
@@ -261,10 +284,18 @@ async function loadContext(seriesId: string, signature: string): Promise<void> {
   } catch (error) {
     if (controller.signal.aborted) return;
     if (requestId !== contextRequest || activeSignature !== signature) return;
-    contextError = error instanceof Error ? error.message : 'Unknown context error.';
+    const message = error instanceof Error ? error.message : 'Unknown context error.';
+    if (isContextStillLoading(message)) {
+      retryScheduled = true;
+      contextLoading = true;
+      contextError = null;
+      scheduleContextRetry(seriesId, signature);
+    } else {
+      contextError = message;
+    }
   } finally {
     if (requestId === contextRequest && activeSignature === signature) {
-      contextLoading = false;
+      if (!retryScheduled) contextLoading = false;
       renderPrematch();
     }
   }
@@ -293,6 +324,7 @@ function renderPrematch(): void {
     contextError = null;
     contextLoading = false;
     contextRequest += 1;
+    clearContextRetry();
     if (seriesId) void loadContext(seriesId, signature);
   }
 
@@ -336,7 +368,10 @@ function renderPrematch(): void {
 window.addEventListener('esports-live:selection', event => {
   selectedEvent = (event as CustomEvent<ScheduleEvent>).detail;
   activeSignature = '';
+  clearContextRetry();
   contextController?.abort();
   contextController = null;
   renderPrematch();
 });
+
+window.addEventListener('beforeunload', clearContextRetry);

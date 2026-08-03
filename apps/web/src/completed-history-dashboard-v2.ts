@@ -16,11 +16,31 @@ const LABELS: Record<ObjectiveKey, string> = {
   inhibitors: 'Inhibitors'
 };
 
+const outlineIcon = (paths: string): string => `
+  <svg viewBox="0 0 32 32" style="fill:none" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    ${paths}
+  </svg>`;
+
 const ICONS: Record<ObjectiveKey, string> = {
-  towers: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 4v6M13 4v6M19 4v6M25 4v6M6 10h20l-3 5v13H9V15l-3-5Z"/><path d="M13 19h6v9h-6v-9ZM10 15h12"/></svg>',
-  dragons: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 20c1-7 6-12 14-13l-2-4 7 2-1 7-3-3"/><path d="M22 9c4 3 5 9 2 14-3 5-10 7-15 4-4-2-5-7-3-11 2-3 6-4 9-2 2 1 3 4 1 6-1 2-4 2-5 0"/><path d="m19 12 4 3-5 1"/></svg>',
-  barons: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 7 10 3l2 5 4-6 4 6 2-5 5 4-2 8-2-3-2 5v7l-5 6-5-6v-7l-2-5-2 3-2-8Z"/><path d="m11 18 3 2M21 18l-3 2M13 25h6M16 20v3"/></svg>',
-  inhibitors: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 3 8 8-3 14-5 4-5-4-3-14 8-8Z"/><path d="m16 8 4 5-4 9-4-9 4-5ZM10 25h12"/></svg>'
+  towers: outlineIcon(`
+    <path d="M8 5v7l3 3v12h10V15l3-3V5h-4v4h-8V5H8Z" />
+    <path d="M11 13h10M13 18h6v9M9 27h14" />
+  `),
+  dragons: outlineIcon(`
+    <path d="M6 22c1-8 6-14 15-15l-3-4 8 2-2 8-3-3" />
+    <path d="M22 9c4 3 5 8 3 13-2 5-8 8-13 6-5-2-7-7-5-11 2-4 7-5 10-2l4 3-5 1" />
+    <path d="M13 17c-2 0-3 1-3 3 0 2 2 4 5 4 3 0 5-2 5-5" />
+  `),
+  barons: outlineIcon(`
+    <path d="m5 9 5-5 3 5 3-6 3 6 3-5 5 5-3 16-8 5-8-5L5 9Z" />
+    <path d="M11 16c3-3 7-3 10 0-3 4-7 4-10 0Z" />
+    <circle cx="16" cy="16" r="1.5" />
+  `),
+  inhibitors: outlineIcon(`
+    <path d="m16 3 8 8-3 14-5 4-5-4-3-14 8-8Z" />
+    <path d="m16 8 4 5-4 9-4-9 4-5Z" />
+    <path d="M10 25h12" />
+  `)
 };
 
 let scanQueued = false;
@@ -112,9 +132,6 @@ function redesignComparison(comparison: HTMLElement): void {
   const barons = metricPair(comparison, 'Barons');
   const inhibitors = metricPair(comparison, 'Inhibitors');
 
-  const totalGold = (gold.blue ?? 0) + (gold.red ?? 0);
-  const rawBlueShare = totalGold > 0 ? (gold.blue ?? 0) / totalGold : 0.5;
-  const blueShare = Math.min(0.92, Math.max(0.08, rawBlueShare));
   const difference = gold.blue === null || gold.red === null ? null : gold.blue - gold.red;
   const leader = difference === null
     ? 'Gold unavailable'
@@ -145,12 +162,9 @@ function redesignComparison(comparison: HTMLElement): void {
       <div class="history-v2-team red"><span>RED SIDE</span><strong>${escapeHtml(redName)}</strong></div>
     </header>
     <div class="history-v2-summary">
-      <article class="history-v2-gold-card" style="--history-blue-share:${(blueShare * 100).toFixed(2)}%">
+      <article class="history-v2-gold-card">
         <span>GOLD LEAD</span>
         <strong class="${leaderClass}">${escapeHtml(leader)}</strong>
-        <div class="history-v2-gold-bar" role="img" aria-label="${escapeHtml(`${blueName} ${formatCompact(gold.blue)} versus ${redName} ${formatCompact(gold.red)}`)}">
-          <i class="blue"></i><i class="red"></i><b aria-hidden="true"></b>
-        </div>
         <small>${formatCompact(gold.blue)} vs ${formatCompact(gold.red)}</small>
       </article>
       <article class="history-v2-quick-stats">

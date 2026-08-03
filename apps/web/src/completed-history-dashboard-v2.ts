@@ -1,6 +1,7 @@
+import { objectiveIcon, type ObjectiveIconKey } from './objective-icons.ts';
 import './completed-history-dashboard-v2.css';
 
-type ObjectiveKey = 'towers' | 'dragons' | 'barons' | 'inhibitors';
+type ObjectiveKey = ObjectiveIconKey;
 type Side = 'blue' | 'red';
 
 interface MetricPair {
@@ -14,33 +15,6 @@ const LABELS: Record<ObjectiveKey, string> = {
   dragons: 'Dragons',
   barons: 'Barons',
   inhibitors: 'Inhibitors'
-};
-
-const outlineIcon = (paths: string): string => `
-  <svg viewBox="0 0 32 32" style="fill:none" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    ${paths}
-  </svg>`;
-
-const ICONS: Record<ObjectiveKey, string> = {
-  towers: outlineIcon(`
-    <path d="M8 5v7l3 3v12h10V15l3-3V5h-4v4h-8V5H8Z" />
-    <path d="M11 13h10M13 18h6v9M9 27h14" />
-  `),
-  dragons: outlineIcon(`
-    <path d="M6 22c1-8 6-14 15-15l-3-4 8 2-2 8-3-3" />
-    <path d="M22 9c4 3 5 8 3 13-2 5-8 8-13 6-5-2-7-7-5-11 2-4 7-5 10-2l4 3-5 1" />
-    <path d="M13 17c-2 0-3 1-3 3 0 2 2 4 5 4 3 0 5-2 5-5" />
-  `),
-  barons: outlineIcon(`
-    <path d="m5 9 5-5 3 5 3-6 3 6 3-5 5 5-3 16-8 5-8-5L5 9Z" />
-    <path d="M11 16c3-3 7-3 10 0-3 4-7 4-10 0Z" />
-    <circle cx="16" cy="16" r="1.5" />
-  `),
-  inhibitors: outlineIcon(`
-    <path d="m16 3 8 8-3 14-5 4-5-4-3-14 8-8Z" />
-    <path d="m16 8 4 5-4 9-4-9 4-5Z" />
-    <path d="M10 25h12" />
-  `)
 };
 
 let scanQueued = false;
@@ -108,8 +82,8 @@ function objectiveMarkup(side: Side, values: Record<ObjectiveKey, number | null>
   return `
     <div class="history-v2-objective-side ${side}" aria-label="${side === 'blue' ? 'Blue' : 'Red'} team objectives">
       ${OBJECTIVES.map(key => `
-        <div class="history-v2-objective-stat" aria-label="${LABELS[key]}: ${formatNumber(values[key])}">
-          <span class="history-v2-objective-icon">${ICONS[key]}</span>
+        <div class="history-v2-objective-stat objective-${key}" aria-label="${LABELS[key]}: ${formatNumber(values[key])}">
+          <span class="history-v2-objective-icon ${key}">${objectiveIcon(key)}</span>
           <span class="history-v2-objective-label">${LABELS[key]}</span>
           <strong>${formatNumber(values[key])}</strong>
         </div>`).join('')}
@@ -154,7 +128,7 @@ function redesignComparison(comparison: HTMLElement): void {
   };
 
   comparison.dataset.historyDashboardV2 = 'true';
-  comparison.classList.add('completed-history-dashboard-v2');
+  comparison.classList.add('completed-history-dashboard-v2', 'objective-emblems-v2');
   comparison.innerHTML = `
     <header class="history-v2-team-header">
       <div class="history-v2-team blue"><span>BLUE SIDE</span><strong>${escapeHtml(blueName)}</strong></div>

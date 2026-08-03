@@ -1,4 +1,5 @@
 import './live-gold-lead-bar.css';
+import './live-summary-compact.css';
 
 export {};
 

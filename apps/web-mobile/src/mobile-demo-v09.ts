@@ -68,7 +68,7 @@ function deficitMarkup(side: Side, trailingSide: Side | null, difference: number
 }
 
 function showTrailingDeficit(snapshot: LiveSnapshot<LolStats>, root: HTMLElement): void {
-  if (!media.matches || !snapshot.stats) return;
+  if (!media.matches || !snapshot.stats || !root.closest('#completed-match-detail')) return;
 
   const blueGold = snapshot.stats.blue.gold;
   const redGold = snapshot.stats.red.gold;

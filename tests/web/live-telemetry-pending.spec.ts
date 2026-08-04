@@ -98,6 +98,7 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
 
 async function installFixtures(page: Page) {
   let liveRequests = 0;
+  let telemetryAvailableAt = 0;
 
   await page.route('**/health', route => fulfillJson(route, {
     ok: true,
@@ -126,11 +127,12 @@ async function installFixtures(page: Page) {
 
   await page.route('**/v1/lol/games/**/live**', async route => {
     liveRequests += 1;
-    if (liveRequests <= 2) {
-      await new Promise(resolve => setTimeout(resolve, 2_000));
-      return fulfillJson(route, pendingSnapshot());
-    }
-    return fulfillJson(route, liveSnapshot());
+    if (telemetryAvailableAt === 0) telemetryAvailableAt = Date.now() + 2_800;
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return fulfillJson(
+      route,
+      Date.now() < telemetryAvailableAt ? pendingSnapshot() : liveSnapshot()
+    );
   });
 
   return { liveRequests: () => liveRequests };
@@ -147,7 +149,9 @@ test('explains Riot telemetry delay and recovers when gameplay frames arrive', a
   await expect(page.locator('[data-selection-snapshot-pending]')).toContainText('Retrying automatically');
 
   await expect.poll(requests.liveRequests).toBeGreaterThan(2);
-  await expect(page.locator('[data-live-dashboard-game-id="game-pending-1"]')).toBeVisible();
+  await expect(page.locator('[data-live-dashboard-game-id="game-pending-1"]'), {
+    message: 'The unified live board should replace the pending telemetry message.'
+  }).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('[data-selection-snapshot-loading]')).toHaveCount(0);
   await expect(page.locator('[data-selection-snapshot-pending]')).toHaveCount(0);
 });

@@ -7,8 +7,8 @@
 
 .live-dashboard-v2 .v2-gold-card,
 .live-dashboard-v2 .v2-objectives-card.objective-hud-v3 {
-  min-height: 88px !important;
-  height: 88px;
+  min-height: 82px !important;
+  height: 82px;
   border-radius: 10px !important;
 }
 
@@ -51,57 +51,50 @@
 }
 
 .live-dashboard-v2 .v2-objectives-card.objective-hud-v3 {
-  align-content: stretch !important;
-  padding: 8px 12px !important;
+  align-content: center !important;
+  padding: 7px 12px !important;
 }
 
-.live-dashboard-v2 .v3-objective-title {
-  position: absolute;
-  top: 7px;
-  left: 50%;
-  width: 160px !important;
-  margin: 0 !important;
-  transform: translateX(-50%);
-  font-size: 8px !important;
+.live-dashboard-v2 .v3-objective-title,
+.live-dashboard-v2 .v3-objective-side::before {
+  display: none !important;
+  content: none !important;
 }
 
 .live-dashboard-v2 .v3-objective-hud {
   grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) !important;
-  align-items: end !important;
+  align-items: center !important;
   height: 100%;
-  padding-top: 15px;
+  padding-top: 0 !important;
 }
 
 .live-dashboard-v2 .v3-objective-side {
-  grid-template-columns: repeat(4, minmax(46px, 1fr)) !important;
-  gap: 5px !important;
-  padding-top: 11px !important;
-}
-
-.live-dashboard-v2 .v3-objective-side::before {
-  top: -1px !important;
-  font-size: 7px !important;
-  letter-spacing: 0.14em !important;
+  grid-template-columns: repeat(4, minmax(52px, 1fr)) !important;
+  gap: 7px !important;
+  padding-top: 0 !important;
 }
 
 .live-dashboard-v2 .v3-objective-stat {
-  min-height: 44px !important;
-  padding: 5px 4px !important;
-  gap: 2px !important;
-  border-radius: 7px !important;
+  min-height: 54px !important;
+  padding: 6px !important;
+  gap: 4px !important;
+  border-radius: 8px !important;
 }
 
 .live-dashboard-v2 .v3-objective-label {
-  font-size: 7px !important;
-  letter-spacing: 0.04em !important;
+  color: #e3ebf5 !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.055em !important;
 }
 
 .live-dashboard-v2 .v3-objective-stat strong {
-  font-size: 17px !important;
+  font-size: 23px !important;
+  line-height: 0.95 !important;
 }
 
 .live-dashboard-v2 .v3-objective-center {
-  height: 42px !important;
+  height: 52px !important;
 }
 
 .live-dashboard-v2 .v2-board-head.compact-matchup-header {
@@ -242,6 +235,24 @@
   .live-dashboard-v2 .v2-summary-row,
   .live-dashboard-v2 .v2-summary-row.gold-lead-removed {
     grid-template-columns: minmax(210px, 0.27fr) minmax(0, 1fr) !important;
+  }
+
+  .live-dashboard-v2 .v3-objective-side {
+    grid-template-columns: repeat(4, minmax(44px, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  .live-dashboard-v2 .v3-objective-stat {
+    min-height: 50px !important;
+    padding-inline: 4px !important;
+  }
+
+  .live-dashboard-v2 .v3-objective-label {
+    font-size: 9px !important;
+  }
+
+  .live-dashboard-v2 .v3-objective-stat strong {
+    font-size: 21px !important;
   }
 
   .live-dashboard-v2 .v2-board-head.compact-matchup-header {

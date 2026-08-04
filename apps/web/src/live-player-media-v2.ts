@@ -199,10 +199,13 @@ function orderedPlayers(team: LolTeamState): readonly (LolPlayerState | null)[] 
 function championMarkup(player: LolPlayerState | null, patch: string | null): string {
   const championId = player?.championId ?? null;
   const key = championKey(championId);
+  const level = player?.level ?? null;
+  const levelText = level === null ? '—' : String(level);
+  const levelLabel = level === null ? 'Champion level unavailable' : `Champion level ${level}`;
   const url = patch && key
     ? `${DATA_DRAGON_BASE}/${encodeURIComponent(patch)}/img/champion/${encodeURIComponent(key)}.png`
     : null;
-  return `${url ? `<img class="v2-champion-portrait" src="${escapeHtml(url)}" alt="${escapeHtml(championId ?? 'Champion')}" />` : ''}<span class="v2-champion-fallback" aria-hidden="true">${escapeHtml(initials(championId))}</span>`;
+  return `${url ? `<img class="v2-champion-portrait" src="${escapeHtml(url)}" alt="${escapeHtml(championId ?? 'Champion')}" />` : ''}<span class="v2-champion-fallback" aria-hidden="true">${escapeHtml(initials(championId))}</span><span class="champion-level-badge" aria-label="${escapeHtml(levelLabel)}">${escapeHtml(levelText)}</span>`;
 }
 
 function itemMarkup(player: LolPlayerState | null, patch: string | null): string {

@@ -145,6 +145,30 @@ test('refreshes the selected live player board on demand', async ({ page }) => {
   });
   expect(summaryMutations).toBeLessThanOrEqual(1);
 
+  await expect(page.locator('.v2-team-logo-fallback')).toHaveCount(2);
+  await expect(page.locator('.v2-item-slot')).toHaveCount(70);
+
+  const layout = await page.locator('.analysis-panel').evaluate(panel => {
+    const hero = panel.querySelector<HTMLElement>('.v2-hero');
+    const row = panel.querySelector<HTMLElement>('.v2-matchup-row');
+    const item = panel.querySelector<HTMLElement>('.v2-item-slot');
+    const panelStyle = getComputedStyle(panel);
+    if (!hero || !row || !item) return null;
+    return {
+      panelPadding: Number.parseFloat(panelStyle.paddingLeft),
+      heroMinHeight: Number.parseFloat(getComputedStyle(hero).minHeight),
+      rowMinHeight: Number.parseFloat(getComputedStyle(row).minHeight),
+      itemWidth: item.getBoundingClientRect().width,
+      overflow: panel.scrollWidth - panel.clientWidth
+    };
+  });
+  expect(layout).not.toBeNull();
+  expect(layout?.panelPadding).toBeGreaterThanOrEqual(10);
+  expect(layout?.heroMinHeight).toBeGreaterThanOrEqual(110);
+  expect(layout?.rowMinHeight).toBeGreaterThanOrEqual(90);
+  expect(layout?.itemWidth).toBeGreaterThanOrEqual(27);
+  expect(layout?.overflow).toBeLessThanOrEqual(2);
+
   const refreshButton = page.getByRole('button', { name: 'Refresh', exact: true });
   await expect(refreshButton).toBeVisible();
   const requestCount = liveRequests();

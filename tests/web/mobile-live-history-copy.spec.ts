@@ -152,6 +152,8 @@ test('mobile live matches reuse the completed-history board and keep navigation 
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.2');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-board-owner', 'history-copy');
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-live-board-state', 'verified');
@@ -165,6 +167,7 @@ test('mobile live matches reuse the completed-history board and keep navigation 
   await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
   await expect(board.locator('.history-v2-team.blue strong')).toHaveText(blue.name);
   await expect(board.locator('.history-v2-team.red strong')).toHaveText(red.name);
+  await expect(page.locator('#game-content > .completed-final-game:not(.mobile-live-history-board)')).toHaveCount(0);
 
   const layout = await page.evaluate(() => {
     const frame = document.querySelector<HTMLElement>('.app-frame');

@@ -1,1 +1,3 @@
-import '../../web/src/live-history-board-view.ts';
+document.documentElement.dataset.mobileLiveBoardOwner = 'history-copy';
+
+export {};

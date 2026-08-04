@@ -144,8 +144,8 @@ test('mobile fallback recovers with history navigation and objective counts', as
   await expect(objectives).toContainText('Barons');
   await expect(objectives).toContainText('Inhibitors');
 
-  await expect(page.locator('.mobile-recovery-items')).toBeHidden();
-  await expect(page.locator('.role-player-items')).toBeHidden();
+  await expect(page.locator('.mobile-recovery-items:visible')).toHaveCount(0);
+  await expect(page.locator('.role-player-items:visible')).toHaveCount(0);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

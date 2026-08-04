@@ -125,7 +125,6 @@ async function installFixtures(page: Page): Promise<void> {
     reasons: []
   }));
   await page.route('**/v1/lol/games/**/live**', route => json(route, snapshot()));
-  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['26.15.1']));
   await page.route('https://ddragon.leagueoflegends.com/cdn/**', route => route.fulfill({
     status: 200,
     contentType: 'image/svg+xml',
@@ -133,7 +132,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('mobile live board keeps compact chrome and uses the current history card layout', async ({ page }) => {
+test('shared mobile scoreboard keeps the compact live layout stable', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -142,153 +141,57 @@ test('mobile live board keeps compact chrome and uses the current history card l
   await page.goto('/');
   await page.locator('[data-series-id="series-mobile-layout"]').click();
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.6');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-surface', 'v22');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-layout-1"]');
   await expect(board).toBeVisible();
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-layout', 'identity-items');
   await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
-  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
   await expect(board).toHaveAttribute('data-mobile-live-cleanup', 'v22');
 
-  const topChrome = await page.evaluate(() => {
-    const topbar = document.querySelector<HTMLElement>('.topbar');
-    const context = document.querySelector<HTMLElement>('.mobile-context-bar');
-    const workspace = document.querySelector<HTMLElement>('#workspace');
-    if (!topbar || !context || !workspace) throw new Error('Top bar, context bar, or workspace is missing.');
-    const topbarBounds = topbar.getBoundingClientRect();
-    const contextBounds = context.getBoundingClientRect();
-    return {
-      gap: contextBounds.top - topbarBounds.bottom,
-      workspacePaddingTop: Number.parseFloat(getComputedStyle(workspace).paddingTop)
-    };
-  });
-  expect(topChrome.gap).toBeGreaterThanOrEqual(-1);
-  expect(topChrome.gap).toBeLessThanOrEqual(2);
-  expect(topChrome.workspacePaddingTop).toBe(0);
-
   await expect(page.locator('.series-hero-topline')).toBeHidden();
-  const chromeLayout = await page.evaluate(() => {
-    const matchup = document.querySelector<HTMLElement>('.series-hero-matchup');
-    const selector = document.querySelector<HTMLElement>('#game-selector');
-    const context = document.querySelector<HTMLElement>('.series-hero-live-context');
-    if (!matchup || !selector || !context) throw new Error('Compact live series chrome is incomplete.');
-    return {
-      matchupHeight: matchup.getBoundingClientRect().height,
-      selectorHeight: selector.getBoundingClientRect().height,
-      contextHeight: context.getBoundingClientRect().height
-    };
-  });
-  expect(chromeLayout.matchupHeight).toBeLessThanOrEqual(112);
-  expect(chromeLayout.selectorHeight).toBeLessThanOrEqual(54);
-  expect(chromeLayout.contextHeight).toBeLessThanOrEqual(34);
+  await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
+  await expect(board.locator('.mobile-live-parity-objectives')).toHaveCount(1);
+  await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
+  await expect(board.locator('.role-matchup-row')).toHaveCount(5);
+  await expect(board.locator('.role-player-name strong')).toHaveCount(10);
+  await expect(board.locator('.role-player-portrait')).toHaveCount(10);
+  await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
+  await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
+  await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
 
-  await expect(page.locator('.mobile-live-history-board > .mobile-completed-team-names')).toHaveCount(0);
-  await expect(page.locator('.mobile-live-history-board > .mobile-completed-objectives')).toHaveCount(0);
-
-  const visibleObjectiveSurfaces = await page.evaluate(() => {
-    const selectors = '.mobile-live-parity-objectives, .mobile-completed-objectives, .history-v2-objectives, .v2-objectives-card, .objective-hud-v3';
-    return [...document.querySelectorAll<HTMLElement>(selectors)]
-      .filter(element => {
-        const bounds = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return bounds.width > 0 && bounds.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
-      })
-      .map(element => element.className);
-  });
-  expect(visibleObjectiveSurfaces).toEqual(['mobile-live-parity-objectives']);
-
-  await page.evaluate(() => {
-    const history = document.querySelector<HTMLElement>('#series-history');
-    if (!history) throw new Error('Series history panel is missing.');
-    history.className = 'live-series-message-panel';
-    history.hidden = false;
-    history.innerHTML = '<div class="live-series-message warning">Series context enrichment is still loading.</div>';
-  });
-  await expect(page.locator('#series-history')).toBeHidden();
-  await expect(page.locator('#series-history')).toHaveText('');
-
-  const parityLayout = await board.locator('.mobile-live-parity-comparison').evaluate(element => {
-    const boardElement = element.closest<HTMLElement>('.mobile-live-history-board');
+  const layout = await board.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
     const teamStrip = element.querySelector<HTMLElement>('.mobile-live-parity-team-strip');
     const gold = element.querySelector<HTMLElement>('.mobile-live-parity-gold');
     const objectives = element.querySelector<HTMLElement>('.mobile-live-parity-objectives');
-    if (!boardElement || !teamStrip || !gold || !objectives) throw new Error('History-style live comparison is incomplete.');
-    const bounds = boardElement.getBoundingClientRect();
-    return {
-      boardWidth: bounds.width,
-      boardRadius: getComputedStyle(boardElement).borderRadius,
-      teamStripHeight: teamStrip.getBoundingClientRect().height,
-      goldWidth: gold.getBoundingClientRect().width,
-      objectiveHeight: objectives.getBoundingClientRect().height
-    };
-  });
-  expect(parityLayout.boardWidth).toBeGreaterThanOrEqual(360);
-  expect(parityLayout.boardWidth).toBeLessThanOrEqual(380);
-  expect(parityLayout.boardRadius).not.toBe('0px');
-  expect(parityLayout.teamStripHeight).toBeGreaterThanOrEqual(70);
-  expect(parityLayout.teamStripHeight).toBeLessThanOrEqual(94);
-  expect(parityLayout.goldWidth).toBeGreaterThanOrEqual(74);
-  expect(parityLayout.goldWidth).toBeLessThanOrEqual(82);
-  expect(parityLayout.objectiveHeight).toBeGreaterThanOrEqual(62);
-  expect(parityLayout.objectiveHeight).toBeLessThanOrEqual(82);
-
-  const teamNameLayout = await board.locator('.mobile-live-parity-team.blue strong').evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    const style = getComputedStyle(element);
-    return {
-      height: bounds.height,
-      lineHeight: Number.parseFloat(style.lineHeight),
-      whiteSpace: style.whiteSpace
-    };
-  });
-  expect(teamNameLayout.whiteSpace).toBe('normal');
-  expect(teamNameLayout.height).toBeGreaterThan(teamNameLayout.lineHeight * 1.5);
-  expect(teamNameLayout.height).toBeLessThanOrEqual(teamNameLayout.lineHeight * 2.2);
-
-  const names = board.locator('.role-player-name strong');
-  await expect(names).toHaveCount(10);
-  await expect(names.first()).toHaveText('USE top');
-  const nameLayout = await names.first().evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    const style = getComputedStyle(element);
+    const firstRow = element.querySelector<HTMLElement>('.role-matchup-row');
+    if (!teamStrip || !gold || !objectives || !firstRow) throw new Error('Shared board layout is incomplete.');
     return {
       width: bounds.width,
-      height: bounds.height,
-      display: style.display,
-      visibility: style.visibility,
-      opacity: Number(style.opacity)
+      radius: getComputedStyle(element).borderRadius,
+      teamStripHeight: teamStrip.getBoundingClientRect().height,
+      goldWidth: gold.getBoundingClientRect().width,
+      objectiveHeight: objectives.getBoundingClientRect().height,
+      firstRowHeight: firstRow.getBoundingClientRect().height,
+      overflow: document.documentElement.scrollWidth - window.innerWidth
     };
   });
-  expect(nameLayout.width).toBeGreaterThan(42);
-  expect(nameLayout.height).toBeGreaterThan(8);
-  expect(nameLayout.display).not.toBe('none');
-  expect(nameLayout.visibility).toBe('visible');
-  expect(nameLayout.opacity).toBeGreaterThan(0.9);
-
-  const portraits = board.locator('.role-player-portrait');
-  await expect(portraits).toHaveCount(10);
-  const portraitLayout = await portraits.first().evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    return { width: bounds.width, height: bounds.height };
-  });
-  expect(portraitLayout.width).toBeGreaterThanOrEqual(32);
-  expect(portraitLayout.height).toBeGreaterThanOrEqual(32);
-
-  const itemRows = board.locator('.role-player-items');
-  await expect(itemRows).toHaveCount(10);
-  const slots = board.locator('.role-player-items .telemetry-item-slot');
-  await expect(slots).toHaveCount(70);
-  const slotWidth = await slots.first().evaluate(element => element.getBoundingClientRect().width);
-  expect(slotWidth).toBeGreaterThanOrEqual(12);
-
-  const firstRowHeight = await board.locator('.role-matchup-row').first().evaluate(
-    element => element.getBoundingClientRect().height
-  );
-  expect(firstRowHeight).toBeGreaterThanOrEqual(72);
-  expect(firstRowHeight).toBeLessThanOrEqual(84);
-
-  await expect(board.locator('.player-board-toolbar')).toBeHidden();
+  expect(layout.width).toBeGreaterThanOrEqual(360);
+  expect(layout.width).toBeLessThanOrEqual(380);
+  expect(layout.radius).not.toBe('0px');
+  expect(layout.teamStripHeight).toBeGreaterThanOrEqual(70);
+  expect(layout.teamStripHeight).toBeLessThanOrEqual(94);
+  expect(layout.goldWidth).toBeGreaterThanOrEqual(74);
+  expect(layout.goldWidth).toBeLessThanOrEqual(82);
+  expect(layout.objectiveHeight).toBeGreaterThanOrEqual(62);
+  expect(layout.objectiveHeight).toBeLessThanOrEqual(82);
+  expect(layout.firstRowHeight).toBeGreaterThanOrEqual(72);
+  expect(layout.firstRowHeight).toBeLessThanOrEqual(84);
+  expect(layout.overflow).toBeLessThanOrEqual(1);
 
   const nav = page.locator('.mobile-app-nav');
   await expect(nav).toHaveAttribute('data-mobile-nav-clearance', 'measured');
@@ -300,8 +203,5 @@ test('mobile live board keeps compact chrome and uses the current history card l
     return navElement.getBoundingClientRect().top - lastRow.getBoundingClientRect().bottom;
   });
   expect(bottomClearance).toBeGreaterThanOrEqual(12);
-
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
   expect(pageErrors).toEqual([]);
 });

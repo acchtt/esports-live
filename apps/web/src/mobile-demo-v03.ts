@@ -20,7 +20,8 @@ const VERSION = '0.17.1';
 const LABEL = 'DEMO v0.17.1';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'history-copy';
-document.documentElement.dataset.mobileDemoRedeploy = '2026-08-04T15:56:00Z';
+document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';
+document.documentElement.dataset.mobileDemoRedeploy = '2026-08-04T16:05:00Z';
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');

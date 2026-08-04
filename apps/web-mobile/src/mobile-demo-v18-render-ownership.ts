@@ -17,13 +17,26 @@ function liveModeActive(): boolean {
     && body.dataset.mobileContext !== 'history';
 }
 
-function isCompleteHistoryCopy(board: HTMLElement): boolean {
-  return board.dataset.mobileHistoryCopy === 'true'
-    && Boolean(board.querySelector('.completed-team-comparison.completed-history-dashboard-v2'))
+function isCurrentHistoryDesign(board: HTMLElement): boolean {
+  return document.documentElement.dataset.mobileLiveHistoryDesign === 'v20'
+    && board.dataset.mobileLiveDesign === 'history-current'
+    && Boolean(board.querySelector('.completed-team-comparison.mobile-live-parity-comparison'))
+    && Boolean(board.querySelector('.mobile-live-parity-team-strip'))
+    && Boolean(board.querySelector('.mobile-live-parity-objectives'))
+    && board.querySelectorAll('.completed-final-matchups .role-matchup-row').length === 5;
+}
+
+function isLegacyHistoryCopy(board: HTMLElement): boolean {
+  return Boolean(board.querySelector('.completed-team-comparison.completed-history-dashboard-v2'))
     && Boolean(board.querySelector('.history-v2-team-header'))
     && Boolean(board.querySelector('.history-v2-summary'))
     && Boolean(board.querySelector('.history-v2-objectives'))
     && board.querySelectorAll('.completed-final-matchups .role-matchup-row').length === 5;
+}
+
+function isCompleteHistoryCopy(board: HTMLElement): boolean {
+  return board.dataset.mobileHistoryCopy === 'true'
+    && (isCurrentHistoryDesign(board) || isLegacyHistoryCopy(board));
 }
 
 function repairBoard(): void {

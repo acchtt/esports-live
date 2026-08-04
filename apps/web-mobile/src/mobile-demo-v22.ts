@@ -7,6 +7,24 @@ let cleanupQueued = false;
 const style = document.createElement('style');
 style.textContent = `
 @media(max-width:760px){
+  html body.mobile-demo-active #completed-match-detail
+  [data-mobile-scoreboard-renderer="shared-v1"]>.mobile-unified-scoreboard-comparison,
+  html body.mobile-demo-active[data-mobile-view="live"]
+  [data-mobile-scoreboard-renderer="shared-v1"]>.mobile-unified-scoreboard-comparison{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important
+  }
+
+  html body.mobile-demo-active #completed-match-detail
+  [data-mobile-scoreboard-renderer="shared-v1"]>.mobile-unified-scoreboard-matchups,
+  html body.mobile-demo-active[data-mobile-view="live"]
+  [data-mobile-scoreboard-renderer="shared-v1"]>.mobile-unified-scoreboard-matchups{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important
+  }
+
   body.mobile-demo-active[data-mobile-view="live"]:not([data-mobile-context="history"])
   .mobile-live-history-board[data-mobile-live-design="history-current"]>.mobile-completed-team-names,
   body.mobile-demo-active[data-mobile-view="live"]:not([data-mobile-context="history"])

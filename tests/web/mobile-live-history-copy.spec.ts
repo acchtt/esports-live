@@ -147,39 +147,52 @@ async function openLiveMatch(page: Page, withStats: boolean): Promise<void> {
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
 }
 
-test('mobile live matches reuse the completed-history board and keep navigation inside the app frame', async ({ page }) => {
+test('mobile live matches use the current completed-history visual design and keep navigation inside the app frame', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.3');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.4');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-live-board-owner', 'history-copy');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-history-design', 'v20');
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-live-board-state', 'verified');
   await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
-  await expect(board.locator('.completed-team-comparison.completed-history-dashboard-v2')).toBeVisible();
-  await expect(board.locator('.history-v2-team-header.mobile-completed-team-names')).toBeVisible();
-  await expect(board.locator('.history-v2-summary')).toBeVisible();
-  await expect(board.locator('.history-v2-objectives.mobile-completed-objectives')).toBeVisible();
+  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
+  await expect(board.locator('.completed-team-comparison.mobile-live-parity-comparison')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-gold')).toHaveAttribute('data-leading-side', 'blue');
+  await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+2.5K');
+  await expect(board.locator('.mobile-live-parity-objective-title')).toHaveText('OBJECTIVES · BLUE – RED');
+  await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
+  await expect(board.locator('.mobile-live-parity-objective.objective-towers .blue')).toHaveText('5');
+  await expect(board.locator('.mobile-live-parity-objective.objective-towers .red')).toHaveText('2');
+  await expect(board.locator('.history-v2-summary')).toHaveCount(0);
+  await expect(board.locator('.history-v2-quick-stats')).toHaveCount(0);
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-name strong')).toHaveCount(10);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
   await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
-  await expect(board.locator('.history-v2-team.blue strong')).toHaveText(blue.name);
-  await expect(board.locator('.history-v2-team.red strong')).toHaveText(red.name);
+  await expect(board.locator('.mobile-live-parity-team.blue strong')).toHaveText(blue.name);
+  await expect(board.locator('.mobile-live-parity-team.red strong')).toHaveText(red.name);
   await expect(page.locator('#game-content > .completed-final-game:not(.mobile-live-history-board)')).toHaveCount(0);
 
   const layout = await page.evaluate(() => {
     const frame = document.querySelector<HTMLElement>('.app-frame');
     const nav = document.querySelector<HTMLElement>('.mobile-app-nav');
-    if (!frame || !nav) throw new Error('Mobile frame or navigation is missing.');
+    const boardElement = document.querySelector<HTMLElement>('.mobile-live-history-board[data-mobile-live-design="history-current"]');
+    if (!frame || !nav || !boardElement) throw new Error('Mobile frame, board, or navigation is missing.');
     const frameBounds = frame.getBoundingClientRect();
     const navBounds = nav.getBoundingClientRect();
+    const boardBounds = boardElement.getBoundingClientRect();
     const buttons = [...nav.querySelectorAll<HTMLElement>('button')].map(button => button.getBoundingClientRect().width);
     return {
       frameLeft: frameBounds.left,
       frameRight: frameBounds.right,
+      boardLeft: boardBounds.left,
+      boardRight: boardBounds.right,
+      boardRadius: getComputedStyle(boardElement).borderRadius,
       navLeft: navBounds.left,
       navRight: navBounds.right,
       bottomGap: window.innerHeight - navBounds.bottom,
@@ -187,6 +200,9 @@ test('mobile live matches reuse the completed-history board and keep navigation 
       overflow: document.documentElement.scrollWidth - window.innerWidth
     };
   });
+  expect(layout.boardLeft).toBeGreaterThanOrEqual(layout.frameLeft + 4);
+  expect(layout.boardRight).toBeLessThanOrEqual(layout.frameRight - 4);
+  expect(layout.boardRadius).not.toBe('0px');
   expect(layout.navLeft).toBeGreaterThanOrEqual(layout.frameLeft + 6);
   expect(layout.navRight).toBeLessThanOrEqual(layout.frameRight - 6);
   expect(layout.bottomGap).toBeGreaterThanOrEqual(6);
@@ -209,7 +225,7 @@ test('mobile live matches reuse the completed-history board and keep navigation 
   expect(pageErrors).toEqual([]);
 });
 
-test('mobile live matches keep the history board shell while verified telemetry is pending', async ({ page }) => {
+test('mobile live matches keep the current history shell while verified telemetry is pending', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, false);
@@ -218,10 +234,14 @@ test('mobile live matches keep the history board shell while verified telemetry 
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-live-board-state', 'pending');
   await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
-  await expect(board.locator('.completed-team-comparison.completed-history-dashboard-v2')).toBeVisible();
+  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
+  await expect(board.locator('.completed-team-comparison.mobile-live-parity-comparison')).toBeVisible();
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
-  await expect(board.locator('.history-v2-team.blue strong')).toHaveText(blue.name);
-  await expect(board.locator('.history-v2-team.red strong')).toHaveText(red.name);
+  await expect(board.locator('.mobile-live-parity-team.blue strong')).toHaveText(blue.name);
+  await expect(board.locator('.mobile-live-parity-team.red strong')).toHaveText(red.name);
+  await expect(board.locator('.mobile-live-parity-gold')).toHaveClass(/neutral/);
+  await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('—');
+  await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
   await expect(board.locator('.mobile-live-board-notice')).toContainText('Waiting for Riot');
   await expect(page.getByRole('heading', { name: 'Waiting for verified gameplay' })).toHaveCount(0);
 

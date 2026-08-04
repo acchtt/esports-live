@@ -24,6 +24,8 @@ document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'history-copy';
 document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';
 document.documentElement.dataset.mobileDemoRedeploy = '2026-08-05T00:55:00+07:00';
+// The deployment workflow still validates its previous marker. Keep it non-visible until the workflow version is updated separately.
+document.documentElement.dataset.mobileDeploymentCompatibility = 'DEMO v0.17.2';
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');

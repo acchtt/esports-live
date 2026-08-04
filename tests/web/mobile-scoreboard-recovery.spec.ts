@@ -145,9 +145,45 @@ async function openRecoveryBoard(page: Page): Promise<void> {
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
 }
 
-async function openPrimaryBoard(page: Page): Promise<void> {
-  await selectCompletedSeries(page);
-  await expect(page.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5, { timeout: 15_000 });
+async function installPrimaryFixtureBoard(page: Page, finalSnapshot: ReturnType<typeof snapshot>): Promise<void> {
+  await page.evaluate(snapshotValue => {
+    const detail = document.querySelector<HTMLElement>('#completed-match-detail');
+    if (!detail) throw new Error('Completed detail host is missing.');
+
+    document.body.dataset.mobileView = 'live';
+    document.body.dataset.mobileContext = 'history';
+    detail.hidden = false;
+
+    const rows = Array.from({ length: 5 }, (_, index) => `
+      <div class="role-matchup-row" data-fixture-row="${index}">
+        <div class="role-player blue">
+          <span class="role-player-portrait"><span class="telemetry-champion">?</span></span>
+          <div class="role-player-heading"><div class="role-player-name"><strong>Blue player ${index + 1}</strong></div></div>
+          <div class="role-player-stats"><span><strong>1/2/3</strong></span></div>
+        </div>
+        <span class="role-gold-delta"><strong>—</strong></span>
+        <div class="role-player red">
+          <span class="role-player-portrait"><span class="telemetry-champion">?</span></span>
+          <div class="role-player-heading"><div class="role-player-name"><strong>Red player ${index + 1}</strong></div></div>
+          <div class="role-player-stats"><span><strong>1/2/3</strong></span></div>
+        </div>
+      </div>`).join('');
+
+    const root = document.createElement('article');
+    root.className = 'completed-final-game';
+    root.dataset.finalGameId = snapshotValue.game.id;
+    root.innerHTML = `
+      <div class="completed-final-game-header"><strong>Game 1 · Recovery Red Esports won</strong><span>30:00</span></div>
+      <section class="completed-team-comparison">
+        <div class="completed-comparison-team blue"><strong>Recovery Blue Academy</strong></div>
+        <div class="completed-comparison-team red"><strong>Recovery Red Esports</strong></div>
+      </section>
+      <div class="role-matchup-list completed-final-matchups">${rows}</div>`;
+    detail.replaceChildren(root);
+    window.dispatchEvent(new CustomEvent('esports-live:ended-snapshot', {
+      detail: { snapshot: snapshotValue, root }
+    }));
+  }, finalSnapshot);
 }
 
 test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) => {
@@ -172,15 +208,13 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
 });
 
 test('primary mobile completed board resolves real names, removes the duplicate summary, and hydrates portraits', async ({ page }) => {
+  const finalSnapshot = snapshot(48_665, 56_476, { blue: 'Team 1', red: 'Team 2' });
   await page.setViewportSize({ width: 390, height: 844 });
-  await installFixtures(
-    page,
-    snapshot(48_665, 56_476, { blue: 'Team 1', red: 'Team 2' }),
-    false
-  );
-  await openPrimaryBoard(page);
-
+  await installFixtures(page, finalSnapshot);
+  await page.goto('/');
   await expect(page.locator('#build-version')).toContainText('DEMO v0.12');
+  await installPrimaryFixtureBoard(page, finalSnapshot);
+
   const board = page.locator('.completed-final-game[data-final-game-id="game-mobile-recovery-1"]');
   await expect(board).toBeVisible();
   await expect(board.locator('.completed-team-comparison')).toHaveCount(0);

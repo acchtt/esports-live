@@ -251,7 +251,7 @@ function liveModeActive(): boolean {
 }
 
 function fallbackName(board: HTMLElement, side: Side): string {
-  return board.querySelector<HTMLElement>(`.history-v2-team.${side} strong, .mobile-completed-team-names .${side} strong`)?.textContent?.trim()
+  return board.querySelector<HTMLElement>(`.history-v2-team.${side} strong, .mobile-completed-team-names .${side} strong, .mobile-live-parity-team.${side} strong`)?.textContent?.trim()
     || (side === 'blue' ? 'Blue team' : 'Red team');
 }
 
@@ -336,9 +336,6 @@ window.addEventListener('esports-live:ended-snapshot', event => {
   if (detail?.root) queueMicrotask(() => applyCurrentHistoryDesign(detail.root!, detail.snapshot ?? null));
 });
 
-if (gameContent) {
-  new MutationObserver(queueApply).observe(gameContent, { childList: true, subtree: true });
-}
 new MutationObserver(queueApply).observe(body, { attributes: true, attributeFilter: ['data-mobile-view', 'data-mobile-context'] });
 window.addEventListener('pageshow', queueApply);
 if (typeof media.addEventListener === 'function') media.addEventListener('change', queueApply);

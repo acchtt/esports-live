@@ -297,7 +297,8 @@ function applyCurrentHistoryDesign(board: HTMLElement, snapshot: LiveSnapshot<Lo
     blue: usableSnapshot?.stats?.blue.name ?? fallbackName(board, 'blue'),
     red: usableSnapshot?.stats?.red.name ?? fallbackName(board, 'red')
   });
-  if (board.dataset.mobileLiveDesignKey === key) return;
+  const currentMarkupPresent = Boolean(comparison.querySelector('.mobile-live-parity-team-strip'));
+  if (board.dataset.mobileLiveDesignKey === key && currentMarkupPresent) return;
 
   comparison.className = 'completed-team-comparison completed-history-dashboard-v2 objective-text-only mobile-live-parity-comparison';
   comparison.dataset.historyDashboardV2 = 'true';

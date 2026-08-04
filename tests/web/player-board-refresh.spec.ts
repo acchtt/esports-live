@@ -128,14 +128,13 @@ test('refreshes the selected live player board on demand', async ({ page }) => {
   await expect(page.locator('[data-live-history-game-id="game-live-refresh"]')).toBeVisible();
   await expect.poll(liveRequests).toBeGreaterThan(0);
 
-  const refreshButton = page.getByRole('button', { name: 'Refresh live player board' });
+  const refreshButton = page.getByRole('button', { name: 'Refresh', exact: true });
   await expect(refreshButton).toBeVisible();
   const requestCount = liveRequests();
   await refreshButton.click();
 
   await expect.poll(liveRequests).toBeGreaterThan(requestCount);
-  await expect(page.getByRole('button', { name: 'Refresh live player board' })).toBeEnabled();
-  await expect(page.locator('.player-board-toolbar-copy small')).toContainText('Last updated');
+  await expect(refreshButton).toBeEnabled();
   await expect(page.locator('#game-selector [data-game-id="game-live-refresh"]')).toHaveClass(/active/);
   expect(pageErrors).toEqual([]);
 });

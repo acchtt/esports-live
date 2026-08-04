@@ -2,19 +2,19 @@
   position: relative;
   display: grid;
   align-content: center;
-  min-height: 98px;
-  padding: 8px 12px 9px;
+  min-height: 90px;
+  padding: 10px 14px;
   overflow: hidden;
   background:
-    linear-gradient(90deg, rgba(35, 164, 255, 0.045), transparent 26%, transparent 74%, rgba(255, 57, 87, 0.045)),
-    linear-gradient(180deg, rgba(10, 24, 42, 0.98), rgba(5, 14, 25, 0.98));
+    linear-gradient(90deg, rgba(35, 164, 255, 0.065), transparent 28%, transparent 72%, rgba(255, 57, 87, 0.065)),
+    linear-gradient(180deg, rgba(11, 27, 47, 0.99), rgba(5, 15, 27, 0.99));
 }
 
 .v2-objectives-card.objective-hud-v3::before,
 .v2-objectives-card.objective-hud-v3::after {
   position: absolute;
   top: 0;
-  width: 44px;
+  width: 64px;
   height: 2px;
   content: '';
   pointer-events: none;
@@ -22,37 +22,14 @@
 
 .v2-objectives-card.objective-hud-v3::before {
   left: 0;
-  background: linear-gradient(90deg, #43bbff, transparent);
-  box-shadow: 0 0 14px rgba(67, 187, 255, 0.42);
+  background: linear-gradient(90deg, #55c2ff, transparent);
+  box-shadow: 0 0 16px rgba(67, 187, 255, 0.48);
 }
 
 .v2-objectives-card.objective-hud-v3::after {
   right: 0;
-  background: linear-gradient(270deg, #ff4964, transparent);
-  box-shadow: 0 0 14px rgba(255, 73, 100, 0.4);
-}
-
-.v3-objective-title {
-  display: grid;
-  grid-template-columns: minmax(24px, 1fr) auto minmax(24px, 1fr);
-  align-items: center;
-  gap: 8px;
-  width: min(180px, 36%);
-  margin: 0 auto 3px;
-  color: #8495ab;
-  font-size: 8px;
-  font-weight: 850;
-  letter-spacing: 0.15em;
-  text-align: center;
-}
-
-.v3-objective-title i {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(135, 160, 193, 0.36));
-}
-
-.v3-objective-title i:last-child {
-  background: linear-gradient(90deg, rgba(135, 160, 193, 0.36), transparent);
+  background: linear-gradient(270deg, #ff5a74, transparent);
+  box-shadow: 0 0 16px rgba(255, 73, 100, 0.46);
 }
 
 .v3-objective-hud {
@@ -63,71 +40,52 @@
 }
 
 .v3-objective-side {
-  position: relative;
   display: grid;
-  grid-template-columns: repeat(4, minmax(48px, 1fr));
+  grid-template-columns: repeat(4, minmax(58px, 1fr));
   align-items: stretch;
-  gap: 5px;
+  gap: 8px;
   min-width: 0;
-  padding-top: 12px;
 }
 
-.v3-objective-side::before {
-  position: absolute;
-  top: 0;
-  color: currentColor;
-  font-size: 7px;
-  font-weight: 900;
-  letter-spacing: 0.13em;
-  opacity: 0.72;
-}
-
-.v3-objective-side.blue::before {
-  left: 5px;
-  content: 'BLUE SIDE';
-}
-
-.v3-objective-side.red::before {
-  right: 5px;
-  content: 'RED SIDE';
-}
-
-.v3-objective-side.blue { color: #39b8ff; }
-.v3-objective-side.red { color: #ff4565; }
+.v3-objective-side.blue { color: #56c8ff; }
+.v3-objective-side.red { color: #ff607b; }
 
 .v3-objective-stat {
   position: relative;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 3px;
+  gap: 6px;
   min-width: 0;
-  min-height: 46px;
-  padding: 5px 4px;
-  border: 1px solid rgba(112, 151, 196, 0.1);
-  border-radius: 7px;
+  min-height: 58px;
+  padding: 8px 7px;
+  border: 1px solid rgba(151, 179, 211, 0.18);
+  border-radius: 9px;
   color: currentColor;
-  background: rgba(255, 255, 255, 0.016);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.03),
+    0 5px 14px rgba(0, 0, 0, 0.12);
   text-align: center;
 }
 
 .v3-objective-side.blue .v3-objective-stat {
-  border-color: rgba(57, 184, 255, 0.11);
-  background: linear-gradient(180deg, rgba(57, 184, 255, 0.03), rgba(255, 255, 255, 0.01));
+  border-color: rgba(79, 196, 255, 0.25);
+  background: linear-gradient(180deg, rgba(79, 196, 255, 0.09), rgba(79, 196, 255, 0.02));
 }
 
 .v3-objective-side.red .v3-objective-stat {
-  border-color: rgba(255, 69, 101, 0.11);
-  background: linear-gradient(180deg, rgba(255, 69, 101, 0.03), rgba(255, 255, 255, 0.01));
+  border-color: rgba(255, 88, 115, 0.25);
+  background: linear-gradient(180deg, rgba(255, 88, 115, 0.09), rgba(255, 88, 115, 0.02));
 }
 
 .v3-objective-label {
   max-width: 100%;
   overflow: hidden;
-  color: #b9c6d5;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.025em;
+  color: #e4ebf3;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
   line-height: 1;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -136,41 +94,42 @@
 
 .v3-objective-stat strong {
   color: currentColor;
-  font-size: 17px;
+  font-size: 24px;
   font-variant-numeric: tabular-nums;
-  font-weight: 850;
-  line-height: 1;
-  text-shadow: 0 0 12px color-mix(in srgb, currentColor 16%, transparent);
+  font-weight: 900;
+  line-height: 0.95;
+  text-shadow: 0 0 14px color-mix(in srgb, currentColor 32%, transparent);
 }
 
 .v3-objective-center {
   position: relative;
   display: block;
   width: 1px;
-  height: 52px;
+  height: 62px;
   margin: auto;
-  background: linear-gradient(180deg, transparent, rgba(143, 165, 194, 0.26), transparent);
+  background: linear-gradient(180deg, transparent, rgba(176, 195, 220, 0.42), transparent);
 }
 
 .v3-objective-center::before,
 .v3-objective-center::after {
   position: absolute;
   top: 50%;
-  width: 7px;
+  width: 9px;
   height: 1px;
   content: '';
-  background: linear-gradient(90deg, transparent, rgba(129, 151, 181, 0.18));
+  background: linear-gradient(90deg, transparent, rgba(160, 181, 208, 0.3));
 }
 
-.v3-objective-center::before { right: 5px; }
+.v3-objective-center::before { right: 6px; }
 .v3-objective-center::after {
-  left: 5px;
+  left: 6px;
   transform: scaleX(-1);
 }
 
 @media (max-width: 1180px) {
   .v2-objectives-card.objective-hud-v3 {
-    padding-inline: 9px;
+    min-height: 86px;
+    padding-inline: 10px;
   }
 
   .v3-objective-hud {
@@ -178,29 +137,28 @@
   }
 
   .v3-objective-side {
-    grid-template-columns: repeat(4, minmax(42px, 1fr));
-    gap: 3px;
+    grid-template-columns: repeat(4, minmax(46px, 1fr));
+    gap: 5px;
+  }
+
+  .v3-objective-stat {
+    min-height: 52px;
+    padding-inline: 5px;
   }
 
   .v3-objective-label {
-    font-size: 7px;
+    font-size: 10px;
   }
 
   .v3-objective-stat strong {
-    font-size: 16px;
+    font-size: 22px;
   }
 }
 
 @media (max-width: 720px) {
   .v2-objectives-card.objective-hud-v3 {
-    min-height: 92px;
-    padding: 7px 6px;
-  }
-
-  .v3-objective-title {
-    width: min(170px, 58%);
-    margin-bottom: 2px;
-    font-size: 7px;
+    min-height: 80px;
+    padding: 8px 6px;
   }
 
   .v3-objective-hud {
@@ -209,28 +167,26 @@
 
   .v3-objective-side {
     grid-template-columns: repeat(4, minmax(31px, 1fr));
-    gap: 2px;
-    padding-top: 11px;
-  }
-
-  .v3-objective-side::before {
-    font-size: 6px;
+    gap: 3px;
   }
 
   .v3-objective-stat {
-    min-height: 43px;
-    padding-inline: 2px;
+    min-height: 46px;
+    gap: 4px;
+    padding: 5px 2px;
+    border-radius: 7px;
   }
 
   .v3-objective-label {
-    font-size: 6px;
+    font-size: 8px;
+    letter-spacing: 0.015em;
   }
 
   .v3-objective-stat strong {
-    font-size: 14px;
+    font-size: 18px;
   }
 
   .v3-objective-center {
-    height: 48px;
+    height: 52px;
   }
 }

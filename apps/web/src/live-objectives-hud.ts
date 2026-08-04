@@ -36,8 +36,7 @@ function objectiveValue(team: LolTeamState, key: ObjectiveKey): number | null {
 
 function objectiveMarkup(team: LolTeamState, key: ObjectiveKey): string {
   const label = OBJECTIVE_LABELS[key];
-  const value = objectiveValue(team, key);
-  const formatted = formatObjective(value);
+  const formatted = formatObjective(objectiveValue(team, key));
   return `
     <div class="v3-objective-stat objective-${key}" title="${label}" aria-label="${label}: ${formatted}">
       <span class="v3-objective-label">${label}</span>
@@ -66,16 +65,13 @@ function applyObjectiveHud(): void {
     objectiveValue(snapshot.stats!.blue, key),
     objectiveValue(snapshot.stats!.red, key)
   ]);
-  const signature = JSON.stringify(['objective-text-v1', snapshot.game.id, ...values]);
+  const signature = JSON.stringify(['objective-text-v2', snapshot.game.id, ...values]);
   if (card.dataset.objectiveHudSignature === signature) return;
 
   card.classList.add('objective-hud-v3', 'objective-text-only');
   card.classList.remove('objective-emblems-v2');
   card.dataset.objectiveHudSignature = signature;
   card.innerHTML = `
-    <div class="v3-objective-title" aria-hidden="true">
-      <i></i><span>OBJECTIVES</span><i></i>
-    </div>
     <div class="v3-objective-hud">
       ${sideMarkup(snapshot.stats.blue, 'blue')}
       <span class="v3-objective-center" aria-hidden="true"></span>

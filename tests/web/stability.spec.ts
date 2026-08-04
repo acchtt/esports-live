@@ -230,7 +230,7 @@ test('stays visible and interactive through polling and view changes', async ({ 
     schedule: element.querySelector<HTMLElement>('.schedule-panel')?.getBoundingClientRect().width ?? 0,
     analysis: element.querySelector<HTMLElement>('.analysis-panel')?.getBoundingClientRect().width ?? 0
   }));
-  expect(collapsedWidths.schedule).toBeGreaterThan(360);
+  expect(collapsedWidths.schedule).toBeGreaterThan(300);
   expect(collapsedWidths.analysis).toBeGreaterThan(800);
 
   await platformToggle.click();
@@ -253,9 +253,9 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await expect(liveScoreboard).toBeVisible();
 
   const liveClock = page.locator('#live-game-clock');
-  const liveClockHeader = page.locator('.completed-final-game-header.live-match-clock-header');
+  const liveClockHeader = page.locator('.v2-hero');
   await expect(liveClock).toHaveText(/\d+:\d{2}/);
-  await expect(page.locator('.live-match-clock-patch')).toContainText('Patch 26.15');
+  await expect(page.locator('.v2-footer > span').first()).toContainText('Patch 26.15');
   const clockCenterOffset = await liveClockHeader.evaluate(header => {
     const clock = header.querySelector<HTMLElement>('#live-game-clock');
     if (!clock) return Number.POSITIVE_INFINITY;

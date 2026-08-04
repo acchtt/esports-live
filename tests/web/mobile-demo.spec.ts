@@ -153,9 +153,9 @@ test('mobile demo switches surfaces and uses the history board design for live m
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.15');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.16');
   await expect(nav).toBeVisible();
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.15');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.16');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   await expect(schedule).toBeVisible();
   await expect(analysis).toBeHidden();

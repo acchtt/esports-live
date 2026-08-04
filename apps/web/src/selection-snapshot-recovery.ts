@@ -6,7 +6,6 @@ export {};
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const RETRY_MS = 2_000;
-const PENDING_NOTICE_MS = 1_500;
 
 const scheduleList = document.querySelector<HTMLElement>('#schedule-list');
 const gameSelector = document.querySelector<HTMLElement>('#game-selector');
@@ -14,18 +13,12 @@ const gameContent = document.querySelector<HTMLElement>('#game-content');
 
 let requestGeneration = 0;
 let refreshTimer: number | null = null;
-let pendingNoticeTimer: number | null = null;
 let queued = false;
 let activeKey = '';
 
 function clearRefreshTimer(): void {
   if (refreshTimer !== null) window.clearTimeout(refreshTimer);
   refreshTimer = null;
-}
-
-function clearPendingNoticeTimer(): void {
-  if (pendingNoticeTimer !== null) window.clearTimeout(pendingNoticeTimer);
-  pendingNoticeTimer = null;
 }
 
 function selectedSeriesButton(): HTMLButtonElement | null {
@@ -66,7 +59,10 @@ function selectedGameIsRendered(gameId: string): boolean {
 }
 
 function escapeHtml(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
 
 function renderLoading(): void {
@@ -75,18 +71,23 @@ function renderLoading(): void {
     <div class="analysis-empty" data-selection-snapshot-loading>
       <span class="analysis-empty-icon" aria-hidden="true">↻</span>
       <h3>Loading selected game</h3>
-      <p>Checking Riot's live telemetry feed.</p>
+      <p>Fetching the latest verified telemetry for this game.</p>
     </div>`;
 }
 
-function renderPending(message: string): void {
+function waitingMessage(message: string): string {
+  return /no valid telemetry frame|source timestamp|normalized gameplay frame/i.test(message)
+    ? 'Riot has marked this game live, but its live feed has not published a timestamped gameplay frame yet.'
+    : message;
+}
+
+function renderWaiting(message: string): void {
   if (!gameContent) return;
   gameContent.innerHTML = `
-    <div class="analysis-empty" data-selection-snapshot-pending>
-      <span class="analysis-empty-icon" aria-hidden="true">◷</span>
-      <h3>Live telemetry pending</h3>
-      <p>${escapeHtml(message)}</p>
-      <small>Riot can mark a game live before publishing a verified gameplay frame. Retrying automatically.</small>
+    <div class="analysis-empty" data-selection-snapshot-waiting>
+      <span class="analysis-empty-icon" aria-hidden="true">↻</span>
+      <h3>Waiting for live telemetry</h3>
+      <p>${escapeHtml(waitingMessage(message))} Retrying automatically.</p>
     </div>`;
 }
 
@@ -119,20 +120,9 @@ async function refreshSelectedSnapshot(force = false, showLoading = true): Promi
 
   const generation = ++requestGeneration;
   clearRefreshTimer();
-  clearPendingNoticeTimer();
 
   const hasCurrentPanel = selectedGameIsRendered(selection.gameId);
-  if (showLoading && !hasCurrentPanel) {
-    renderLoading();
-    pendingNoticeTimer = window.setTimeout(() => {
-      pendingNoticeTimer = null;
-      if (generation !== requestGeneration) return;
-      if (!selectionStillMatches(selection.seriesId, selection.gameId)) return;
-      if (!selectedGameIsRendered(selection.gameId)) {
-        renderPending('The game is listed as live, but a verified gameplay frame has not arrived yet.');
-      }
-    }, PENDING_NOTICE_MS);
-  }
+  if (showLoading && !hasCurrentPanel) renderLoading();
 
   let shouldRetry = false;
 
@@ -153,7 +143,7 @@ async function refreshSelectedSnapshot(force = false, showLoading = true): Promi
       if (!selectedGameIsRendered(selection.gameId)) {
         const reason = snapshot.quality.reasons.map(item => item.message).join(' ')
           || 'No normalized gameplay frame is available for this game yet.';
-        if (shouldRetry) renderPending(reason);
+        if (shouldRetry) renderWaiting(reason);
         else renderUnavailable(reason);
       }
     }
@@ -164,11 +154,10 @@ async function refreshSelectedSnapshot(force = false, showLoading = true): Promi
     shouldRetry = selection.gameState !== 'completed';
     if (!selectedGameIsRendered(selection.gameId)) {
       const message = error instanceof Error ? error.message : 'Unknown snapshot error.';
-      if (shouldRetry) renderPending(message);
+      if (shouldRetry) renderWaiting(message);
       else renderUnavailable(message);
     }
   } finally {
-    clearPendingNoticeTimer();
     if (generation !== requestGeneration) return;
     if (!selectionStillMatches(selection.seriesId, selection.gameId)) return;
     if (shouldRetry) scheduleRefresh(selection.seriesId, selection.gameId);
@@ -208,7 +197,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     requestGeneration += 1;
     clearRefreshTimer();
-    clearPendingNoticeTimer();
     return;
   }
   queueSelectionSync(true);
@@ -216,7 +204,6 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('beforeunload', () => {
   requestGeneration += 1;
   clearRefreshTimer();
-  clearPendingNoticeTimer();
 });
 
 queueSelectionSync(true);

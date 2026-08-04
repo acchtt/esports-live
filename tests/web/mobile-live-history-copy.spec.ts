@@ -168,7 +168,9 @@ test('live matches use the shared mobile scoreboard renderer', async ({ page }) 
   const layout = await page.evaluate(() => {
     const frame = document.querySelector<HTMLElement>('.app-frame');
     const nav = document.querySelector<HTMLElement>('.mobile-app-nav');
-    const boardElement = document.querySelector<HTMLElement>('[data-mobile-scoreboard-renderer="shared-v1"]');
+    const boardElement = document.querySelector<HTMLElement>(
+      '.mobile-live-history-board[data-mobile-scoreboard-renderer="shared-v1"]'
+    );
     if (!frame || !nav || !boardElement) throw new Error('Mobile frame, board, or navigation is missing.');
     const frameBounds = frame.getBoundingClientRect();
     const navBounds = nav.getBoundingClientRect();

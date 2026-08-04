@@ -11,10 +11,12 @@ style.textContent = `
   }
 
   body.mobile-demo-active[data-mobile-context="history"] .analysis-panel{
+    overflow:visible!important;
     padding-top:0!important
   }
 
   body.mobile-demo-active[data-mobile-context="history"] .mobile-context-bar{
+    position:sticky!important;
     top:64px!important;
     z-index:45!important;
     min-height:46px!important;

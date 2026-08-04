@@ -4,6 +4,7 @@ const provider = { id: 'fixture', name: 'Fixture provider' };
 const blue = { id: 'history-blue', name: 'History Blue', code: 'HBL' };
 const red = { id: 'history-red', name: 'History Red', code: 'HRD' };
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
+const champions = ['Gnar', 'LeeSin', 'Syndra', 'Ezreal', 'Nautilus'] as const;
 
 function iso(offsetMs = 0): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -24,7 +25,7 @@ function players(side: 'blue' | 'red') {
   return roles.map((role, index) => ({
     id: `${side}-${index + 1}`,
     handle: `${side === 'blue' ? 'Blue' : 'Red'} ${role}`,
-    championId: `${role} champion`,
+    championId: champions[index],
     role,
     level: 11 + index,
     kills: side === 'blue' ? 2 + index : index,
@@ -82,11 +83,7 @@ function completedSnapshot() {
 }
 
 async function json(route: Route, value: unknown): Promise<void> {
-  await route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(value)
-  });
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
 }
 
 async function installFixtures(page: Page): Promise<void> {
@@ -96,7 +93,6 @@ async function installFixtures(page: Page): Promise<void> {
     schemaVersion: '1.0',
     adapters: ['lol']
   }));
-
   await page.route('**/v1/lol/schedule**', route => {
     const activeOnly = route.request().url().includes('states=live,paused,scheduled');
     return json(route, {
@@ -104,7 +100,6 @@ async function installFixtures(page: Page): Promise<void> {
       events: activeOnly ? [] : [{ series: completedSeries, provider, observedAt: iso() }]
     });
   });
-
   await page.route('**/v1/lol/series/**/context**', route => json(route, {
     schemaVersion: '1.0',
     esport: 'lol',
@@ -117,10 +112,7 @@ async function installFixtures(page: Page): Promise<void> {
       bestOf: 1,
       winsRequired: 1,
       drawPossible: false,
-      score: [
-        { team: blue, wins: 1 },
-        { team: red, wins: 0 }
-      ],
+      score: [{ team: blue, wins: 1 }, { team: red, wins: 0 }],
       games: [{
         ...completedSeries.games[0],
         blueTeam: blue,
@@ -132,11 +124,15 @@ async function installFixtures(page: Page): Promise<void> {
     complete: true,
     reasons: []
   }));
-
   await page.route('**/v1/lol/games/**/live**', route => json(route, completedSnapshot()));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#334155"/></svg>'
+  }));
 }
 
-test('mobile match history stays on the list until a result is selected', async ({ page }) => {
+test('mobile match history stays on the list until selected and then uses the shared scoreboard', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -144,7 +140,7 @@ test('mobile match history stays on the list until a result is selected', async 
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
   await page.getByRole('button', { name: 'Open match history' }).click();
 
   const historyCard = page.locator('[data-completed-series-id="series-mobile-history"]');
@@ -160,6 +156,21 @@ test('mobile match history stays on the list until a result is selected', async 
   await expect(page.locator('#completed-match-detail')).toBeVisible();
   await expect(page.locator('.analysis-header')).toBeHidden();
 
+  const board = page.locator('#completed-match-detail [data-final-game-id="game-mobile-history-1"]');
+  await expect(board).toBeVisible({ timeout: 15_000 });
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'history');
+  await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
+  await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+4.7K');
+  await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
+  await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
+  await expect(board.locator('.role-player-portrait')).toHaveCount(10);
+  await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
+  await expect(board.locator('.history-v2-summary')).toHaveCount(0);
+  await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
+  await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
+
   const historyChrome = await page.evaluate(() => {
     const panel = document.querySelector<HTMLElement>('.analysis-panel');
     const topbar = document.querySelector<HTMLElement>('.topbar');
@@ -170,29 +181,13 @@ test('mobile match history stays on the list until a result is selected', async 
     return {
       contextIsFirst: panel.firstElementChild === context,
       gap: contextBounds.top - topbarBounds.bottom,
-      contextHeight: contextBounds.height
+      contextHeight: contextBounds.height,
+      overflow: document.documentElement.scrollWidth - window.innerWidth
     };
   });
   expect(historyChrome.contextIsFirst).toBe(true);
   expect(Math.abs(historyChrome.gap)).toBeLessThanOrEqual(2);
   expect(historyChrome.contextHeight).toBeLessThanOrEqual(50);
-
-  const normalRows = page.locator('.completed-final-matchups .role-matchup-row');
-  const recoveryRows = page.locator('.mobile-recovery-matchups .mobile-recovery-row');
-  await expect.poll(async () => (
-    await normalRows.count() + await recoveryRows.count()
-  ), { timeout: 15_000 }).toBe(5);
-
-  const normalBoardReady = await normalRows.count() === 5;
-  const board = normalBoardReady
-    ? page.locator('.completed-final-matchups')
-    : page.locator('.mobile-recovery-matchups');
-  const boardHeight = await board.evaluate(element => element.getBoundingClientRect().height);
-  expect(boardHeight).toBeLessThanOrEqual(360);
-
-  const horizontalOverflow = await page.evaluate(() => (
-    document.documentElement.scrollWidth - window.innerWidth
-  ));
-  expect(horizontalOverflow).toBeLessThanOrEqual(1);
+  expect(historyChrome.overflow).toBeLessThanOrEqual(1);
   expect(pageErrors).toEqual([]);
 });

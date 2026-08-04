@@ -16,12 +16,12 @@ import './mobile-demo-v18.ts';
 import './mobile-demo-v18-history-nav-compat.ts';
 import './mobile-demo-v18-render-ownership.ts';
 
-const VERSION = '0.17.1';
-const LABEL = 'DEMO v0.17.1';
+const VERSION = '0.17.2';
+const LABEL = 'DEMO v0.17.2';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'history-copy';
 document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';
-document.documentElement.dataset.mobileDemoRedeploy = '2026-08-04T16:05:00Z';
+document.documentElement.dataset.mobileDemoRedeploy = '2026-08-05T00:10:00+07:00';
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');

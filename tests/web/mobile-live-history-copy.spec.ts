@@ -152,7 +152,7 @@ test('mobile live matches use the current completed-history visual design and ke
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.4');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.5');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-live-board-owner', 'history-copy');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-live-history-design', 'v20');
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');

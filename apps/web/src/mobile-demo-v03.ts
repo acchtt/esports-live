@@ -2,9 +2,10 @@ import './mobile-completed-scoreboard-recovery.ts';
 import './mobile-demo-v05.ts';
 import './mobile-demo-v06.ts';
 import './mobile-demo-v08.ts';
+import './mobile-demo-v09.ts';
 
-const VERSION = '0.8';
-const LABEL = 'DEMO v0.8';
+const VERSION = '0.9';
+const LABEL = 'DEMO v0.9';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 
 function applyMobileDemoVersion(): void {

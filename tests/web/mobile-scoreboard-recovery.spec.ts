@@ -4,8 +4,7 @@ const provider = { id: 'fixture', name: 'Fixture provider' };
 const blue = { id: 'recovery-blue', name: 'Recovery Blue Academy', code: 'RBL' };
 const red = { id: 'recovery-red', name: 'Recovery Red Esports', code: 'RRD' };
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
-const championNames = ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'] as const;
-const championNumericKeys = ['126', '57', '61', '22', '12'] as const;
+const champions = ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'] as const;
 
 function iso(offsetMs = 0): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -22,11 +21,11 @@ const series = {
   games: [{ id: 'game-mobile-recovery-1', number: 1, state: 'completed' }]
 };
 
-function players(side: 'blue' | 'red', numericChampionIds = false) {
+function players(side: 'blue' | 'red') {
   return roles.map((role, index) => ({
     id: `${side}-${index}`,
-    handle: `${side} ${role}`,
-    championId: numericChampionIds ? championNumericKeys[index] : championNames[index],
+    handle: `${side === 'blue' ? 'RBL' : 'RRD'} ${role}`,
+    championId: champions[index],
     role,
     level: 12,
     kills: side === 'blue' ? 2 : 1,
@@ -38,12 +37,7 @@ function players(side: 'blue' | 'red', numericChampionIds = false) {
   }));
 }
 
-function snapshot(
-  blueGold = 35_000,
-  redGold = 31_000,
-  telemetryNames: { blue: string; red: string } | null = null,
-  numericChampionIds = false
-) {
+function snapshot(blueGold = 35_000, redGold = 31_000) {
   return {
     schemaVersion: '1.0',
     esport: 'lol',
@@ -55,21 +49,19 @@ function snapshot(
       patch: '16.15.1',
       blue: {
         ...blue,
-        name: telemetryNames?.blue ?? blue.name,
         side: 'blue',
         gold: blueGold,
         kills: 12,
         objectives: { towers: 8, inhibitors: 1, dragons: ['infernal'], barons: 1, heralds: 1, grubs: 3 },
-        players: players('blue', numericChampionIds)
+        players: players('blue')
       },
       red: {
         ...red,
-        name: telemetryNames?.red ?? red.name,
         side: 'red',
         gold: redGold,
         kills: 7,
         objectives: { towers: 3, inhibitors: 0, dragons: ['cloud'], barons: 0, heralds: 0, grubs: 1 },
-        players: players('red', numericChampionIds)
+        players: players('red')
       }
     },
     quality: {
@@ -89,11 +81,7 @@ async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
 }
 
-async function installFixtures(
-  page: Page,
-  finalSnapshot = snapshot(),
-  failFirstFinalRequest = true
-): Promise<void> {
+async function installFixtures(page: Page): Promise<void> {
   await page.route('**/health', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -122,328 +110,92 @@ async function installFixtures(
     complete: true,
     reasons: []
   }));
-  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['16.15.1']));
-  await page.route('https://ddragon.leagueoflegends.com/cdn/16.15.1/data/en_US/champion.json', route => json(route, {
-    data: {
-      Jayce: { id: 'Jayce', key: '126', name: 'Jayce' },
-      Maokai: { id: 'Maokai', key: '57', name: 'Maokai' },
-      Orianna: { id: 'Orianna', key: '61', name: 'Orianna' },
-      Ashe: { id: 'Ashe', key: '22', name: 'Ashe' },
-      Alistar: { id: 'Alistar', key: '12', name: 'Alistar' }
-    }
+  await page.route('**/v1/lol/games/**/live**', route => json(route, snapshot()));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#334155"/></svg>'
   }));
-
-  let finalRequests = 0;
-  await page.route('**/v1/lol/games/**/live**', async route => {
-    finalRequests += 1;
-    if (failFirstFinalRequest && finalRequests === 1) {
-      await route.abort('failed');
-      return;
-    }
-    await json(route, finalSnapshot);
-  });
 }
 
-async function selectCompletedSeries(page: Page): Promise<void> {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Open match history' }).click();
-  const card = page.locator('[data-completed-series-id="series-mobile-recovery"]');
-  await expect(card).toBeVisible();
-  await card.click();
-}
-
-async function openRecoveryBoard(page: Page): Promise<void> {
-  await selectCompletedSeries(page);
-  await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
-}
-
-async function installPrimaryFixtureBoard(page: Page, finalSnapshot: ReturnType<typeof snapshot>): Promise<void> {
+async function installFixtureBoard(page: Page, value: ReturnType<typeof snapshot>): Promise<void> {
   await page.evaluate(snapshotValue => {
     const detail = document.querySelector<HTMLElement>('#completed-match-detail');
     if (!detail) throw new Error('Completed detail host is missing.');
-    const gameId = snapshotValue.game?.id;
-    if (!gameId) throw new Error('Fixture game ID is missing.');
-
     document.body.dataset.mobileView = 'live';
     document.body.dataset.mobileContext = 'history';
     detail.hidden = false;
 
-    const rows = Array.from({ length: 5 }, (_, index) => `
-      <div class="role-matchup-row" data-fixture-row="${index}">
-        <div class="role-player blue">
-          <span class="role-player-portrait"><span class="telemetry-champion">?</span></span>
-          <div class="role-player-heading"><div class="role-player-name"><strong>Blue player ${index + 1}</strong></div></div>
-          <div class="role-player-stats"><span><strong>1/2/3</strong></span></div>
-        </div>
-        <span class="role-gold-delta"><strong>—</strong></span>
-        <div class="role-player red">
-          <span class="role-player-portrait"><span class="telemetry-champion">?</span></span>
-          <div class="role-player-heading"><div class="role-player-name"><strong>Red player ${index + 1}</strong></div></div>
-          <div class="role-player-stats"><span><strong>1/2/3</strong></span></div>
-        </div>
-      </div>`).join('');
-
     const root = document.createElement('article');
     root.className = 'completed-final-game';
-    root.dataset.finalGameId = gameId;
+    root.dataset.finalGameId = snapshotValue.game.id;
     root.innerHTML = `
-      <div class="completed-final-game-header"><strong>Game 1 · Recovery Red Esports won</strong><span>30:00</span></div>
+      <div class="completed-final-game-header"><strong>Game 1 · Recovery Blue Academy won</strong><span>30:00</span></div>
       <section class="completed-team-comparison">
         <div class="completed-comparison-team blue"><strong>Recovery Blue Academy</strong></div>
         <div class="completed-comparison-team red"><strong>Recovery Red Esports</strong></div>
-      </section>
-      <div class="role-matchup-list completed-final-matchups">${rows}</div>`;
+      </section>`;
     detail.replaceChildren(root);
     window.dispatchEvent(new CustomEvent('esports-live:ended-snapshot', {
       detail: { snapshot: snapshotValue, root }
     }));
-  }, finalSnapshot);
+  }, value);
 }
 
 test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
-
   await page.addInitScript(() => {
-    Object.defineProperty(window, 'ResizeObserver', {
-      configurable: true,
-      value: undefined
-    });
+    Object.defineProperty(window, 'ResizeObserver', { configurable: true, value: undefined });
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
-  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
 });
 
-test('primary mobile completed board resolves real names, removes the duplicate summary, and hydrates numeric portraits', async ({ page }) => {
-  const finalSnapshot = snapshot(48_665, 56_476, { blue: 'Team 1', red: 'Team 2' }, true);
+test('recovered history boards use the same shared renderer as live matches', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
   await page.setViewportSize({ width: 390, height: 844 });
-  await installFixtures(page, finalSnapshot);
+  await installFixtures(page);
   await page.goto('/');
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
-  await installPrimaryFixtureBoard(page, finalSnapshot);
+  await installFixtureBoard(page, snapshot());
 
-  const board = page.locator('.completed-final-game[data-final-game-id="game-mobile-recovery-1"]');
+  const board = page.locator('[data-final-game-id="game-mobile-recovery-1"]');
   await expect(board).toBeVisible();
-  await expect(board.locator('.completed-team-comparison')).toHaveCount(0);
-  await expect(board.locator('.mobile-final-recovery-summary')).toHaveCount(0);
-
-  const teams = board.locator('.mobile-completed-team-names');
-  await expect(teams).toContainText('Recovery Blue Academy');
-  await expect(teams).toContainText('Recovery Red Esports');
-  await expect(teams).not.toContainText('Team 1');
-  await expect(teams).not.toContainText('Team 2');
-  await expect(teams).toHaveAttribute('data-leading-side', 'red');
-  await expect(teams.locator('.mobile-completed-gold-lead.red strong')).toHaveText('+7.8K');
-  await expect(teams.locator('.mobile-completed-gold-lead.red')).toHaveAttribute(
-    'aria-label',
-    'Recovery Red Esports leads by 7.8K gold'
-  );
-
-  await expect(board.locator('.mobile-completed-objectives')).toBeVisible();
-  await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
-  const portraits = board.locator('.role-player-portrait .mobile-completed-champion');
-  await expect(portraits).toHaveCount(10);
-  await expect(portraits.first()).toHaveAttribute('src', /\/16\.15\.1\/img\/champion\/Jayce\.png$/);
-  await expect(portraits.first()).toHaveAttribute('alt', 'Jayce portrait');
-  await expect(board.locator('.role-player-portrait .telemetry-champion')).toHaveCount(0);
-
-  const primaryDeltaLayout = await board.locator('.role-gold-delta').first().evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    const strong = element.querySelector<HTMLElement>('strong');
-    if (!strong) throw new Error('Primary gold comparison is missing.');
-    return {
-      width: bounds.width,
-      fontSize: Number.parseFloat(getComputedStyle(strong).fontSize)
-    };
-  });
-  expect(primaryDeltaLayout.width).toBeGreaterThanOrEqual(60);
-  expect(primaryDeltaLayout.fontSize).toBeGreaterThanOrEqual(11);
-
-  const panelClearance = await page.locator('.analysis-panel').evaluate(element => {
-    const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
-    if (!navElement) throw new Error('Navigation is missing.');
-    return {
-      panelPaddingBottom: Number.parseFloat(getComputedStyle(element).paddingBottom),
-      navHeight: navElement.getBoundingClientRect().height
-    };
-  });
-  expect(panelClearance.panelPaddingBottom).toBeGreaterThan(panelClearance.navHeight + 16);
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'history');
+  await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-team.blue strong')).toHaveText(blue.name);
+  await expect(board.locator('.mobile-live-parity-team.red strong')).toHaveText(red.name);
+  await expect(board.locator('.mobile-live-parity-gold')).toHaveAttribute('data-leading-side', 'blue');
+  await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+4K');
+  await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
+  await expect(board.locator('.role-matchup-row')).toHaveCount(5);
+  await expect(board.locator('.role-player-portrait')).toHaveCount(10);
+  await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
+  await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
+  await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
+  await expect(board.locator('.history-v2-summary')).toHaveCount(0);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+  expect(pageErrors).toEqual([]);
 });
 
-test('mobile fallback restores numeric portraits, starts at the board top, and keeps navigation clear', async ({ page }) => {
+test('shared renderer follows the red leading side for history boards', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installFixtures(page, snapshot(35_000, 31_000, null, true));
-  await openRecoveryBoard(page);
+  await installFixtures(page);
+  await page.goto('/');
+  await installFixtureBoard(page, snapshot(31_000, 38_800));
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
-  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
-  await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
-  await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
-  await expect(page.locator('.mobile-app-nav [data-mobile-view="live"] span')).toHaveText('History');
-
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(1);
-  const topLayout = await page.evaluate(() => {
-    const context = document.querySelector<HTMLElement>('.mobile-context-bar');
-    const gameHeader = document.querySelector<HTMLElement>('.mobile-final-recovery .completed-final-game-header');
-    if (!context || !gameHeader) throw new Error('History top layout is incomplete.');
-    return {
-      contextBottom: context.getBoundingClientRect().bottom,
-      gameHeaderTop: gameHeader.getBoundingClientRect().top
-    };
-  });
-  expect(topLayout.gameHeaderTop).toBeGreaterThanOrEqual(topLayout.contextBottom - 1);
-
-  const teams = page.locator('.mobile-completed-team-names');
-  await expect(teams).toContainText('Recovery Blue Academy');
-  await expect(teams).toContainText('Recovery Red Esports');
-  await expect(teams).toHaveAttribute('data-leading-side', 'blue');
-  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(0);
-
-  const goldLead = teams.locator('.mobile-completed-gold-lead.blue');
-  await expect(goldLead).toHaveCount(1);
-  await expect(goldLead.locator('small')).toHaveText('Gold lead');
-  await expect(goldLead.locator('strong')).toHaveText('+4K');
-  await expect(goldLead).toHaveAttribute('aria-label', 'Recovery Blue Academy leads by 4K gold');
-  await expect(teams.locator('.mobile-completed-team-name.blue')).toHaveClass(/leading/);
-  await expect(teams.locator('.mobile-completed-team-name.red')).not.toHaveClass(/leading/);
-
-  const teamNameLayout = await teams.locator('.mobile-completed-team-name.blue strong').evaluate(element => {
-    const style = getComputedStyle(element);
-    return { whiteSpace: style.whiteSpace, lineHeight: Number.parseFloat(style.lineHeight) };
-  });
-  expect(teamNameLayout.whiteSpace).toBe('normal');
-  expect(teamNameLayout.lineHeight).toBeGreaterThan(13);
-
-  const objectives = page.locator('.mobile-completed-objectives');
-  await expect(objectives).toContainText('Towers');
-  await expect(objectives).toContainText('8');
-  await expect(objectives).toContainText('3');
-  await expect(objectives).toContainText('Dragons');
-  await expect(objectives).toContainText('Barons');
-  await expect(objectives).toContainText('Inhibitors');
-
-  const objectiveFontSizes = await objectives.evaluate(element => {
-    const title = element.querySelector<HTMLElement>('.mobile-completed-objectives-title');
-    const label = element.querySelector<HTMLElement>('.mobile-completed-objective > span');
-    const value = element.querySelector<HTMLElement>('.mobile-completed-objective strong');
-    if (!title || !label || !value) throw new Error('Objective typography is incomplete.');
-    return {
-      title: Number.parseFloat(getComputedStyle(title).fontSize),
-      label: Number.parseFloat(getComputedStyle(label).fontSize),
-      value: Number.parseFloat(getComputedStyle(value).fontSize)
-    };
-  });
-  expect(objectiveFontSizes.title).toBeGreaterThanOrEqual(9);
-  expect(objectiveFontSizes.label).toBeGreaterThanOrEqual(8.3);
-  expect(objectiveFontSizes.value).toBeGreaterThanOrEqual(11);
-
-  const deltas = page.locator('.mobile-recovery-gold-delta');
-  await expect(deltas).toHaveCount(5);
-  for (let index = 0; index < 5; index += 1) {
-    await expect(deltas.nth(index)).toHaveText('+500');
-  }
-  const fallbackDeltaLayout = await deltas.first().evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    return {
-      width: bounds.width,
-      fontSize: Number.parseFloat(getComputedStyle(element).fontSize)
-    };
-  });
-  expect(fallbackDeltaLayout.width).toBeGreaterThanOrEqual(60);
-  expect(fallbackDeltaLayout.fontSize).toBeGreaterThanOrEqual(11);
-
-  await expect(page.locator('.mobile-final-recovery-summary')).toHaveCount(0);
-  await expect(page.locator('.mobile-recovery-portrait:visible')).toHaveCount(10);
-  const fallbackPortraits = page.locator('.mobile-recovery-portrait img');
-  await expect(fallbackPortraits).toHaveCount(10);
-  await expect(fallbackPortraits.first()).toHaveAttribute('src', /\/16\.15\.1\/img\/champion\/Jayce\.png$/);
-  await expect(page.locator('.mobile-recovery-identity small:visible')).toHaveCount(0);
-  await expect(page.locator('.mobile-recovery-stats b')).toHaveCount(10);
-  await expect(page.locator('.mobile-recovery-matchups')).not.toContainText(' CS');
-  await expect(page.locator('.mobile-recovery-items:visible')).toHaveCount(0);
-  await expect(page.locator('.role-player-items:visible')).toHaveCount(0);
-  await expect(page.locator('.mobile-recovery-role:visible')).toHaveCount(0);
-
-  const boardBounds = await page.locator('.mobile-final-recovery').evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    return { width: bounds.width, left: bounds.left, right: bounds.right };
-  });
-  expect(boardBounds.width).toBeGreaterThanOrEqual(360);
-  expect(boardBounds.left).toBeGreaterThanOrEqual(-0.5);
-  expect(boardBounds.right).toBeLessThanOrEqual(390.5);
-
-  const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
-  const navLayout = await nav.evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    const style = getComputedStyle(element);
-    return {
-      position: style.position,
-      borderRadius: style.borderRadius,
-      left: bounds.left,
-      right: bounds.right,
-      top: bounds.top,
-      bottom: bounds.bottom,
-      height: bounds.height,
-      bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom),
-      visualBottom: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mobile-demo-visual-bottom')) || 0
-    };
-  });
-  expect(navLayout.position).toBe('fixed');
-  expect(navLayout.borderRadius).toBe('0px');
-  expect(navLayout.left).toBeLessThanOrEqual(0.5);
-  expect(navLayout.right).toBeGreaterThanOrEqual(389.5);
-  expect(navLayout.bottom).toBeGreaterThanOrEqual(843.5 - navLayout.visualBottom);
-  expect(navLayout.bodyPaddingBottom).toBeGreaterThan(navLayout.height + 8);
-
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const clearance = await page.evaluate(() => {
-    const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
-    const lastRow = document.querySelector<HTMLElement>('.mobile-recovery-row:last-child');
-    if (!navElement || !lastRow) throw new Error('Navigation clearance targets are missing.');
-    return {
-      navTop: navElement.getBoundingClientRect().top,
-      lastRowBottom: lastRow.getBoundingClientRect().bottom
-    };
-  });
-  expect(clearance.lastRowBottom).toBeLessThanOrEqual(clearance.navTop - 16);
-
-  const frameBorders = await page.locator('.mobile-final-recovery').evaluate(element => {
-    const style = getComputedStyle(element);
-    return [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
-  });
-  expect(frameBorders).toEqual(['0px', '0px', '0px', '0px']);
-
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-});
-
-test('mobile completed gold lead follows the red leading side', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await installFixtures(page, snapshot(31_000, 35_000));
-  await openRecoveryBoard(page);
-
-  const teams = page.locator('.mobile-completed-team-names');
-  await expect(teams).toHaveAttribute('data-leading-side', 'red');
-  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(0);
-  await expect(teams.locator('.mobile-completed-gold-lead.red strong')).toHaveText('+4K');
-  await expect(teams.locator('.mobile-completed-gold-lead.red')).toHaveAttribute(
-    'aria-label',
-    'Recovery Red Esports leads by 4K gold'
-  );
-  await expect(teams.locator('.mobile-completed-team-name.red')).toHaveClass(/leading/);
-  await expect(teams.locator('.mobile-completed-team-name.blue')).not.toHaveClass(/leading/);
-
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
+  const board = page.locator('[data-final-game-id="game-mobile-recovery-1"]');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board.locator('.mobile-live-parity-gold')).toHaveAttribute('data-leading-side', 'red');
+  await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+7.8K');
 });

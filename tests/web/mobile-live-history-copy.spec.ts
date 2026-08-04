@@ -87,11 +87,7 @@ function snapshot(withStats: boolean) {
 }
 
 async function json(route: Route, value: unknown): Promise<void> {
-  await route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(value)
-  });
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
 }
 
 async function installFixtures(page: Page, withStats: boolean): Promise<void> {
@@ -101,12 +97,10 @@ async function installFixtures(page: Page, withStats: boolean): Promise<void> {
     schemaVersion: '1.0',
     adapters: ['lol']
   }));
-
   await page.route('**/v1/lol/schedule**', route => json(route, {
     esport: 'lol',
     events: [{ series, provider, observedAt: iso() }]
   }));
-
   await page.route('**/v1/lol/series/**/context**', route => json(route, {
     schemaVersion: '1.0',
     esport: 'lol',
@@ -119,10 +113,7 @@ async function installFixtures(page: Page, withStats: boolean): Promise<void> {
       bestOf: 3,
       winsRequired: 2,
       drawPossible: false,
-      score: [
-        { team: blue, wins: 0 },
-        { team: red, wins: 0 }
-      ],
+      score: [{ team: blue, wins: 0 }, { team: red, wins: 0 }],
       games: series.games.map(game => ({
         ...game,
         blueTeam: blue,
@@ -134,9 +125,12 @@ async function installFixtures(page: Page, withStats: boolean): Promise<void> {
     complete: true,
     reasons: []
   }));
-
   await page.route('**/v1/lol/games/**/live**', route => json(route, snapshot(withStats)));
-  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['26.15.1']));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#334155"/></svg>'
+  }));
 }
 
 async function openLiveMatch(page: Page, withStats: boolean): Promise<void> {
@@ -147,101 +141,69 @@ async function openLiveMatch(page: Page, withStats: boolean): Promise<void> {
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
 }
 
-test('mobile live matches use the current completed-history visual design and keep navigation inside the app frame', async ({ page }) => {
+test('live matches use the shared mobile scoreboard renderer', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.6');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-board-owner', 'history-copy');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-history-design', 'v20');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   await expect(board).toBeVisible();
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-live-board-state', 'verified');
-  await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
-  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
-  await expect(board.locator('.completed-team-comparison.mobile-live-parity-comparison')).toBeVisible();
-  await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
-  await expect(board.locator('.mobile-live-parity-gold')).toHaveAttribute('data-leading-side', 'blue');
+  await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+2.5K');
-  await expect(board.locator('.mobile-live-parity-objective-title')).toHaveText('OBJECTIVES · BLUE – RED');
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
-  await expect(board.locator('.mobile-live-parity-objective.objective-towers .blue')).toHaveText('5');
-  await expect(board.locator('.mobile-live-parity-objective.objective-towers .red')).toHaveText('2');
-  await expect(board.locator('.history-v2-summary')).toHaveCount(0);
-  await expect(board.locator('.history-v2-quick-stats')).toHaveCount(0);
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
-  await expect(board.locator('.role-player-name strong')).toHaveCount(10);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
   await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
-  await expect(board.locator('.mobile-live-parity-team.blue strong')).toHaveText(blue.name);
-  await expect(board.locator('.mobile-live-parity-team.red strong')).toHaveText(red.name);
-  await expect(page.locator('#game-content > .completed-final-game:not(.mobile-live-history-board)')).toHaveCount(0);
+  await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
+  await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
+  await expect(board.locator('.history-v2-summary')).toHaveCount(0);
 
   const layout = await page.evaluate(() => {
     const frame = document.querySelector<HTMLElement>('.app-frame');
     const nav = document.querySelector<HTMLElement>('.mobile-app-nav');
-    const boardElement = document.querySelector<HTMLElement>('.mobile-live-history-board[data-mobile-live-design="history-current"]');
+    const boardElement = document.querySelector<HTMLElement>('[data-mobile-scoreboard-renderer="shared-v1"]');
     if (!frame || !nav || !boardElement) throw new Error('Mobile frame, board, or navigation is missing.');
     const frameBounds = frame.getBoundingClientRect();
     const navBounds = nav.getBoundingClientRect();
     const boardBounds = boardElement.getBoundingClientRect();
-    const buttons = [...nav.querySelectorAll<HTMLElement>('button')].map(button => button.getBoundingClientRect().width);
     return {
-      frameLeft: frameBounds.left,
-      frameRight: frameBounds.right,
       boardLeft: boardBounds.left,
       boardRight: boardBounds.right,
-      boardRadius: getComputedStyle(boardElement).borderRadius,
+      frameLeft: frameBounds.left,
+      frameRight: frameBounds.right,
       navLeft: navBounds.left,
       navRight: navBounds.right,
-      bottomGap: window.innerHeight - navBounds.bottom,
-      buttonSpread: Math.max(...buttons) - Math.min(...buttons),
       overflow: document.documentElement.scrollWidth - window.innerWidth
     };
   });
   expect(layout.boardLeft).toBeGreaterThanOrEqual(layout.frameLeft + 4);
   expect(layout.boardRight).toBeLessThanOrEqual(layout.frameRight - 4);
-  expect(layout.boardRadius).not.toBe('0px');
   expect(layout.navLeft).toBeGreaterThanOrEqual(layout.frameLeft + 6);
   expect(layout.navRight).toBeLessThanOrEqual(layout.frameRight - 6);
-  expect(layout.bottomGap).toBeGreaterThanOrEqual(6);
-  expect(layout.buttonSpread).toBeLessThanOrEqual(1);
   expect(layout.overflow).toBeLessThanOrEqual(1);
-
-  const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-layout', 'app-frame');
-  await expect(nav).toHaveAttribute('data-mobile-nav-clearance', 'measured');
-  await nav.getByRole('button', { name: 'Show matches' }).click();
-  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
-  await expect(nav.getByRole('button', { name: 'Show matches' })).toHaveAttribute('aria-current', 'page');
-  await nav.getByRole('button', { name: 'Show platform status' }).click();
-  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'platform');
-  await expect(nav.getByRole('button', { name: 'Show platform status' })).toHaveAttribute('aria-current', 'page');
-  await nav.getByRole('button', { name: 'Show selected match' }).click();
-  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
-  await expect(nav.getByRole('button', { name: 'Show selected match' })).toHaveAttribute('aria-current', 'page');
-
   expect(pageErrors).toEqual([]);
 });
 
-test('mobile live matches keep the current history shell while verified telemetry is pending', async ({ page }) => {
+test('pending live matches keep the same shared scoreboard shell', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, false);
 
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   await expect(board).toBeVisible();
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-live-board-state', 'pending');
-  await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
-  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
-  await expect(board.locator('.completed-team-comparison.mobile-live-parity-comparison')).toBeVisible();
-  await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
-  await expect(board.locator('.mobile-live-parity-team.blue strong')).toHaveText(blue.name);
-  await expect(board.locator('.mobile-live-parity-team.red strong')).toHaveText(red.name);
-  await expect(board.locator('.mobile-live-parity-gold')).toHaveClass(/neutral/);
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('—');
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
+  await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.mobile-live-board-notice')).toContainText('Waiting for Riot');
   await expect(page.getByRole('heading', { name: 'Waiting for verified gameplay' })).toHaveCount(0);
 

@@ -218,16 +218,33 @@ function syncNavigationSpace(): void {
   document.documentElement.style.setProperty('--mobile-demo-nav-height', `${height}px`);
 }
 
+function observeNavigationSpace(): void {
+  if (!nav) return;
+  nav.dataset.mobileNavVersion = '0.11';
+
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(syncNavigationSpace).observe(nav);
+  }
+}
+
+function observeMobileBreakpoint(): void {
+  if (typeof media.addEventListener === 'function') {
+    media.addEventListener('change', syncNavigationSpace);
+    return;
+  }
+
+  if (typeof media.addListener === 'function') {
+    media.addListener(syncNavigationSpace);
+  }
+}
+
 window.addEventListener('esports-live:ended-snapshot', event => {
   const detail = (event as CustomEvent<{ snapshot?: LiveSnapshot<LolStats>; root?: HTMLElement }>).detail;
   if (detail?.snapshot && detail.root) renderTeamGoldLead(detail.snapshot, detail.root);
 });
 
-if (nav) {
-  nav.dataset.mobileNavVersion = '0.10';
-  new ResizeObserver(syncNavigationSpace).observe(nav);
-}
-media.addEventListener('change', syncNavigationSpace);
+observeNavigationSpace();
+observeMobileBreakpoint();
 window.addEventListener('resize', syncNavigationSpace);
 window.addEventListener('pageshow', syncNavigationSpace);
 syncNavigationSpace();

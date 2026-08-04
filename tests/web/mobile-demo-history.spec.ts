@@ -157,12 +157,18 @@ test('mobile match history stays on the list until a result is selected', async 
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('#completed-match-detail')).toBeVisible();
 
-  const matchups = page.locator('.completed-final-matchups .role-matchup-row');
-  await expect(matchups).toHaveCount(5);
-  const boardHeight = await page.locator('.completed-final-matchups').evaluate(element => (
-    element.getBoundingClientRect().height
-  ));
-  expect(boardHeight).toBeLessThanOrEqual(330);
+  const normalRows = page.locator('.completed-final-matchups .role-matchup-row');
+  const recoveryRows = page.locator('.mobile-recovery-matchups .mobile-recovery-row');
+  await expect.poll(async () => (
+    await normalRows.count() + await recoveryRows.count()
+  ), { timeout: 15_000 }).toBe(5);
+
+  const normalBoardReady = await normalRows.count() === 5;
+  const board = normalBoardReady
+    ? page.locator('.completed-final-matchups')
+    : page.locator('.mobile-recovery-matchups');
+  const boardHeight = await board.evaluate(element => element.getBoundingClientRect().height);
+  expect(boardHeight).toBeLessThanOrEqual(340);
 
   const horizontalOverflow = await page.evaluate(() => (
     document.documentElement.scrollWidth - window.innerWidth

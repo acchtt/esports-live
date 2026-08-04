@@ -1,4 +1,5 @@
-import type { ScheduleEvent, TeamRef } from '@esports-live/core';
+import type { LiveSnapshot, ScheduleEvent, TeamRef } from '@esports-live/core';
+import type { LolStats } from '@esports-live/adapter-lol';
 import './series-hero-view.css';
 import './official-lol-logo.css';
 
@@ -28,6 +29,7 @@ hero.hidden = true;
 analysisHeader.insertBefore(hero, gameSelector);
 
 let activeEvent: ScheduleEvent | null = null;
+let latestPatch: string | null = null;
 let renderFrame: number | null = null;
 let renderKey = '';
 
@@ -118,6 +120,11 @@ function formatStart(value: string): string {
   });
 }
 
+function formatPatch(value: string | null): string {
+  const match = value?.match(/^(\d+)\.(\d+)/);
+  return match ? `${match[1]}.${match[2]}` : 'Pending';
+}
+
 function gameMark(): string {
   return `
     <span class="series-hero-game-mark official-lol-logo" aria-hidden="true">
@@ -156,6 +163,7 @@ function render(): void {
   const competition = event.series.competition.stage
     ? `${event.series.competition.name} · ${event.series.competition.stage}`
     : event.series.competition.name;
+  const gameLabel = activeGameLabel(event);
   const key = JSON.stringify({
     id: event.series.id,
     left,
@@ -164,8 +172,9 @@ function render(): void {
     progress,
     status,
     competition,
-    game: activeGameLabel(event),
-    start: event.series.scheduledStart
+    game: gameLabel,
+    start: event.series.scheduledStart,
+    patch: latestPatch
   });
   if (key === renderKey) return;
   renderKey = key;
@@ -196,9 +205,18 @@ function render(): void {
     </div>
 
     <div class="series-hero-footer">
-      <span class="series-hero-live-context"><i></i>${escapeHtml(activeGameLabel(event))}</span>
-      <span>${progress.completed} of ${progress.total} games completed</span>
-      <time datetime="${escapeHtml(event.series.scheduledStart)}">${escapeHtml(formatStart(event.series.scheduledStart))}</time>
+      <span class="series-hero-live-context">
+        <i></i><span><b>Current game</b><span>${escapeHtml(gameLabel)}</span></span>
+      </span>
+      <span class="series-hero-progress">
+        <span><b>Series progress</b><span>${progress.completed} of ${progress.total} games completed</span></span>
+      </span>
+      <time datetime="${escapeHtml(event.series.scheduledStart)}">
+        <span><b>Start time</b><span>${escapeHtml(formatStart(event.series.scheduledStart))}</span></span>
+      </time>
+      <span class="series-hero-patch">
+        <span><b>Patch</b><span>${escapeHtml(formatPatch(latestPatch))}</span></span>
+      </span>
     </div>`;
 
   hero.hidden = false;
@@ -212,7 +230,17 @@ function scheduleRender(): void {
 }
 
 window.addEventListener('esports-live:selection', event => {
-  activeEvent = (event as CustomEvent<ScheduleEvent>).detail;
+  const next = (event as CustomEvent<ScheduleEvent>).detail;
+  if (activeEvent?.series.id !== next.series.id) latestPatch = null;
+  activeEvent = next;
+  renderKey = '';
+  scheduleRender();
+});
+
+window.addEventListener('esports-live:snapshot', event => {
+  const snapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
+  if (!snapshot?.stats || snapshot.series.id !== activeEvent?.series.id) return;
+  latestPatch = snapshot.stats.patch;
   renderKey = '';
   scheduleRender();
 });

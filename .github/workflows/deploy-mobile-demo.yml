@@ -48,7 +48,14 @@ jobs:
         run: npm run check
 
       - name: Validate mobile browser layout
-        run: npm run test:web
+        shell: bash
+        run: |
+          npm run build:web
+          npx playwright test \
+            tests/web/mobile-demo.spec.ts \
+            tests/web/mobile-demo-history.spec.ts \
+            tests/web/completed-board-merge.spec.ts \
+            tests/web/history-mode-ownership.spec.ts
 
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy
@@ -108,6 +115,7 @@ jobs:
         run: |
           grep -R "$API_BASE_URL" apps/web/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
+          grep -R "DEMO v0.2" apps/web/dist/assets
 
       - name: Deploy mobile Pages preview
         run: >-

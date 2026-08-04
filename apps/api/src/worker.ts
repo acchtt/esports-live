@@ -3,6 +3,7 @@ import {
   createCompletedInventoryProvider,
   createLeaguepediaHistoryFallbackProvider,
   createRiotCurrentPlayerProvider,
+  createRiotDelayedLiveRecoveryProvider,
   createRiotLolConsistentProvider,
   createUsableScheduleProvider,
   type LolProviderClient,
@@ -77,11 +78,13 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
 
   const registry = new AdapterRegistry();
   if (apiKey) {
-    const riotProvider = createRiotLolConsistentProvider({
-      apiKey,
-      includeDetails: false,
-      useDetailItemFallback: false
-    });
+    const riotProvider = createRiotDelayedLiveRecoveryProvider(
+      createRiotLolConsistentProvider({
+        apiKey,
+        includeDetails: false,
+        useDetailItemFallback: false
+      })
+    );
     const provider = createUsableScheduleProvider(
       createLeaguepediaHistoryFallbackProvider(
         createCompletedInventoryProvider(

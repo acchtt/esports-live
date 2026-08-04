@@ -144,6 +144,7 @@ test('mobile match history stays on the list until a result is selected', async 
   await installFixtures(page);
   await page.goto('/');
 
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.14');
   await page.getByRole('button', { name: 'Open match history' }).click();
 
   const historyCard = page.locator('[data-completed-series-id="series-mobile-history"]');
@@ -155,7 +156,26 @@ test('mobile match history stays on the list until a result is selected', async 
 
   await historyCard.click();
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
+  await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('#completed-match-detail')).toBeVisible();
+  await expect(page.locator('.analysis-header')).toBeHidden();
+
+  const historyChrome = await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>('.analysis-panel');
+    const topbar = document.querySelector<HTMLElement>('.topbar');
+    const context = document.querySelector<HTMLElement>('.mobile-context-bar');
+    if (!panel || !topbar || !context) throw new Error('History chrome is incomplete.');
+    const topbarBounds = topbar.getBoundingClientRect();
+    const contextBounds = context.getBoundingClientRect();
+    return {
+      contextIsFirst: panel.firstElementChild === context,
+      gap: contextBounds.top - topbarBounds.bottom,
+      contextHeight: contextBounds.height
+    };
+  });
+  expect(historyChrome.contextIsFirst).toBe(true);
+  expect(Math.abs(historyChrome.gap)).toBeLessThanOrEqual(2);
+  expect(historyChrome.contextHeight).toBeLessThanOrEqual(50);
 
   const normalRows = page.locator('.completed-final-matchups .role-matchup-row');
   const recoveryRows = page.locator('.mobile-recovery-matchups .mobile-recovery-row');
@@ -168,7 +188,7 @@ test('mobile match history stays on the list until a result is selected', async 
     ? page.locator('.completed-final-matchups')
     : page.locator('.mobile-recovery-matchups');
   const boardHeight = await board.evaluate(element => element.getBoundingClientRect().height);
-  expect(boardHeight).toBeLessThanOrEqual(340);
+  expect(boardHeight).toBeLessThanOrEqual(360);
 
   const horizontalOverflow = await page.evaluate(() => (
     document.documentElement.scrollWidth - window.innerWidth

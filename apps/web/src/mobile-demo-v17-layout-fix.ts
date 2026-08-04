@@ -42,7 +42,7 @@ style.textContent = `
   }
 
   body.mobile-demo-active .mobile-live-history-board .role-matchup-row{
-    grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr)!important;
+    grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr)!important;
     min-height:88px!important
   }
 
@@ -150,7 +150,7 @@ style.textContent = `
   }
 
   body.mobile-demo-active .mobile-live-history-board .role-gold-delta{
-    min-width:54px!important;
+    min-width:60px!important;
     margin:auto 1px!important
   }
 }

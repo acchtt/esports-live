@@ -1,3 +1,14 @@
 .desktop-command-center-v5 #series-history[hidden] {
   display: none !important;
 }
+
+/* The overview grid stretches the hero to the height of the three-game results rail.
+   Make the inner stage fill that height so the matchup expands instead of leaving an
+   empty blue/red gradient block beneath the metadata footer. */
+.desktop-command-center-v5 .series-hero {
+  overflow: hidden !important;
+}
+
+.desktop-command-center-v5 .series-hero-stage {
+  height: 100% !important;
+}

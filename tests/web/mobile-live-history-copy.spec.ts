@@ -152,11 +152,12 @@ test('mobile live matches reuse the completed-history board and keep navigation 
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.2');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.3');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-live-board-owner', 'history-copy');
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-live-board-state', 'verified');
+  await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
   await expect(board.locator('.completed-team-comparison.completed-history-dashboard-v2')).toBeVisible();
   await expect(board.locator('.history-v2-team-header.mobile-completed-team-names')).toBeVisible();
   await expect(board.locator('.history-v2-summary')).toBeVisible();
@@ -194,6 +195,7 @@ test('mobile live matches reuse the completed-history board and keep navigation 
 
   const nav = page.locator('.mobile-app-nav');
   await expect(nav).toHaveAttribute('data-mobile-nav-layout', 'app-frame');
+  await expect(nav).toHaveAttribute('data-mobile-nav-clearance', 'measured');
   await nav.getByRole('button', { name: 'Show matches' }).click();
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   await expect(nav.getByRole('button', { name: 'Show matches' })).toHaveAttribute('aria-current', 'page');
@@ -215,6 +217,7 @@ test('mobile live matches keep the history board shell while verified telemetry 
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-live-board-state', 'pending');
+  await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
   await expect(board.locator('.completed-team-comparison.completed-history-dashboard-v2')).toBeVisible();
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.history-v2-team.blue strong')).toHaveText(blue.name);

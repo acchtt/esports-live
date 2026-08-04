@@ -97,6 +97,7 @@ function removeLegacyStrips(root: HTMLElement, comparison: HTMLElement): void {
 }
 
 function finalizeLiveBoard(snapshot: LiveSnapshot<LolStats>, root: HTMLElement): void {
+  if (document.documentElement.dataset.mobileLiveHistoryDesign === 'v20') return;
   if (!snapshot.stats || root.dataset.mobileHistoryCopy !== 'true') return;
 
   let comparison = root.querySelector<HTMLElement>('.completed-team-comparison');

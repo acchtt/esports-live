@@ -176,7 +176,7 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
   expect(surfaces?.topBorder).not.toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerBorder).not.toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerDisplay).toBe('grid');
-  expect(surfaces?.footerColumns).toBe(2);
+  expect(surfaces?.footerColumns).toBe(4);
   expect(surfaces?.matchupMinHeight).toBeGreaterThanOrEqual(120);
 
   const headerBox = await page.locator('.analysis-header').boundingBox();

@@ -20,13 +20,14 @@ import './mobile-demo-v19.ts';
 import './mobile-demo-v20.ts';
 import './mobile-demo-v20-board-owner.ts';
 import './mobile-demo-v20-width-fix.ts';
+import './mobile-demo-v21.ts';
 
-const VERSION = '0.17.4';
-const LABEL = 'DEMO v0.17.4';
+const VERSION = '0.17.5';
+const LABEL = 'DEMO v0.17.5';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'history-copy';
 document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';
-document.documentElement.dataset.mobileDemoRedeploy = '2026-08-05T01:23:00+07:00';
+document.documentElement.dataset.mobileDemoRedeploy = '2026-08-05T02:07:00+07:00';
 // The deployment workflow still validates its previous marker. Keep it non-visible until the workflow version is updated separately.
 document.documentElement.dataset.mobileDeploymentCompatibility = 'DEMO v0.17.2';
 

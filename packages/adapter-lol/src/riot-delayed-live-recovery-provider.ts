@@ -23,6 +23,11 @@ function recoverable(snapshot: LolProviderSnapshot): boolean {
     || codes.has('pregame_or_unknown');
 }
 
+function sourceTime(snapshot: LolProviderSnapshot): number {
+  const parsed = Date.parse(snapshot.sourceTimestamp ?? '');
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
 function retainLastVerified(
   previous: LolProviderSnapshot,
   incoming: LolProviderSnapshot
@@ -61,13 +66,14 @@ export function createRiotDelayedLiveRecoveryProvider(
     const lastProbe = lastBroadProbeAt.get(gameId) ?? Number.NEGATIVE_INFINITY;
     if (nowMs - lastProbe >= broadProbeIntervalMs) {
       lastBroadProbeAt.set(gameId, nowMs);
-      for (const delayMs of recoveryDelaysMs) {
+      const recovered = await Promise.all(recoveryDelaysMs.map(async delayMs => {
         const recoveryCursor = new Date(nowMs - Math.max(1_000, delayMs)).toISOString();
-        const recovered = await base.getSnapshot(gameId, recoveryCursor).catch(() => null);
-        if (!recovered) continue;
-        remember(gameId, recovered);
-        if (recovered.stats) return recovered;
-      }
+        return base.getSnapshot(gameId, recoveryCursor).catch(() => null);
+      }));
+      const best = recovered
+        .filter((snapshot): snapshot is LolProviderSnapshot => snapshot?.stats !== null)
+        .sort((left, right) => sourceTime(right) - sourceTime(left))[0];
+      if (best) return remember(gameId, best);
     }
 
     const previous = lastVerified.get(gameId);

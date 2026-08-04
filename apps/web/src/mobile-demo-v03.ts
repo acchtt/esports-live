@@ -3,9 +3,10 @@ import './mobile-demo-v05.ts';
 import './mobile-demo-v06.ts';
 import './mobile-demo-v08.ts';
 import './mobile-demo-v09.ts';
+import './mobile-demo-v10.ts';
 
-const VERSION = '0.9';
-const LABEL = 'DEMO v0.9';
+const VERSION = '0.10';
+const LABEL = 'DEMO v0.10';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 
 function applyMobileDemoVersion(): void {

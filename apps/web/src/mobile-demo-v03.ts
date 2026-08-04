@@ -1,5 +1,7 @@
-const VERSION = '0.3';
-const LABEL = 'DEMO v0.3';
+import './mobile-completed-scoreboard-recovery.ts';
+
+const VERSION = '0.4';
+const LABEL = 'DEMO v0.4';
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');

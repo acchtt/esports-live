@@ -11,12 +11,13 @@ import './mobile-demo-v15.ts';
 import './mobile-demo-v16.ts';
 import './mobile-demo-v17.ts';
 import './mobile-demo-v17-compat.ts';
+import './mobile-demo-v17-layout-fix.ts';
 
-const VERSION = '0.17';
-const LABEL = 'DEMO v0.17';
+const VERSION = '0.17.1';
+const LABEL = 'DEMO v0.17.1';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'history';
-document.documentElement.dataset.mobileDemoRedeploy = '2026-08-04T14:31:00Z';
+document.documentElement.dataset.mobileDemoRedeploy = '2026-08-04T15:25:00Z';
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');

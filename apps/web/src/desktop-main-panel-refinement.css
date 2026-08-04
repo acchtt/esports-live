@@ -1,11 +1,175 @@
-.desktop-dashboard-redesign .analysis-panel {
-  padding: 12px !important;
-  overflow: visible;
-  border-radius: 18px;
+.desktop-dashboard-redesign {
+  --fidelity-bg: #030915;
+  --fidelity-panel: rgba(6, 16, 31, 0.98);
+  --fidelity-panel-raised: rgba(9, 24, 44, 0.96);
+  --fidelity-panel-soft: rgba(12, 30, 52, 0.82);
+  --fidelity-border: rgba(92, 145, 199, 0.22);
+  --fidelity-border-strong: rgba(74, 172, 246, 0.44);
+  --fidelity-copy: #f7fbff;
+  --fidelity-muted: #7f94ae;
+  --fidelity-blue: #52c2ff;
+  --fidelity-blue-soft: #9fe1ff;
+  --fidelity-red: #ff5578;
+  --fidelity-red-soft: #ff9aae;
+  --fidelity-green: #36e6a3;
+}
+
+.desktop-dashboard-redesign {
   background:
-    radial-gradient(circle at 14% 0, rgba(30, 141, 235, 0.075), transparent 26%),
-    radial-gradient(circle at 88% 0, rgba(241, 66, 112, 0.065), transparent 28%),
-    linear-gradient(180deg, rgba(5, 13, 25, 0.99), rgba(2, 9, 18, 0.995));
+    radial-gradient(circle at 16% 0, rgba(21, 115, 207, 0.12), transparent 30rem),
+    radial-gradient(circle at 84% 0, rgba(213, 44, 92, 0.08), transparent 34rem),
+    var(--fidelity-bg);
+}
+
+.desktop-dashboard-redesign .topbar {
+  min-height: 72px;
+  padding: 12px 24px;
+  border-bottom-color: rgba(94, 139, 191, 0.2);
+  background: rgba(2, 8, 18, 0.94);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+}
+
+.desktop-dashboard-redesign .brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(42, 161, 242, 0.25), rgba(13, 57, 102, 0.5));
+}
+
+.desktop-dashboard-redesign .brand strong,
+.desktop-dashboard-redesign .connection strong {
+  color: var(--fidelity-copy);
+  font-size: 0.9rem;
+}
+
+.desktop-dashboard-redesign .brand small,
+.desktop-dashboard-redesign .connection small {
+  color: var(--fidelity-muted);
+  font-size: 0.67rem;
+}
+
+.desktop-dashboard-redesign #workspace {
+  gap: 14px;
+  width: min(1960px, calc(100% - 20px));
+  padding: 12px 0 26px;
+}
+
+.desktop-dashboard-redesign .panel {
+  border-color: var(--fidelity-border);
+  border-radius: 16px;
+  background: var(--fidelity-panel);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.25);
+}
+
+/* Match rail */
+.desktop-dashboard-redesign .schedule-panel {
+  background:
+    linear-gradient(180deg, rgba(7, 19, 36, 0.99), rgba(4, 12, 24, 0.99));
+}
+
+.desktop-dashboard-redesign .schedule-panel .panel-heading {
+  min-height: 88px;
+  padding: 18px 18px 16px;
+  border-bottom-color: rgba(91, 139, 191, 0.18);
+}
+
+.desktop-dashboard-redesign .schedule-panel .eyebrow {
+  margin-bottom: 6px;
+  color: var(--fidelity-blue);
+  font-size: 0.6rem;
+}
+
+.desktop-dashboard-redesign .schedule-panel h1 {
+  color: var(--fidelity-copy);
+  font-size: 1.18rem;
+  line-height: 1.15;
+}
+
+.desktop-dashboard-redesign .refresh-controls > span {
+  color: #71869f;
+  font-size: 0.58rem;
+}
+
+.desktop-dashboard-redesign .icon-button {
+  min-height: 38px;
+  border-radius: 9px;
+  border-color: rgba(91, 145, 200, 0.24);
+  color: #dceaff;
+  background: rgba(29, 72, 113, 0.16);
+}
+
+.desktop-dashboard-redesign .sport-tabs {
+  gap: 7px;
+  padding: 10px;
+  border-bottom-color: rgba(91, 139, 191, 0.16);
+}
+
+.desktop-dashboard-redesign .sport-tab {
+  min-height: 50px;
+  border-radius: 9px;
+  font-size: 0.7rem;
+}
+
+.desktop-dashboard-redesign .sport-tab.active {
+  border-color: rgba(71, 180, 247, 0.4);
+  color: #e4f7ff;
+  background: linear-gradient(180deg, rgba(20, 100, 159, 0.24), rgba(8, 48, 82, 0.26));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.desktop-dashboard-redesign .schedule-list {
+  gap: 8px;
+  padding: 10px;
+}
+
+.desktop-dashboard-redesign .match-card {
+  min-height: 90px;
+  padding: 14px 14px 13px;
+  border-color: rgba(86, 132, 181, 0.08);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.desktop-dashboard-redesign .match-card:hover {
+  border-color: rgba(80, 160, 224, 0.2);
+  background: rgba(27, 80, 126, 0.12);
+}
+
+.desktop-dashboard-redesign .match-card.selected {
+  border-color: rgba(70, 185, 255, 0.42);
+  background:
+    linear-gradient(135deg, rgba(18, 104, 166, 0.22), rgba(8, 30, 53, 0.3));
+  box-shadow: inset 3px 0 var(--fidelity-blue), 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.desktop-dashboard-redesign .match-card-top {
+  margin-bottom: 8px;
+  color: #7f94ad;
+  font-size: 0.64rem;
+}
+
+.desktop-dashboard-redesign .match-card > strong {
+  color: #eef7ff;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.desktop-dashboard-redesign .match-card > small {
+  margin-top: 7px;
+  color: #7086a0;
+  font-size: 0.64rem;
+}
+
+/* Main canvas */
+.desktop-dashboard-redesign .analysis-panel {
+  min-width: 0;
+  overflow: hidden;
+  padding: 10px !important;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 8% 0, rgba(31, 132, 218, 0.08), transparent 26%),
+    radial-gradient(circle at 92% 0, rgba(229, 52, 101, 0.07), transparent 29%),
+    linear-gradient(180deg, rgba(4, 13, 26, 0.99), rgba(2, 9, 19, 0.995));
 }
 
 .desktop-dashboard-redesign .analysis-panel > .analysis-header,
@@ -16,49 +180,78 @@
 
 .desktop-dashboard-redesign .analysis-panel > .analysis-header.series-hero-active {
   overflow: hidden;
-  border: 1px solid rgba(111, 158, 207, 0.2);
-  border-radius: 16px;
-  background: rgba(5, 15, 28, 0.78);
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.03),
-    0 18px 42px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--fidelity-border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(7, 20, 37, 0.98), rgba(4, 14, 28, 0.98));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025), 0 18px 44px rgba(0, 0, 0, 0.18);
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero {
-  padding: 12px !important;
+  padding: 10px !important;
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-topline {
-  min-height: 56px;
-  padding: 9px 13px;
-  border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(15, 31, 53, 0.94), rgba(8, 20, 37, 0.94));
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid rgba(86, 139, 192, 0.2);
+  border-radius: 10px;
+  background-image: linear-gradient(180deg, rgba(14, 34, 58, 0.98), rgba(8, 22, 40, 0.98));
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-game-mark {
-  min-width: 66px;
-  min-height: 36px;
+  min-width: 58px;
+  min-height: 32px;
+  border-radius: 9px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-competition span {
+  color: #7189a5;
+  font-size: 0.54rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-competition strong {
+  color: #f3f8ff;
+  font-size: 0.78rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-status {
+  min-height: 28px;
+  padding-inline: 12px;
+  border-radius: 999px;
+  font-size: 0.58rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-matchup {
   grid-template-columns: minmax(0, 1fr) minmax(178px, 0.34fr) minmax(0, 1fr) !important;
-  min-height: 128px;
-  margin-top: 9px;
-  border-radius: 15px;
+  min-height: 142px;
+  margin-top: 8px;
+  border: 1px solid rgba(83, 143, 199, 0.24);
+  border-radius: 13px;
+  background:
+    linear-gradient(90deg, rgba(7, 58, 96, 0.92), rgba(4, 15, 29, 0.98) 42%, rgba(4, 15, 29, 0.98) 58%, rgba(74, 14, 42, 0.9));
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-team {
-  min-height: 128px;
-  gap: 16px;
-  padding: 18px 22px;
+  min-height: 142px;
+  gap: 18px;
+  padding: 20px 24px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team.left {
+  box-shadow: inset 4px 0 var(--fidelity-blue);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team.right {
+  box-shadow: inset -4px 0 var(--fidelity-red);
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-team-logo {
   position: relative;
-  width: 68px;
-  height: 68px;
-  border-radius: 20px;
+  width: 72px;
+  height: 72px;
+  border-radius: 21px;
+  background: linear-gradient(180deg, rgba(23, 47, 75, 0.96), rgba(8, 22, 40, 0.98));
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.25), inset 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-team-logo img,
@@ -79,24 +272,52 @@
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-team-copy strong {
   max-width: 100%;
-  font-size: clamp(1.12rem, 1.65vw, 1.55rem);
-  line-height: 1.08;
+  color: #fff;
+  font-size: clamp(1.22rem, 1.65vw, 1.72rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team-copy > small {
+  color: #8097b2;
+  font-size: 0.58rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-score {
   min-width: 178px;
-  padding: 15px 18px;
+  padding: 16px 18px;
+  border-right-color: rgba(82, 194, 255, 0.45);
+  border-left-color: rgba(255, 85, 120, 0.42);
+  background: rgba(2, 10, 22, 0.54);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-score > span {
+  color: #8196b0;
+  font-size: 0.56rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-score strong {
-  font-size: clamp(2.55rem, 4vw, 3.65rem);
+  font-size: clamp(2.8rem, 4vw, 4rem);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-score strong:first-child {
+  color: var(--fidelity-blue-soft);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-score strong:last-child {
+  color: var(--fidelity-red);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-score small {
+  color: #9aabc0;
+  font-size: 0.66rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-footer {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 8px;
-  padding-top: 9px;
+  padding-top: 8px;
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-footer > span,
@@ -104,44 +325,64 @@
 .desktop-dashboard-redesign .analysis-panel .series-hero-progress {
   display: flex !important;
   min-width: 0;
-  min-height: 54px;
-  padding: 8px 11px 8px 42px;
-  border-radius: 11px;
+  min-height: 60px;
+  padding: 10px 12px 10px 44px;
+  border: 1px solid rgba(84, 136, 190, 0.2);
+  border-radius: 10px;
+  background-image: linear-gradient(180deg, rgba(12, 31, 53, 0.95), rgba(7, 20, 37, 0.97));
 }
 
 .desktop-dashboard-redesign .analysis-panel .series-hero-footer > span::before,
 .desktop-dashboard-redesign .analysis-panel .series-hero-footer > time::before {
   left: 11px;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer b {
+  color: #eaf3ff;
+  font-size: 0.68rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer span > span,
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer time > span {
+  color: #8296af;
+  font-size: 0.59rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel #game-selector {
-  margin: 0 12px 12px !important;
+  margin: 0 10px 10px !important;
 }
 
+/* Series results */
 .desktop-dashboard-redesign #series-history.live-series-results {
-  margin: 10px 0 0 !important;
+  margin: 9px 0 0 !important;
   padding: 12px !important;
   overflow: hidden;
-  border: 1px solid rgba(103, 151, 201, 0.18) !important;
-  border-radius: 15px;
-  background:
-    linear-gradient(180deg, rgba(8, 21, 38, 0.9), rgba(4, 14, 27, 0.94)) !important;
+  border: 1px solid var(--fidelity-border) !important;
+  border-radius: 13px;
+  background: linear-gradient(180deg, rgba(8, 22, 40, 0.95), rgba(4, 14, 27, 0.98)) !important;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .desktop-dashboard-redesign #series-history.live-series-results .completed-section-heading {
-  min-height: 30px;
+  min-height: 32px;
+  align-items: center;
 }
 
 .desktop-dashboard-redesign #series-history.live-series-results .completed-section-heading h3 {
-  font-size: 0.92rem;
+  color: #f0f6ff;
+  font-size: 0.82rem;
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-section-heading > span {
+  color: #7890aa;
+  font-size: 0.61rem;
 }
 
 .desktop-dashboard-redesign #series-history.live-series-results .completed-games {
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 9px;
+  gap: 8px;
 }
 
 .desktop-dashboard-redesign #series-history.live-series-results .completed-game {
@@ -151,81 +392,139 @@
     'top top'
     'blue red'
     'result result' !important;
-  gap: 8px 10px;
-  min-height: 112px !important;
-  padding: 11px 12px !important;
-  border-radius: 12px;
+  gap: 8px 9px;
+  min-height: 128px !important;
+  padding: 12px !important;
+  border-color: rgba(87, 145, 202, 0.19);
+  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(11, 31, 54, 0.86), rgba(5, 17, 31, 0.96));
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-game.live {
+  border-color: rgba(255, 85, 120, 0.5);
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 64, 106, 0.13), transparent 44%),
+    linear-gradient(145deg, rgba(29, 19, 42, 0.94), rgba(7, 17, 31, 0.97));
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-game-top strong {
+  font-size: 0.69rem;
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-game-state {
+  min-height: 22px;
+  font-size: 0.49rem;
 }
 
 .desktop-dashboard-redesign #series-history.live-series-results .completed-side {
   display: grid !important;
-  min-height: 42px;
-  padding: 7px 9px;
+  min-height: 48px;
+  padding: 8px 9px;
+  border-radius: 8px;
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-side span {
+  font-size: 0.47rem;
 }
 
 .desktop-dashboard-redesign #series-history.live-series-results .completed-side b {
-  font-size: 0.68rem;
+  color: #dce8f8;
+  font-size: 0.66rem;
 }
 
 .desktop-dashboard-redesign #series-history.live-series-results .completed-result {
-  min-height: 28px;
-  padding-top: 7px;
+  min-height: 30px;
+  padding-top: 8px;
 }
 
+/* Live board */
 .desktop-dashboard-redesign .analysis-panel > #game-content {
-  margin-top: 10px;
+  margin-top: 9px;
   padding: 0 !important;
 }
 
 .desktop-dashboard-redesign .analysis-panel .live-dashboard-v2 {
-  gap: 9px;
+  gap: 8px;
   padding: 0 !important;
 }
 
 .desktop-dashboard-redesign .analysis-panel .live-dashboard-v2 > .player-board-toolbar {
-  grid-template-columns: minmax(185px, 0.72fr) minmax(500px, 2.35fr) auto !important;
-  min-height: 68px;
-  padding: 9px 12px;
-  border-radius: 13px;
+  grid-template-columns: minmax(190px, 0.74fr) minmax(520px, 2.35fr) auto !important;
+  min-height: 76px;
+  padding: 10px 13px;
+  border-color: rgba(86, 150, 209, 0.26);
+  border-radius: 11px;
+  background: linear-gradient(90deg, rgba(11, 39, 67, 0.96), rgba(6, 20, 38, 0.98));
+}
+
+.desktop-dashboard-redesign .analysis-panel .player-board-toolbar-copy strong {
+  color: #f4f8ff;
+  font-size: 0.8rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .player-board-toolbar-copy small {
+  color: #7d91aa;
+  font-size: 0.58rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .player-board-toolbar-summary {
-  grid-template-columns: repeat(5, minmax(72px, 1fr));
+  grid-template-columns: repeat(5, minmax(82px, 1fr));
 }
 
 .desktop-dashboard-redesign .analysis-panel .player-board-summary-cell {
-  padding: 3px 9px;
+  min-height: 44px;
+  padding: 4px 10px;
 }
 
 .desktop-dashboard-redesign .analysis-panel .player-board-summary-cell > span {
-  font-size: 0.5rem;
+  color: #7187a2;
+  font-size: 0.48rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .player-board-summary-values b {
-  font-size: 0.84rem;
+  font-size: 0.86rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .player-board-refresh-button {
-  min-width: 118px;
-  min-height: 38px;
-  border-radius: 9px;
+  min-width: 126px;
+  min-height: 40px;
+  border-radius: 8px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-hero,
+.desktop-dashboard-redesign .analysis-panel .v2-gold-card,
+.desktop-dashboard-redesign .analysis-panel .v2-objectives-card,
+.desktop-dashboard-redesign .analysis-panel .v2-board,
+.desktop-dashboard-redesign .analysis-panel .v2-footer {
+  border-color: rgba(94, 145, 197, 0.22);
+  background: linear-gradient(180deg, rgba(9, 26, 46, 0.98), rgba(5, 16, 30, 0.99));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025), 0 14px 34px rgba(0, 0, 0, 0.14);
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-hero {
-  min-height: 118px;
-  border-radius: 14px;
+  min-height: 132px;
+  border-radius: 12px;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-team {
-  gap: 15px;
-  padding: 18px 22px;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-team.blue {
+  background: linear-gradient(110deg, rgba(18, 105, 169, 0.24), transparent 62%);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-team.red {
+  background: linear-gradient(250deg, rgba(197, 34, 78, 0.22), transparent 62%);
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-team-logo {
   position: relative;
-  width: 60px;
-  height: 60px;
-  border-radius: 18px;
+  width: 66px;
+  height: 66px;
+  border-radius: 19px;
+  background: linear-gradient(180deg, rgba(22, 45, 72, 0.98), rgba(7, 20, 36, 0.98));
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-team-logo img,
@@ -239,135 +538,254 @@
   color: #dcecff;
   font-size: 0.72rem;
   font-weight: 950;
-  letter-spacing: 0.04em;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-team-logo img:not([hidden]) + .v2-team-logo-fallback {
   visibility: hidden;
 }
 
+.desktop-dashboard-redesign .analysis-panel .v2-team-copy small {
+  color: #7d92ac;
+  font-size: 0.55rem;
+}
+
 .desktop-dashboard-redesign .analysis-panel .v2-team-copy strong {
-  font-size: clamp(1.18rem, 1.9vw, 1.72rem);
+  color: #fff;
+  font-size: clamp(1.3rem, 1.9vw, 1.95rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-team-kills {
-  font-size: clamp(2.8rem, 4vw, 3.8rem);
+  font-size: clamp(3.15rem, 4.5vw, 4.45rem);
+  line-height: 0.92;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-clock {
-  min-width: 156px;
-  padding: 14px 18px;
+  min-width: 168px;
+  padding: 14px 20px;
+  background: rgba(2, 10, 21, 0.52);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-clock small {
+  font-size: 0.55rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-clock strong {
-  font-size: 1.9rem;
+  font-size: 2.05rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-clock span {
+  font-size: 0.58rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-summary-row {
-  grid-template-columns: minmax(265px, 0.28fr) minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: minmax(270px, 0.29fr) minmax(0, 1fr);
+  gap: 8px;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-gold-card,
 .desktop-dashboard-redesign .analysis-panel .v2-objectives-card {
-  min-height: 86px;
+  min-height: 92px;
+  border-radius: 10px;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-gold-card {
-  padding: 13px 15px;
+  padding: 14px 16px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-gold-card > span {
+  color: #7b90a9;
+  font-size: 0.51rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-gold-card > strong {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-gold-card > small {
+  color: #7d91aa;
+  font-size: 0.57rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-objectives-card {
+  padding: 9px 10px;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v3-objective-hud {
-  min-height: 68px !important;
+  min-height: 72px !important;
+  padding: 0 !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v3-objective-side {
+  gap: 7px !important;
+  padding-top: 0 !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v3-objective-side::before {
+  display: none !important;
+  content: none !important;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v3-objective-stat {
-  min-height: 62px !important;
-  padding: 7px 6px !important;
+  min-height: 68px !important;
+  padding: 8px 6px !important;
+  border-color: rgba(101, 151, 203, 0.2) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.025) !important;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v3-objective-label {
-  font-size: 0.58rem !important;
+  color: #8b9db3 !important;
+  font-size: 0.56rem !important;
+  letter-spacing: 0.07em !important;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v3-objective-stat strong {
-  font-size: 1.38rem !important;
+  font-size: 1.5rem !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-board {
+  border-radius: 11px;
+  overflow: hidden;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-board-head.compact-matchup-header {
-  min-height: 62px;
-  padding-inline: 16px;
+  min-height: 68px;
+  padding: 0 16px;
+  border-bottom-color: rgba(102, 151, 202, 0.18);
+  background:
+    linear-gradient(90deg, rgba(20, 80, 124, 0.22), rgba(5, 18, 34, 0.84) 45%, rgba(5, 18, 34, 0.84) 55%, rgba(119, 28, 58, 0.2));
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-board-side-label {
+  min-height: 22px;
+  font-size: 0.47rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-board-side strong {
-  font-size: 0.82rem;
+  color: #f0f6ff;
+  font-size: 0.78rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-board-side-stats {
+  min-height: 30px;
+  font-size: 0.64rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-board-center small {
+  color: #7186a0;
+  font-size: 0.43rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-matchup-row {
-  min-height: 94px !important;
+  min-height: 104px !important;
+  border-bottom-color: rgba(103, 150, 199, 0.1);
+  background: rgba(3, 13, 26, 0.32);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-matchup-row:nth-child(even) {
+  background: rgba(9, 26, 44, 0.34);
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-player,
 .desktop-dashboard-redesign .analysis-panel .v2-player.red {
-  grid-template-rows: minmax(42px, auto) 30px !important;
-  row-gap: 6px !important;
-  padding: 8px 14px !important;
+  grid-template-rows: minmax(46px, auto) 34px !important;
+  row-gap: 7px !important;
+  padding: 9px 15px !important;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-champion {
-  width: 48px;
-  height: 48px;
+  width: 54px;
+  height: 54px;
+  border-color: rgba(109, 170, 221, 0.34);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.26);
+}
+
+.desktop-dashboard-redesign .analysis-panel .champion-level-badge {
+  min-width: 20px;
+  height: 20px;
+  padding-inline: 4px;
+  border: 2px solid #06101f;
+  font-size: 0.5rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-player-copy strong {
-  font-size: 0.8rem;
+  color: #f4f8ff;
+  font-size: 0.78rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-player-copy small,
 .desktop-dashboard-redesign .analysis-panel .v2-player-stat small {
-  font-size: 0.54rem;
+  color: #7189a5;
+  font-size: 0.5rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-player-stat strong {
-  font-size: 0.79rem;
+  color: #eef5ff;
+  font-size: 0.75rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-player-media {
-  min-height: 30px;
+  min-height: 34px;
   gap: 5px;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-item-slot {
-  width: 28px !important;
-  height: 28px !important;
-  flex-basis: 28px !important;
-  border-radius: 6px;
+  width: 30px !important;
+  height: 30px !important;
+  flex-basis: 30px !important;
+  border-color: rgba(126, 170, 214, 0.34);
+  border-radius: 5px;
+  background: rgba(2, 10, 20, 0.88);
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-role-gold {
-  min-width: 54px;
+  min-width: 58px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-role-gold small {
+  font-size: 0.43rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-role-gold strong {
+  font-size: 0.67rem;
 }
 
 .desktop-dashboard-redesign .analysis-panel .v2-footer {
-  min-height: 44px;
-  margin-top: 1px;
+  min-height: 46px;
+  border-radius: 9px;
+  color: #8397b0;
+  font-size: 0.59rem;
+}
+
+.desktop-dashboard-redesign footer {
+  color: #617792;
+  font-size: 0.62rem;
+}
+
+@media (min-width: 1480px) {
+  .desktop-dashboard-redesign #workspace.platform-collapsed {
+    grid-template-columns: minmax(340px, 380px) minmax(0, 1fr) 58px;
+  }
 }
 
 @media (max-width: 1280px) {
   .desktop-dashboard-redesign .analysis-panel {
-    padding: 10px !important;
+    padding: 8px !important;
   }
 
   .desktop-dashboard-redesign .analysis-panel .series-hero-matchup {
-    grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr) 158px minmax(0, 1fr) !important;
   }
 
   .desktop-dashboard-redesign .analysis-panel .series-hero-team {
     padding-inline: 16px;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-team-logo {
+    width: 62px;
+    height: 62px;
   }
 
   .desktop-dashboard-redesign .analysis-panel .series-hero-footer {
@@ -375,7 +793,13 @@
   }
 
   .desktop-dashboard-redesign .analysis-panel .live-dashboard-v2 > .player-board-toolbar {
-    grid-template-columns: minmax(170px, 0.72fr) minmax(380px, 2fr) auto !important;
+    grid-template-columns: minmax(170px, 0.72fr) minmax(390px, 2fr) auto !important;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .v2-item-slot {
+    width: 27px !important;
+    height: 27px !important;
+    flex-basis: 27px !important;
   }
 }
 
@@ -396,7 +820,7 @@
 
 @media (max-width: 760px) {
   .desktop-dashboard-redesign .analysis-panel {
-    padding: 6px !important;
+    padding: 5px !important;
   }
 
   .desktop-dashboard-redesign .analysis-panel .series-hero-footer {
@@ -405,5 +829,20 @@
 
   .desktop-dashboard-redesign .analysis-panel .series-hero-matchup {
     grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1fr) !important;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-team {
+    min-height: 108px;
+    padding: 12px 8px;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-team-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-score {
+    min-width: 88px;
+    padding: 10px 4px;
   }
 }

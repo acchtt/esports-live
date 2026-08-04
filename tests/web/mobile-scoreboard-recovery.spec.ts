@@ -36,7 +36,11 @@ function players(side: 'blue' | 'red') {
   }));
 }
 
-function snapshot(blueGold = 35_000, redGold = 31_000) {
+function snapshot(
+  blueGold = 35_000,
+  redGold = 31_000,
+  telemetryNames: { blue: string; red: string } | null = null
+) {
   return {
     schemaVersion: '1.0',
     esport: 'lol',
@@ -45,9 +49,10 @@ function snapshot(blueGold = 35_000, redGold = 31_000) {
     game: series.games[0],
     stats: {
       gameClockSeconds: 1_800,
-      patch: '26.15.1',
+      patch: '16.15.1',
       blue: {
         ...blue,
+        name: telemetryNames?.blue ?? blue.name,
         side: 'blue',
         gold: blueGold,
         kills: 12,
@@ -56,6 +61,7 @@ function snapshot(blueGold = 35_000, redGold = 31_000) {
       },
       red: {
         ...red,
+        name: telemetryNames?.red ?? red.name,
         side: 'red',
         gold: redGold,
         kills: 7,
@@ -80,7 +86,11 @@ async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
 }
 
-async function installFixtures(page: Page, finalSnapshot = snapshot()): Promise<void> {
+async function installFixtures(
+  page: Page,
+  finalSnapshot = snapshot(),
+  failFirstFinalRequest = true
+): Promise<void> {
   await page.route('**/health', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -114,7 +124,7 @@ async function installFixtures(page: Page, finalSnapshot = snapshot()): Promise<
   let finalRequests = 0;
   await page.route('**/v1/lol/games/**/live**', async route => {
     finalRequests += 1;
-    if (finalRequests === 1) {
+    if (failFirstFinalRequest && finalRequests === 1) {
       await route.abort('failed');
       return;
     }
@@ -122,13 +132,22 @@ async function installFixtures(page: Page, finalSnapshot = snapshot()): Promise<
   });
 }
 
-async function openRecoveryBoard(page: Page): Promise<void> {
+async function selectCompletedSeries(page: Page): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: 'Open match history' }).click();
   const card = page.locator('[data-completed-series-id="series-mobile-recovery"]');
   await expect(card).toBeVisible();
   await card.click();
+}
+
+async function openRecoveryBoard(page: Page): Promise<void> {
+  await selectCompletedSeries(page);
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
+}
+
+async function openPrimaryBoard(page: Page): Promise<void> {
+  await selectCompletedSeries(page);
+  await expect(page.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5, { timeout: 15_000 });
 }
 
 test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) => {
@@ -145,11 +164,50 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.11');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.12');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
-  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.11');
+  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.12');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
+});
+
+test('primary mobile completed board resolves real names, removes the duplicate summary, and hydrates portraits', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(
+    page,
+    snapshot(48_665, 56_476, { blue: 'Team 1', red: 'Team 2' }),
+    false
+  );
+  await openPrimaryBoard(page);
+
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.12');
+  const board = page.locator('.completed-final-game[data-final-game-id="game-mobile-recovery-1"]');
+  await expect(board).toBeVisible();
+  await expect(board.locator('.completed-team-comparison')).toHaveCount(0);
+  await expect(board.locator('.mobile-final-recovery-summary')).toHaveCount(0);
+
+  const teams = board.locator('.mobile-completed-team-names');
+  await expect(teams).toContainText('Recovery Blue Academy');
+  await expect(teams).toContainText('Recovery Red Esports');
+  await expect(teams).not.toContainText('Team 1');
+  await expect(teams).not.toContainText('Team 2');
+  await expect(teams).toHaveAttribute('data-leading-side', 'red');
+  await expect(teams.locator('.mobile-completed-gold-lead.red strong')).toHaveText('+7.8K');
+  await expect(teams.locator('.mobile-completed-gold-lead.red')).toHaveAttribute(
+    'aria-label',
+    'Recovery Red Esports leads by 7.8K gold'
+  );
+
+  await expect(board.locator('.mobile-completed-objectives')).toBeVisible();
+  await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
+  const portraits = board.locator('.role-player-portrait .mobile-completed-champion');
+  await expect(portraits).toHaveCount(10);
+  await expect(portraits.first()).toHaveAttribute('src', /\/16\.15\.1\/img\/champion\/Jayce\.png$/);
+  await expect(portraits.first()).toHaveAttribute('alt', 'Jayce portrait');
+  await expect(board.locator('.role-player-portrait .telemetry-champion')).toHaveCount(0);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test('mobile fallback shows a readable blue gold lead and keeps the bottom navigation clear', async ({ page }) => {
@@ -157,7 +215,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   await installFixtures(page);
   await openRecoveryBoard(page);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.11');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.12');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
@@ -232,7 +290,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   expect(boardBounds.right).toBeLessThanOrEqual(390.5);
 
   const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.11');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.12');
   const navLayout = await nav.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const style = getComputedStyle(element);

@@ -1,10 +1,12 @@
 import './mobile-demo.css';
 import './mobile-demo-fixes.css';
 import './mobile-demo-platform-fix.css';
+import './mobile-demo-version.css';
 
 type MobileView = 'matches' | 'live' | 'platform';
 
 const MOBILE_QUERY = '(max-width: 760px)';
+const MOBILE_DEMO_VERSION = '0.2';
 const media = window.matchMedia(MOBILE_QUERY);
 const body = document.body;
 const analysisPanel = document.querySelector<HTMLElement>('.analysis-panel');
@@ -126,13 +128,11 @@ if (selectedSeries) {
 }
 
 if (buildVersion) {
-  const label = buildVersion.querySelector<HTMLElement>('span');
-  if (label) label.textContent = label.textContent?.replace(/^DEMO/, 'MOBILE') ?? 'MOBILE';
-  buildVersion.title = buildVersion.title.replace(/^Demo/, 'Mobile demo');
-  buildVersion.setAttribute(
-    'aria-label',
-    buildVersion.getAttribute('aria-label')?.replace(/^Demo/, 'Mobile demo') ?? 'Mobile demo build'
-  );
+  const revision = buildVersion.querySelector<HTMLElement>('strong')?.textContent?.trim() || 'local';
+  buildVersion.classList.add('mobile-demo-version');
+  buildVersion.innerHTML = `<span>DEMO v${MOBILE_DEMO_VERSION}</span><strong>${revision}</strong>`;
+  buildVersion.title = `Mobile demo v${MOBILE_DEMO_VERSION} · build ${revision}`;
+  buildVersion.setAttribute('aria-label', `Mobile demo version ${MOBILE_DEMO_VERSION}, build ${revision}`);
 }
 
 updateTitle();

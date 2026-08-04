@@ -1,8 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const provider = { id: 'fixture', name: 'Fixture provider' };
-const blue = { id: 'blue-layout', name: 'Movistar KOI Fénix', code: 'KOI' };
-const red = { id: 'red-layout', name: 'UB Alma Mater', code: 'UBAM' };
+const blue = { id: 'blue-layout', name: 'Unicorns of Love Sexy Edition', code: 'USE' };
+const red = { id: 'red-layout', name: 'VfB Stuttgart', code: 'VFB' };
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
 const champions = ['Gnar', 'LeeSin', 'Syndra', 'Ezreal', 'Nautilus'] as const;
 
@@ -28,7 +28,7 @@ const series = {
 function players(side: 'blue' | 'red') {
   return roles.map((role, index) => ({
     id: `${side}-${role}`,
-    handle: `${side === 'blue' ? 'KOI' : 'Alma'} ${role}`,
+    handle: `${side === 'blue' ? 'USE' : 'VfB'} ${role}`,
     championId: champions[index],
     role,
     level: 8 + index,
@@ -142,12 +142,30 @@ test('mobile live board keeps compact chrome and uses the current history card l
   await page.goto('/');
   await page.locator('[data-series-id="series-mobile-layout"]').click();
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.4');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.5');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-surface', 'v21');
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-layout-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-layout', 'identity-items');
   await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
   await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
+  await expect(board).toHaveAttribute('data-mobile-live-cleanup', 'v21');
+
+  const topChrome = await page.evaluate(() => {
+    const topbar = document.querySelector<HTMLElement>('.topbar');
+    const context = document.querySelector<HTMLElement>('.mobile-context-bar');
+    const workspace = document.querySelector<HTMLElement>('#workspace');
+    if (!topbar || !context || !workspace) throw new Error('Top bar, context bar, or workspace is missing.');
+    const topbarBounds = topbar.getBoundingClientRect();
+    const contextBounds = context.getBoundingClientRect();
+    return {
+      gap: contextBounds.top - topbarBounds.bottom,
+      workspacePaddingTop: Number.parseFloat(getComputedStyle(workspace).paddingTop)
+    };
+  });
+  expect(topChrome.gap).toBeGreaterThanOrEqual(-1);
+  expect(topChrome.gap).toBeLessThanOrEqual(2);
+  expect(topChrome.workspacePaddingTop).toBe(0);
 
   await expect(page.locator('.series-hero-topline')).toBeHidden();
   const chromeLayout = await page.evaluate(() => {
@@ -164,6 +182,18 @@ test('mobile live board keeps compact chrome and uses the current history card l
   expect(chromeLayout.matchupHeight).toBeLessThanOrEqual(112);
   expect(chromeLayout.selectorHeight).toBeLessThanOrEqual(54);
   expect(chromeLayout.contextHeight).toBeLessThanOrEqual(34);
+
+  const visibleObjectiveSurfaces = await page.evaluate(() => {
+    const selectors = '.mobile-live-parity-objectives, .history-v2-objectives, .v2-objectives-card, .objective-hud-v3';
+    return [...document.querySelectorAll<HTMLElement>(selectors)]
+      .filter(element => {
+        const bounds = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return bounds.width > 0 && bounds.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+      })
+      .map(element => element.className);
+  });
+  expect(visibleObjectiveSurfaces).toEqual(['mobile-live-parity-objectives']);
 
   const parityLayout = await board.locator('.mobile-live-parity-comparison').evaluate(element => {
     const boardElement = element.closest<HTMLElement>('.mobile-live-history-board');
@@ -184,15 +214,28 @@ test('mobile live board keeps compact chrome and uses the current history card l
   expect(parityLayout.boardWidth).toBeLessThanOrEqual(380);
   expect(parityLayout.boardRadius).not.toBe('0px');
   expect(parityLayout.teamStripHeight).toBeGreaterThanOrEqual(70);
-  expect(parityLayout.teamStripHeight).toBeLessThanOrEqual(88);
+  expect(parityLayout.teamStripHeight).toBeLessThanOrEqual(94);
   expect(parityLayout.goldWidth).toBeGreaterThanOrEqual(74);
   expect(parityLayout.goldWidth).toBeLessThanOrEqual(82);
   expect(parityLayout.objectiveHeight).toBeGreaterThanOrEqual(62);
   expect(parityLayout.objectiveHeight).toBeLessThanOrEqual(82);
 
+  const teamNameLayout = await board.locator('.mobile-live-parity-team.blue strong').evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      height: bounds.height,
+      lineHeight: Number.parseFloat(style.lineHeight),
+      whiteSpace: style.whiteSpace
+    };
+  });
+  expect(teamNameLayout.whiteSpace).toBe('normal');
+  expect(teamNameLayout.height).toBeGreaterThan(teamNameLayout.lineHeight * 1.5);
+  expect(teamNameLayout.height).toBeLessThanOrEqual(teamNameLayout.lineHeight * 2.2);
+
   const names = board.locator('.role-player-name strong');
   await expect(names).toHaveCount(10);
-  await expect(names.first()).toHaveText('KOI top');
+  await expect(names.first()).toHaveText('USE top');
   const nameLayout = await names.first().evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const style = getComputedStyle(element);

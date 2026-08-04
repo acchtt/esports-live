@@ -121,7 +121,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('mobile fallback recovers when the first final scoreboard request fails', async ({ page }) => {
+test('mobile fallback recovers with history navigation and objective counts', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await page.goto('/');
@@ -131,8 +131,21 @@ test('mobile fallback recovers when the first final scoreboard request fails', a
   await card.click();
 
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.4');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.5');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
+  await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
+  await expect(page.locator('.mobile-app-nav [data-mobile-view="live"] span')).toHaveText('History');
+
+  const objectives = page.locator('.mobile-completed-objectives');
+  await expect(objectives).toContainText('Towers');
+  await expect(objectives).toContainText('8');
+  await expect(objectives).toContainText('3');
+  await expect(objectives).toContainText('Dragons');
+  await expect(objectives).toContainText('Barons');
+  await expect(objectives).toContainText('Inhibitors');
+
+  await expect(page.locator('.mobile-recovery-items')).toBeHidden();
+  await expect(page.locator('.role-player-items')).toBeHidden();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

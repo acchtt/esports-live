@@ -6,7 +6,7 @@ import './mobile-demo-version.css';
 type MobileView = 'matches' | 'live' | 'platform';
 
 const MOBILE_QUERY = '(max-width: 760px)';
-const MOBILE_DEMO_VERSION = '0.2';
+const MOBILE_DEMO_VERSION = '0.17.2';
 const media = window.matchMedia(MOBILE_QUERY);
 const body = document.body;
 const analysisPanel = document.querySelector<HTMLElement>('.analysis-panel');
@@ -109,7 +109,8 @@ window.addEventListener('esports-live:snapshot', () => {
   if (media.matches && currentView() === 'platform') queueMicrotask(expandPlatform);
 });
 window.addEventListener('pageshow', () => syncViewport());
-media.addEventListener('change', syncViewport);
+if (typeof media.addEventListener === 'function') media.addEventListener('change', syncViewport);
+else if (typeof media.addListener === 'function') media.addListener(syncViewport);
 
 if (platformPanel) {
   new MutationObserver(() => {

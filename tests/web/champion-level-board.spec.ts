@@ -142,8 +142,8 @@ test('shows live champion levels on both matchup-board portraits', async ({ page
   await page.goto('/');
   await page.locator('[data-series-id="series-levels"]').click();
 
-  const blueLevel = page.locator('.role-matchup-row').first().locator('.role-player.blue .champion-level-badge');
-  const redLevel = page.locator('.role-matchup-row').first().locator('.role-player.red .champion-level-badge');
+  const blueLevel = page.locator('.v2-matchup-row').first().locator('.v2-player.blue .champion-level-badge');
+  const redLevel = page.locator('.v2-matchup-row').first().locator('.v2-player.red .champion-level-badge');
 
   await expect(blueLevel).toHaveText('13');
   await expect(blueLevel).toHaveAttribute('aria-label', 'Champion level 13');

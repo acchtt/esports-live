@@ -71,7 +71,7 @@ export function createRiotDelayedLiveRecoveryProvider(
         return base.getSnapshot(gameId, recoveryCursor).catch(() => null);
       }));
       const best = recovered
-        .filter((snapshot): snapshot is LolProviderSnapshot => snapshot?.stats !== null)
+        .filter((snapshot): snapshot is LolProviderSnapshot => snapshot !== null && snapshot.stats !== null)
         .sort((left, right) => sourceTime(right) - sourceTime(left))[0];
       if (best) return remember(gameId, best);
     }

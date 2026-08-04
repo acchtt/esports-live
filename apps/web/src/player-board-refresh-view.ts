@@ -209,6 +209,23 @@ function summaryMarkup(): string {
   ].join('');
 }
 
+function summaryRenderKey(): string {
+  const stats = latestSnapshot?.stats;
+  if (!stats) return 'empty';
+  return JSON.stringify([
+    stats.blue.kills,
+    stats.red.kills,
+    stats.blue.gold,
+    stats.red.gold,
+    stats.blue.objectives.towers,
+    stats.red.objectives.towers,
+    stats.blue.objectives.dragons?.length ?? null,
+    stats.red.objectives.dragons?.length ?? null,
+    stats.blue.objectives.barons,
+    stats.red.objectives.barons
+  ]);
+}
+
 function clearRefreshTimeout(): void {
   if (refreshTimeout !== null) window.clearTimeout(refreshTimeout);
   refreshTimeout = null;
@@ -227,7 +244,13 @@ function updateControl(toolbar: HTMLElement): void {
   const button = toolbar.querySelector<HTMLButtonElement>('[data-player-board-refresh]');
   const detailText = refreshing ? 'Requesting a fresh verified snapshot…' : updatedLabel();
   if (detail && detail.textContent !== detailText) detail.textContent = detailText;
-  if (summary) summary.innerHTML = summaryMarkup();
+  if (summary) {
+    const renderKey = summaryRenderKey();
+    if (summary.dataset.summaryRenderKey !== renderKey) {
+      summary.dataset.summaryRenderKey = renderKey;
+      summary.innerHTML = summaryMarkup();
+    }
+  }
   if (!button) return;
 
   button.disabled = refreshing;

@@ -38,4 +38,4 @@ jobs:
         if: github.base_ref == 'demo' || github.ref_name == 'mobile-demo' || github.ref_name == 'demo'
         run: |
           npm run build:web
-          npx playwright test tests/web/mobile-demo.spec.ts tests/web/mobile-demo-history.spec.ts tests/web/completed-board-merge.spec.ts tests/web/history-mode-ownership.spec.ts tests/web/live-poll-recovery.spec.ts
+          npx playwright test tests/web/mobile-demo.spec.ts tests/web/mobile-demo-history.spec.ts tests/web/completed-board-merge.spec.ts tests/web/history-mode-ownership.spec.ts tests/web/live-poll-recovery.spec.ts tests/web/live-telemetry-pending.spec.ts

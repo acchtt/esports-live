@@ -99,7 +99,9 @@ function championCatalog(version: string): Promise<ReadonlyMap<string, string>> 
     cache: 'force-cache',
     signal: controller.signal
   })
-    .then(async response => response.ok ? response.json() as Promise<ChampionCatalogResponse> : {})
+    .then(async (response): Promise<ChampionCatalogResponse> => response.ok
+      ? await response.json() as ChampionCatalogResponse
+      : {})
     .then(payload => {
       const catalog = new Map<string, string>();
       for (const entry of Object.values(payload.data ?? {})) {

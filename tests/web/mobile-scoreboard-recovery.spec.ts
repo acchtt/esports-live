@@ -109,6 +109,7 @@ async function installFixtures(page: Page): Promise<void> {
     complete: true,
     reasons: []
   }));
+  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['16.15.1']));
 
   let finalRequests = 0;
   await page.route('**/v1/lol/games/**/live**', async route => {
@@ -121,7 +122,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('mobile fallback recovers with stable history navigation and role gold deltas', async ({ page }) => {
+test('mobile fallback recovers with readable teams, portraits, objectives, and role gold deltas', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await page.goto('/');
@@ -131,11 +132,15 @@ test('mobile fallback recovers with stable history navigation and role gold delt
   await card.click();
 
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.6');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.7');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
   await expect(page.locator('.mobile-app-nav [data-mobile-view="live"] span')).toHaveText('History');
+
+  const teams = page.locator('.mobile-completed-team-names');
+  await expect(teams).toContainText('Recovery Blue');
+  await expect(teams).toContainText('Recovery Red');
 
   const objectives = page.locator('.mobile-completed-objectives');
   await expect(objectives).toContainText('Towers');
@@ -153,9 +158,11 @@ test('mobile fallback recovers with stable history navigation and role gold delt
 
   await expect(page.locator('.mobile-final-recovery-summary>div')).toHaveCount(2);
   await expect(page.locator('.mobile-final-recovery-summary')).not.toContainText('Gold');
-  await expect(page.locator('.mobile-recovery-portrait:visible')).toHaveCount(0);
+  await expect(page.locator('.mobile-recovery-portrait:visible')).toHaveCount(10);
+  await expect(page.locator('.mobile-recovery-portrait img')).toHaveCount(10);
   await expect(page.locator('.mobile-recovery-identity small:visible')).toHaveCount(0);
-  await expect(page.locator('.mobile-recovery-stats b')).toHaveCount(20);
+  await expect(page.locator('.mobile-recovery-stats b')).toHaveCount(10);
+  await expect(page.locator('.mobile-recovery-matchups')).not.toContainText(' CS');
   await expect(page.locator('.mobile-recovery-items:visible')).toHaveCount(0);
   await expect(page.locator('.role-player-items:visible')).toHaveCount(0);
   await expect(page.locator('.mobile-recovery-role:visible')).toHaveCount(0);

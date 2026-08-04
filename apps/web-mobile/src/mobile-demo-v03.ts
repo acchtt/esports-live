@@ -15,6 +15,7 @@ import './mobile-demo-v17-layout-fix.ts';
 import './mobile-demo-v18.ts';
 import './mobile-demo-v18-history-nav-compat.ts';
 import './mobile-demo-v18-render-ownership.ts';
+import './mobile-demo-v18-live-board-finalize.ts';
 
 const VERSION = '0.17.2';
 const LABEL = 'DEMO v0.17.2';

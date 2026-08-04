@@ -214,9 +214,9 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.14');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.15');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
-  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.14');
+  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.15');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
 });
@@ -226,7 +226,7 @@ test('primary mobile completed board resolves real names, removes the duplicate 
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page, finalSnapshot);
   await page.goto('/');
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.14');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.15');
   await installPrimaryFixtureBoard(page, finalSnapshot);
 
   const board = page.locator('.completed-final-game[data-final-game-id="game-mobile-recovery-1"]');
@@ -280,16 +280,28 @@ test('primary mobile completed board resolves real names, removes the duplicate 
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
-test('mobile fallback shows a readable blue gold lead and keeps the bottom navigation clear', async ({ page }) => {
+test('mobile fallback restores numeric portraits, starts at the board top, and keeps navigation clear', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installFixtures(page);
+  await installFixtures(page, snapshot(35_000, 31_000, null, true));
   await openRecoveryBoard(page);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.14');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.15');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
   await expect(page.locator('.mobile-app-nav [data-mobile-view="live"] span')).toHaveText('History');
+
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThanOrEqual(1);
+  const topLayout = await page.evaluate(() => {
+    const context = document.querySelector<HTMLElement>('.mobile-context-bar');
+    const gameHeader = document.querySelector<HTMLElement>('.mobile-final-recovery .completed-final-game-header');
+    if (!context || !gameHeader) throw new Error('History top layout is incomplete.');
+    return {
+      contextBottom: context.getBoundingClientRect().bottom,
+      gameHeaderTop: gameHeader.getBoundingClientRect().top
+    };
+  });
+  expect(topLayout.gameHeaderTop).toBeGreaterThanOrEqual(topLayout.contextBottom - 1);
 
   const teams = page.locator('.mobile-completed-team-names');
   await expect(teams).toContainText('Recovery Blue Academy');
@@ -352,7 +364,9 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
 
   await expect(page.locator('.mobile-final-recovery-summary')).toHaveCount(0);
   await expect(page.locator('.mobile-recovery-portrait:visible')).toHaveCount(10);
-  await expect(page.locator('.mobile-recovery-portrait img')).toHaveCount(10);
+  const fallbackPortraits = page.locator('.mobile-recovery-portrait img');
+  await expect(fallbackPortraits).toHaveCount(10);
+  await expect(fallbackPortraits.first()).toHaveAttribute('src', /\/16\.15\.1\/img\/champion\/Jayce\.png$/);
   await expect(page.locator('.mobile-recovery-identity small:visible')).toHaveCount(0);
   await expect(page.locator('.mobile-recovery-stats b')).toHaveCount(10);
   await expect(page.locator('.mobile-recovery-matchups')).not.toContainText(' CS');
@@ -369,7 +383,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   expect(boardBounds.right).toBeLessThanOrEqual(390.5);
 
   const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.14');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.15');
   const navLayout = await nav.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const style = getComputedStyle(element);

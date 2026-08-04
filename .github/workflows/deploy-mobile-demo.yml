@@ -1,4 +1,4 @@
-name: Deploy Mobile Demo
+name: Deploy Mobile Preview
 
 on:
   push:
@@ -54,6 +54,7 @@ jobs:
           npx playwright test \
             tests/web/mobile-demo.spec.ts \
             tests/web/mobile-demo-history.spec.ts \
+            tests/web/mobile-scoreboard-recovery.spec.ts \
             tests/web/completed-board-merge.spec.ts \
             tests/web/history-mode-ownership.spec.ts
 
@@ -115,7 +116,7 @@ jobs:
         run: |
           grep -R "$API_BASE_URL" apps/web/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
-          grep -R "DEMO v0.2" apps/web/dist/assets
+          grep -R "DEMO v0.9" apps/web/dist/assets
 
       - name: Deploy mobile Pages preview
         run: >-

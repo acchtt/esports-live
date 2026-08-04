@@ -1,4 +1,5 @@
 import './mobile-demo.css';
+import './mobile-demo-fixes.css';
 
 type MobileView = 'matches' | 'live' | 'platform';
 
@@ -99,10 +100,6 @@ document.addEventListener('click', event => {
     queueMicrotask(() => setView('matches', false));
   }
 }, { capture: true });
-
-window.addEventListener('esports-live:completed-selection', () => {
-  if (media.matches) setView('live');
-});
 
 window.addEventListener('esports-live:selection', updateTitle);
 window.addEventListener('pageshow', () => syncViewport());

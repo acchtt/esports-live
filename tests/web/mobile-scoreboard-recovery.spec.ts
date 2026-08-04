@@ -214,9 +214,9 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.16');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
-  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.16');
+  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
 });
@@ -226,7 +226,7 @@ test('primary mobile completed board resolves real names, removes the duplicate 
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page, finalSnapshot);
   await page.goto('/');
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.16');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
   await installPrimaryFixtureBoard(page, finalSnapshot);
 
   const board = page.locator('.completed-final-game[data-final-game-id="game-mobile-recovery-1"]');
@@ -285,7 +285,7 @@ test('mobile fallback restores numeric portraits, starts at the board top, and k
   await installFixtures(page, snapshot(35_000, 31_000, null, true));
   await openRecoveryBoard(page);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.16');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
@@ -383,7 +383,7 @@ test('mobile fallback restores numeric portraits, starts at the board top, and k
   expect(boardBounds.right).toBeLessThanOrEqual(390.5);
 
   const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.16');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   const navLayout = await nav.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const style = getComputedStyle(element);

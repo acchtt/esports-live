@@ -31,7 +31,7 @@ function players(side: 'blue' | 'red') {
     deaths: side === 'blue' ? 1 : 2,
     assists: 5,
     creepScore: 120 + index * 20,
-    totalGold: 6_000 + index * 350,
+    totalGold: 6_000 + index * 350 + (side === 'blue' ? 500 : 0),
     items: ['1001', '2003', '1036']
   }));
 }
@@ -121,7 +121,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('mobile fallback recovers with history navigation and objective counts', async ({ page }) => {
+test('mobile fallback recovers with stable history navigation and role gold deltas', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await page.goto('/');
@@ -131,8 +131,9 @@ test('mobile fallback recovers with history navigation and objective counts', as
   await card.click();
 
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.5');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.6');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
+  await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
   await expect(page.locator('.mobile-app-nav [data-mobile-view="live"] span')).toHaveText('History');
 
@@ -144,8 +145,20 @@ test('mobile fallback recovers with history navigation and objective counts', as
   await expect(objectives).toContainText('Barons');
   await expect(objectives).toContainText('Inhibitors');
 
+  const deltas = page.locator('.mobile-recovery-gold-delta');
+  await expect(deltas).toHaveCount(5);
+  for (let index = 0; index < 5; index += 1) {
+    await expect(deltas.nth(index)).toHaveText('+500');
+  }
+
+  await expect(page.locator('.mobile-final-recovery-summary>div')).toHaveCount(2);
+  await expect(page.locator('.mobile-final-recovery-summary')).not.toContainText('Gold');
+  await expect(page.locator('.mobile-recovery-portrait:visible')).toHaveCount(0);
+  await expect(page.locator('.mobile-recovery-identity small:visible')).toHaveCount(0);
+  await expect(page.locator('.mobile-recovery-stats b')).toHaveCount(20);
   await expect(page.locator('.mobile-recovery-items:visible')).toHaveCount(0);
   await expect(page.locator('.role-player-items:visible')).toHaveCount(0);
+  await expect(page.locator('.mobile-recovery-role:visible')).toHaveCount(0);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

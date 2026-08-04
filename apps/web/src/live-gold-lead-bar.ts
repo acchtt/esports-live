@@ -1,5 +1,6 @@
 import './live-gold-lead-bar.css';
 import './live-summary-compact.css';
+import './live-role-gold.css';
 
 export {};
 

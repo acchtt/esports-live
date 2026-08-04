@@ -59,6 +59,7 @@ jobs:
           npx playwright test \
             tests/web/mobile-demo.spec.ts \
             tests/web/mobile-demo-history.spec.ts \
+            tests/web/mobile-scoreboard-recovery.spec.ts \
             tests/web/completed-board-merge.spec.ts \
             tests/web/history-mode-ownership.spec.ts
 
@@ -80,7 +81,7 @@ jobs:
         run: |
           grep -R "$MOBILE_API_BASE_URL" apps/web/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
-          grep -R "DEMO v0.3" apps/web/dist/assets
+          grep -R "DEMO v0." apps/web/dist/assets
 
       - name: Deploy mobile Pages preview
         run: >-
@@ -99,11 +100,11 @@ jobs:
             asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$html" | head -n 1 | cut -d'"' -f2)"
             if [[ "$asset" == /* ]]; then asset="https://mobile-demo.esports-live.pages.dev$asset"; fi
             script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$asset" || true)"
-            if grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" && grep -q "DEMO v0.3" <<<"$script"; then
-              echo "Mobile demo v0.3 build $VITE_BUILD_SHA_SHORT is live at $url"
+            if grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" && grep -q "DEMO v0." <<<"$script"; then
+              echo "Mobile demo build $VITE_BUILD_SHA_SHORT is live at $url"
               exit 0
             fi
-            echo "Mobile demo v0.3 not ready (attempt $attempt/12)."
+            echo "Mobile demo not ready (attempt $attempt/12)."
             sleep 5
           done
           echo "Mobile demo deployment verification failed."

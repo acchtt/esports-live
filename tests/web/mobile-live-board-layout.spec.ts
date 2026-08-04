@@ -133,7 +133,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('mobile live board keeps the pre-board chrome compact and matchup rows readable', async ({ page }) => {
+test('mobile live board keeps compact chrome and uses the current history card layout', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -142,11 +142,12 @@ test('mobile live board keeps the pre-board chrome compact and matchup rows read
   await page.goto('/');
   await page.locator('[data-series-id="series-mobile-layout"]').click();
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.3');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.4');
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-layout-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-layout', 'identity-items');
   await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
+  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
 
   await expect(page.locator('.series-hero-topline')).toBeHidden();
   const chromeLayout = await page.evaluate(() => {
@@ -163,6 +164,31 @@ test('mobile live board keeps the pre-board chrome compact and matchup rows read
   expect(chromeLayout.matchupHeight).toBeLessThanOrEqual(112);
   expect(chromeLayout.selectorHeight).toBeLessThanOrEqual(54);
   expect(chromeLayout.contextHeight).toBeLessThanOrEqual(34);
+
+  const parityLayout = await board.locator('.mobile-live-parity-comparison').evaluate(element => {
+    const boardElement = element.closest<HTMLElement>('.mobile-live-history-board');
+    const teamStrip = element.querySelector<HTMLElement>('.mobile-live-parity-team-strip');
+    const gold = element.querySelector<HTMLElement>('.mobile-live-parity-gold');
+    const objectives = element.querySelector<HTMLElement>('.mobile-live-parity-objectives');
+    if (!boardElement || !teamStrip || !gold || !objectives) throw new Error('History-style live comparison is incomplete.');
+    const bounds = boardElement.getBoundingClientRect();
+    return {
+      boardWidth: bounds.width,
+      boardRadius: getComputedStyle(boardElement).borderRadius,
+      teamStripHeight: teamStrip.getBoundingClientRect().height,
+      goldWidth: gold.getBoundingClientRect().width,
+      objectiveHeight: objectives.getBoundingClientRect().height
+    };
+  });
+  expect(parityLayout.boardWidth).toBeGreaterThanOrEqual(360);
+  expect(parityLayout.boardWidth).toBeLessThanOrEqual(380);
+  expect(parityLayout.boardRadius).not.toBe('0px');
+  expect(parityLayout.teamStripHeight).toBeGreaterThanOrEqual(70);
+  expect(parityLayout.teamStripHeight).toBeLessThanOrEqual(88);
+  expect(parityLayout.goldWidth).toBeGreaterThanOrEqual(74);
+  expect(parityLayout.goldWidth).toBeLessThanOrEqual(82);
+  expect(parityLayout.objectiveHeight).toBeGreaterThanOrEqual(62);
+  expect(parityLayout.objectiveHeight).toBeLessThanOrEqual(82);
 
   const names = board.locator('.role-player-name strong');
   await expect(names).toHaveCount(10);
@@ -206,24 +232,7 @@ test('mobile live board keeps the pre-board chrome compact and matchup rows read
   expect(firstRowHeight).toBeGreaterThanOrEqual(72);
   expect(firstRowHeight).toBeLessThanOrEqual(84);
 
-  const toolbar = board.locator('.player-board-toolbar');
-  await expect(toolbar).toBeVisible();
-  const toolbarLayout = await toolbar.evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    const button = element.querySelector<HTMLElement>('.player-board-refresh-button');
-    if (!button) throw new Error('Refresh button is missing.');
-    return {
-      display: getComputedStyle(element).display,
-      height: bounds.height,
-      buttonHeight: button.getBoundingClientRect().height,
-      buttonWidth: button.getBoundingClientRect().width
-    };
-  });
-  expect(toolbarLayout.display).toBe('grid');
-  expect(toolbarLayout.height).toBeLessThanOrEqual(50);
-  expect(toolbarLayout.buttonHeight).toBeGreaterThanOrEqual(32);
-  expect(toolbarLayout.buttonHeight).toBeLessThanOrEqual(40);
-  expect(toolbarLayout.buttonWidth).toBeLessThanOrEqual(40);
+  await expect(board.locator('.player-board-toolbar')).toBeHidden();
 
   const nav = page.locator('.mobile-app-nav');
   await expect(nav).toHaveAttribute('data-mobile-nav-clearance', 'measured');

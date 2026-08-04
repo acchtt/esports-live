@@ -188,7 +188,7 @@ async function hydratePrimaryPortraits(snapshot: LiveSnapshot<LolStats>, root: H
 }
 
 function refinePrimaryBoard(snapshot: LiveSnapshot<LolStats>, root: HTMLElement): void {
-  if (!media.matches || !snapshot.stats) return;
+  if (!media.matches || !snapshot.stats || !root.closest('#completed-match-detail')) return;
   renderCompactHeader(snapshot, root);
   root.querySelector('.completed-team-comparison')?.remove();
   void hydratePrimaryPortraits(snapshot, root);

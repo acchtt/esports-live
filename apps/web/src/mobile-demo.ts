@@ -1,5 +1,6 @@
 import './mobile-demo.css';
 import './mobile-demo-fixes.css';
+import './mobile-demo-platform-fix.css';
 
 type MobileView = 'matches' | 'live' | 'platform';
 

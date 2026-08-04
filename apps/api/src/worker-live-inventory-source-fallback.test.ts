@@ -75,16 +75,6 @@ function snapshot(): LolProviderSnapshot {
   };
 }
 
-function windowPayload(timestamp: string) {
-  return {
-    frames: [{
-      rfc460Timestamp: timestamp,
-      blueTeam: { participants: [{ participantId: 1 }] },
-      redTeam: { participants: [{ participantId: 6 }] }
-    }]
-  };
-}
-
 function detailPayload(timestamp: string) {
   return {
     frames: [{
@@ -118,7 +108,7 @@ test('falls back to source-aligned inventories when wall-clock frames are newer 
       const url = new URL(String(input));
       if (url.pathname.includes('/window/')) {
         windowRequests += 1;
-        return new Response(JSON.stringify(windowPayload(SOURCE)), { status: 200 });
+        return new Response(null, { status: 204 });
       }
       const anchor = url.searchParams.get('startingTime') ?? '';
       requestedDetails.push(anchor);
@@ -131,7 +121,7 @@ test('falls back to source-aligned inventories when wall-clock frames are newer 
 
   const result = await provider.getSnapshot('game-1');
 
-  assert.ok(windowRequests >= 1);
+  assert.equal(windowRequests, 0);
   assert.deepEqual(requestedDetails, [wallAnchor, sourceAnchor]);
   assert.deepEqual(result.stats?.blue.players[0]?.items, ['1055', '2003']);
   assert.deepEqual(result.stats?.red.players[0]?.items, ['1054', '2003']);

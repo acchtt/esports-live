@@ -10,6 +10,7 @@ import './mobile-demo-v14.ts';
 import './mobile-demo-v15.ts';
 import './mobile-demo-v16.ts';
 import './mobile-demo-v17.ts';
+import './mobile-demo-v17-compat.ts';
 
 const VERSION = '0.17';
 const LABEL = 'DEMO v0.17';

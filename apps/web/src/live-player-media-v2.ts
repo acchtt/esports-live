@@ -235,10 +235,10 @@ function enhancePlayer(container: HTMLElement | null, player: LolPlayerState | n
   media.innerHTML = itemMarkup(player, patch);
 }
 
-function render(snapshot: LiveSnapshot<LolStats>): void {
-  if (!snapshot.stats) return;
+function render(snapshot: LiveSnapshot<LolStats>): boolean {
+  if (!snapshot.stats) return false;
   const board = document.querySelector<HTMLElement>(`.live-dashboard-v2[data-live-dashboard-game-id="${CSS.escape(snapshot.game.id)}"]`);
-  if (!board) return;
+  if (!board) return false;
 
   const patch = dataDragonPatch(snapshot.stats.patch);
   const bluePlayers = orderedPlayers(snapshot.stats.blue);
@@ -250,8 +250,16 @@ function render(snapshot: LiveSnapshot<LolStats>): void {
     enhancePlayer(row.querySelector<HTMLElement>('.v2-player.red'), redPlayers[index] ?? null, patch);
   });
   bindImageFallbacks(board);
+  return rows.length > 0;
+}
+
+function renderAfterDashboard(snapshot: LiveSnapshot<LolStats>): void {
+  queueMicrotask(() => {
+    if (render(snapshot)) return;
+    requestAnimationFrame(() => render(snapshot));
+  });
 }
 
 window.addEventListener('esports-live:snapshot', event => {
-  render((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
+  renderAfterDashboard((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
 });

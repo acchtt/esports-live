@@ -4,6 +4,8 @@ const provider = { id: 'fixture', name: 'Fixture provider' };
 const blue = { id: 'recovery-blue', name: 'Recovery Blue Academy', code: 'RBL' };
 const red = { id: 'recovery-red', name: 'Recovery Red Esports', code: 'RRD' };
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
+const championNames = ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'] as const;
+const championNumericKeys = ['126', '57', '61', '22', '12'] as const;
 
 function iso(offsetMs = 0): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -20,11 +22,11 @@ const series = {
   games: [{ id: 'game-mobile-recovery-1', number: 1, state: 'completed' }]
 };
 
-function players(side: 'blue' | 'red') {
+function players(side: 'blue' | 'red', numericChampionIds = false) {
   return roles.map((role, index) => ({
     id: `${side}-${index}`,
     handle: `${side} ${role}`,
-    championId: ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'][index],
+    championId: numericChampionIds ? championNumericKeys[index] : championNames[index],
     role,
     level: 12,
     kills: side === 'blue' ? 2 : 1,
@@ -39,7 +41,8 @@ function players(side: 'blue' | 'red') {
 function snapshot(
   blueGold = 35_000,
   redGold = 31_000,
-  telemetryNames: { blue: string; red: string } | null = null
+  telemetryNames: { blue: string; red: string } | null = null,
+  numericChampionIds = false
 ) {
   return {
     schemaVersion: '1.0',
@@ -57,7 +60,7 @@ function snapshot(
         gold: blueGold,
         kills: 12,
         objectives: { towers: 8, inhibitors: 1, dragons: ['infernal'], barons: 1, heralds: 1, grubs: 3 },
-        players: players('blue')
+        players: players('blue', numericChampionIds)
       },
       red: {
         ...red,
@@ -66,7 +69,7 @@ function snapshot(
         gold: redGold,
         kills: 7,
         objectives: { towers: 3, inhibitors: 0, dragons: ['cloud'], barons: 0, heralds: 0, grubs: 1 },
-        players: players('red')
+        players: players('red', numericChampionIds)
       }
     },
     quality: {
@@ -120,6 +123,15 @@ async function installFixtures(
     reasons: []
   }));
   await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['16.15.1']));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/16.15.1/data/en_US/champion.json', route => json(route, {
+    data: {
+      Jayce: { id: 'Jayce', key: '126', name: 'Jayce' },
+      Maokai: { id: 'Maokai', key: '57', name: 'Maokai' },
+      Orianna: { id: 'Orianna', key: '61', name: 'Orianna' },
+      Ashe: { id: 'Ashe', key: '22', name: 'Ashe' },
+      Alistar: { id: 'Alistar', key: '12', name: 'Alistar' }
+    }
+  }));
 
   let finalRequests = 0;
   await page.route('**/v1/lol/games/**/live**', async route => {
@@ -202,19 +214,19 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.12');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.13');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
-  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.12');
+  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.13');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
 });
 
-test('primary mobile completed board resolves real names, removes the duplicate summary, and hydrates portraits', async ({ page }) => {
-  const finalSnapshot = snapshot(48_665, 56_476, { blue: 'Team 1', red: 'Team 2' });
+test('primary mobile completed board resolves real names, removes the duplicate summary, and hydrates numeric portraits', async ({ page }) => {
+  const finalSnapshot = snapshot(48_665, 56_476, { blue: 'Team 1', red: 'Team 2' }, true);
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page, finalSnapshot);
   await page.goto('/');
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.12');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.13');
   await installPrimaryFixtureBoard(page, finalSnapshot);
 
   const board = page.locator('.completed-final-game[data-final-game-id="game-mobile-recovery-1"]');
@@ -242,6 +254,16 @@ test('primary mobile completed board resolves real names, removes the duplicate 
   await expect(portraits.first()).toHaveAttribute('alt', 'Jayce portrait');
   await expect(board.locator('.role-player-portrait .telemetry-champion')).toHaveCount(0);
 
+  const panelClearance = await page.locator('.analysis-panel').evaluate(element => {
+    const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
+    if (!navElement) throw new Error('Navigation is missing.');
+    return {
+      panelPaddingBottom: Number.parseFloat(getComputedStyle(element).paddingBottom),
+      navHeight: navElement.getBoundingClientRect().height
+    };
+  });
+  expect(panelClearance.panelPaddingBottom).toBeGreaterThan(panelClearance.navHeight + 16);
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
@@ -251,7 +273,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   await installFixtures(page);
   await openRecoveryBoard(page);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.12');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.13');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
@@ -326,7 +348,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   expect(boardBounds.right).toBeLessThanOrEqual(390.5);
 
   const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.12');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.13');
   const navLayout = await nav.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const style = getComputedStyle(element);
@@ -338,14 +360,15 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
       top: bounds.top,
       bottom: bounds.bottom,
       height: bounds.height,
-      bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom)
+      bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom),
+      visualBottom: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mobile-demo-visual-bottom')) || 0
     };
   });
   expect(navLayout.position).toBe('fixed');
   expect(navLayout.borderRadius).toBe('0px');
   expect(navLayout.left).toBeLessThanOrEqual(0.5);
   expect(navLayout.right).toBeGreaterThanOrEqual(389.5);
-  expect(navLayout.bottom).toBeGreaterThanOrEqual(843.5);
+  expect(navLayout.bottom).toBeGreaterThanOrEqual(843.5 - navLayout.visualBottom);
   expect(navLayout.bodyPaddingBottom).toBeGreaterThan(navLayout.height + 8);
 
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -358,7 +381,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
       lastRowBottom: lastRow.getBoundingClientRect().bottom
     };
   });
-  expect(clearance.lastRowBottom).toBeLessThanOrEqual(clearance.navTop - 4);
+  expect(clearance.lastRowBottom).toBeLessThanOrEqual(clearance.navTop - 16);
 
   const frameBorders = await page.locator('.mobile-final-recovery').evaluate(element => {
     const style = getComputedStyle(element);

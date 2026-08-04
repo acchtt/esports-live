@@ -1,0 +1,298 @@
+@media (max-width: 760px) {
+  /* Keep the live board dense enough to show all five role matchups without
+     turning each player into a full desktop-sized card. */
+  body.mobile-demo-active .v2-board-tabs {
+    display: none;
+  }
+
+  body.mobile-demo-active .v2-board-head {
+    min-height: 32px;
+    padding: 0 7px;
+    font-size: 0.58rem;
+  }
+
+  body.mobile-demo-active .v2-matchup-row {
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+    min-height: 58px;
+  }
+
+  body.mobile-demo-active .v2-player,
+  body.mobile-demo-active .v2-player.red {
+    grid-template-columns: 26px repeat(3, minmax(0, 1fr));
+    grid-template-rows: 26px 17px;
+    gap: 2px 3px;
+    min-width: 0;
+    padding: 5px 4px;
+  }
+
+  body.mobile-demo-active .v2-player.red {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 26px;
+  }
+
+  body.mobile-demo-active .v2-player .v2-champion,
+  body.mobile-demo-active .v2-player.red .v2-champion {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 0.44rem;
+  }
+
+  body.mobile-demo-active .v2-player-copy {
+    align-self: center;
+  }
+
+  body.mobile-demo-active .v2-player-copy strong {
+    font-size: 0.56rem;
+    line-height: 1.05;
+  }
+
+  body.mobile-demo-active .v2-player-copy small,
+  body.mobile-demo-active .v2-player-stat small {
+    display: none;
+  }
+
+  body.mobile-demo-active .v2-player-stat {
+    align-self: center;
+    line-height: 1;
+  }
+
+  body.mobile-demo-active .v2-player-stat strong {
+    font-size: 0.51rem;
+    line-height: 1;
+  }
+
+  body.mobile-demo-active .v2-lane-icon {
+    min-width: 20px;
+  }
+
+  body.mobile-demo-active .v2-lane-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Reduce the vertical lead-in before completed-game player telemetry. */
+  body.mobile-demo-active .completed-match-detail {
+    gap: 10px;
+    padding: 6px;
+  }
+
+  body.mobile-demo-active .completed-detail-header,
+  body.mobile-demo-active .completed-scoreboard,
+  body.mobile-demo-active .completed-match-detail > .completed-series-hero + .completed-games-panel {
+    padding: 9px;
+  }
+
+  body.mobile-demo-active .completed-detail-header h2 {
+    margin-top: 3px;
+    font-size: 0.88rem;
+  }
+
+  body.mobile-demo-active .completed-detail-header p {
+    margin-top: 4px;
+    font-size: 0.62rem;
+  }
+
+  body.mobile-demo-active .completed-final-badge {
+    padding: 4px 7px;
+    font-size: 0.5rem;
+  }
+
+  body.mobile-demo-active .completed-score-team strong {
+    font-size: 0.76rem;
+  }
+
+  body.mobile-demo-active .completed-score-team small {
+    font-size: 0.56rem;
+  }
+
+  body.mobile-demo-active .completed-score-value {
+    gap: 6px;
+    font-size: 1.28rem;
+  }
+
+  body.mobile-demo-active .completed-games-panel {
+    gap: 8px;
+  }
+
+  body.mobile-demo-active .completed-section-heading h3 {
+    font-size: 0.82rem;
+  }
+
+  body.mobile-demo-active .completed-games > .completed-game {
+    min-height: 92px;
+    padding: 10px;
+    gap: 7px;
+  }
+
+  body.mobile-demo-active .completed-final-game {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  body.mobile-demo-active .completed-final-game-header {
+    min-height: 28px;
+    gap: 6px;
+  }
+
+  body.mobile-demo-active .completed-final-game-header strong {
+    font-size: 0.72rem;
+  }
+
+  body.mobile-demo-active .completed-final-game-header span {
+    font-size: 0.52rem;
+  }
+
+  /* Completed-game role boards use the same compact five-row model as live. */
+  body.mobile-demo-active .completed-final-matchups {
+    overflow-x: hidden;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-matchup-row {
+    grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
+    min-width: 0;
+    min-height: 58px;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player,
+  body.mobile-demo-active .completed-final-matchups .role-player.red {
+    grid-template-areas:
+      "heading"
+      "stats"
+      "items";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 18px 16px 15px;
+    gap: 1px;
+    min-width: 0;
+    padding: 4px;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-heading,
+  body.mobile-demo-active .completed-final-matchups .role-player.red .role-player-heading {
+    grid-area: heading;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-chip {
+    display: none;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-name strong {
+    font-size: 0.55rem;
+    line-height: 1;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-name small,
+  body.mobile-demo-active .completed-final-matchups .role-player-stats small {
+    display: none;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-stats,
+  body.mobile-demo-active .completed-final-matchups .role-player.red .role-player-stats {
+    grid-area: stats;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px;
+    min-width: 0;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-stats strong {
+    font-size: 0.5rem;
+    line-height: 1;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-portrait {
+    display: none;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-items {
+    grid-area: items;
+    min-width: 0;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-items .telemetry-inventory {
+    gap: 2px;
+    min-height: 14px;
+    overflow: hidden;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-player-items .telemetry-item-slot {
+    width: 13px;
+    height: 13px;
+    flex-basis: 13px;
+    border-radius: 3px;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-gold-delta {
+    min-width: 38px;
+    padding: 3px 1px;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-gold-delta small,
+  body.mobile-demo-active .completed-final-matchups .role-edge-track {
+    display: none;
+  }
+
+  body.mobile-demo-active .completed-final-matchups .role-gold-delta strong {
+    font-size: 0.48rem;
+  }
+
+  /* Fallback compact layout used before the mirrored board enhancer finishes. */
+  body.mobile-demo-active .completed-final-player.history-player-board {
+    grid-template-areas:
+      "profile stats"
+      "items items";
+    grid-template-columns: minmax(0, 1fr) minmax(92px, auto);
+    min-height: 48px;
+    gap: 3px 6px;
+    padding: 5px;
+  }
+
+  body.mobile-demo-active .history-player-profile {
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  body.mobile-demo-active .history-champion {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+  }
+
+  body.mobile-demo-active .history-copy strong {
+    font-size: 0.56rem;
+  }
+
+  body.mobile-demo-active .history-copy span,
+  body.mobile-demo-active .history-role,
+  body.mobile-demo-active .history-stat span,
+  body.mobile-demo-active .history-items-label {
+    display: none;
+  }
+
+  body.mobile-demo-active .history-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  body.mobile-demo-active .history-stat {
+    min-width: 0;
+    padding: 2px;
+    text-align: center;
+  }
+
+  body.mobile-demo-active .history-stat strong {
+    margin-top: 0;
+    font-size: 0.5rem;
+  }
+
+  body.mobile-demo-active .history-items {
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  body.mobile-demo-active .history-item {
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+  }
+}

@@ -7,7 +7,7 @@ export interface RiotDelayedLiveRecoveryOptions {
   broadProbeIntervalMs?: number;
 }
 
-const DEFAULT_RECOVERY_DELAYS_MS = [12 * 60 * 1_000, 30 * 60 * 1_000] as const;
+const DEFAULT_RECOVERY_DELAYS_MS = [8 * 60 * 1_000, 15 * 60 * 1_000, 30 * 60 * 1_000] as const;
 const DEFAULT_BROAD_PROBE_INTERVAL_MS = 15_000;
 
 const RECOVERY_REASON: QualityReason = {

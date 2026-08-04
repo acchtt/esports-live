@@ -30,41 +30,40 @@ export type ProductionInventoryProviderOptions = Omit<
 >;
 
 /**
- * Select the inventory clock independently from the normalized scoreboard.
+ * Keep Riot inventory probe state alive across snapshot requests.
  *
- * Riot's public live clients request details using wall-clock timestamps. An
- * unanchored window response can contain an initial or otherwise stale frame,
- * which makes an inventory probe miss even while the base scoreboard is
- * current. Completed games still need their final source timestamp because a
- * wall-clock request after the game has ended can be outside the feed window.
+ * Live games use Riot's wall-clock details frontier. Completed games use the
+ * final source window instead. The two persistent provider instances retain
+ * their adaptive detail delay and cached inventory observations; recreating an
+ * enrichment provider for every request prevented that frontier from ever
+ * moving far enough to find inventories on delayed live feeds.
  */
 export function createProductionInventoryProvider(
   base: LolProviderClient,
   options: ProductionInventoryProviderOptions = {}
 ): LolProviderClient {
+  const inventoryWaitBudgetMs =
+    options.inventoryWaitBudgetMs ?? LIVE_INVENTORY_SETTLE_BUDGET_MS;
+  const sharedOptions = { ...options, inventoryWaitBudgetMs };
+  const liveInventoryProvider = createRiotCurrentPlayerProvider(base, {
+    ...sharedOptions,
+    useWindowOverlay: false
+  });
+  const completedInventoryProvider = createRiotCurrentPlayerProvider(base, {
+    ...sharedOptions,
+    useWindowOverlay: true
+  });
+  const gameStates = new Map<string, string>();
+
   return {
     ...base,
     async getSnapshot(gameId: string, after?: string) {
-      const snapshot = await base.getSnapshot(gameId, after);
-      if (!snapshot.stats || !snapshot.sourceTimestamp) return snapshot;
-
-      const snapshotProvider: LolProviderClient = {
-        ...base,
-        async getSnapshot() {
-          return snapshot;
-        }
-      };
-
-      const inventoryProvider = createRiotCurrentPlayerProvider(snapshotProvider, {
-        ...options,
-        // Live details use the same wall-clock frontier as Riot's public web
-        // clients. Final games use the source window so history still resolves.
-        useWindowOverlay: snapshot.game.state === 'completed',
-        inventoryWaitBudgetMs:
-          options.inventoryWaitBudgetMs ?? LIVE_INVENTORY_SETTLE_BUDGET_MS
-      });
-
-      return inventoryProvider.getSnapshot(gameId, after);
+      const provider = gameStates.get(gameId) === 'completed'
+        ? completedInventoryProvider
+        : liveInventoryProvider;
+      const snapshot = await provider.getSnapshot(gameId, after);
+      gameStates.set(gameId, snapshot.game.state);
+      return snapshot;
     }
   };
 }

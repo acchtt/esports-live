@@ -168,7 +168,7 @@ test('continues polling the newly selected live game after an older request fini
   await page.goto('/');
 
   await page.locator('[data-series-id="series-live"]').click();
-  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+  await expect(page.locator('[data-live-dashboard-game-id="game-live-1"]')).toBeVisible();
   await expect.poll(requests.gameOneRequests).toBeGreaterThanOrEqual(2);
 
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
@@ -178,5 +178,5 @@ test('continues polling the newly selected live game after an older request fini
   requests.releaseStaleRequest();
 
   await expect.poll(requests.gameTwoRequests).toBeGreaterThan(0);
-  await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
+  await expect(page.locator('[data-live-dashboard-game-id="game-live-2"]')).toBeVisible();
 });

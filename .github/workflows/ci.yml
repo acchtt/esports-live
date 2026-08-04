@@ -30,5 +30,12 @@ jobs:
       - name: Typecheck and test
         run: npm run check
 
-      - name: Browser stability smoke test
+      - name: Production browser stability suite
+        if: github.base_ref == 'main' || github.ref_name == 'main'
         run: npm run test:web
+
+      - name: Mobile demo browser suite
+        if: github.base_ref == 'demo' || github.ref_name == 'mobile-demo' || github.ref_name == 'demo'
+        run: |
+          npm run build:web
+          npx playwright test tests/web/mobile-demo.spec.ts tests/web/mobile-demo-history.spec.ts tests/web/completed-board-merge.spec.ts tests/web/history-mode-ownership.spec.ts

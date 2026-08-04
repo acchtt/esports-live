@@ -32,6 +32,7 @@ env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   MOBILE_DEMO_COMMIT_SHA: ${{ github.sha }}
+  MOBILE_DEMO_VERSION: 0.17.2
 
 jobs:
   deploy-web:
@@ -159,7 +160,7 @@ jobs:
         run: |
           grep -R "$API_BASE_URL" apps/web-mobile/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web-mobile/dist/index.html
-          grep -R "DEMO v0.17.1" apps/web-mobile/dist/assets
+          grep -R "DEMO v$MOBILE_DEMO_VERSION" apps/web-mobile/dist/assets
 
       - name: Deploy isolated mobile Pages application
         run: >-
@@ -181,7 +182,7 @@ jobs:
             if grep -q '<title>Esports Live</title>' <<<"$html" \
               && grep -q 'class="app-frame"' <<<"$html" \
               && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" \
-              && grep -q 'DEMO v0.17.1' <<<"$script"; then
+              && grep -q "DEMO v$MOBILE_DEMO_VERSION" <<<"$script"; then
               echo "Mobile application $VITE_BUILD_SHA_SHORT is available at $url"
               exit 0
             fi

@@ -161,8 +161,8 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
     const gridStyle = getComputedStyle(footerGrid);
     const matchupStyle = getComputedStyle(matchup);
     return {
-      topBackground: topStyle.backgroundColor,
-      footerBackground: footerStyle.backgroundColor,
+      topBackgroundImage: topStyle.backgroundImage,
+      footerBackgroundImage: footerStyle.backgroundImage,
       topBorder: topStyle.borderTopColor,
       footerBorder: footerStyle.borderTopColor,
       footerDisplay: gridStyle.display,
@@ -171,8 +171,8 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
     };
   });
   expect(surfaces).not.toBeNull();
-  expect(surfaces?.topBackground).not.toBe('rgba(0, 0, 0, 0)');
-  expect(surfaces?.footerBackground).not.toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.topBackgroundImage).not.toBe('none');
+  expect(surfaces?.footerBackgroundImage).not.toBe('none');
   expect(surfaces?.topBorder).not.toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerBorder).not.toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerDisplay).toBe('grid');

@@ -14,6 +14,7 @@ import './mobile-demo-v17.ts';
 const VERSION = '0.17';
 const LABEL = 'DEMO v0.17';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
+document.documentElement.dataset.mobileScoreboardParity = 'history';
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');

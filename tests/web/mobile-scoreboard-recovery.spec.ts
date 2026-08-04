@@ -122,7 +122,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('mobile fallback recovers with readable teams, portraits, objectives, and role gold deltas', async ({ page }) => {
+test('mobile fallback merges team gold into a borderless readable scoreboard', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await page.goto('/');
@@ -132,7 +132,7 @@ test('mobile fallback recovers with readable teams, portraits, objectives, and r
   await card.click();
 
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.7');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.8');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
@@ -141,6 +141,9 @@ test('mobile fallback recovers with readable teams, portraits, objectives, and r
   const teams = page.locator('.mobile-completed-team-names');
   await expect(teams).toContainText('Recovery Blue');
   await expect(teams).toContainText('Recovery Red');
+  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(2);
+  await expect(teams.locator('.mobile-completed-team-gold.blue')).toHaveText('+4K');
+  await expect(teams.locator('.mobile-completed-team-gold.deficit')).toHaveText('−4K');
 
   const objectives = page.locator('.mobile-completed-objectives');
   await expect(objectives).toContainText('Towers');
@@ -156,8 +159,7 @@ test('mobile fallback recovers with readable teams, portraits, objectives, and r
     await expect(deltas.nth(index)).toHaveText('+500');
   }
 
-  await expect(page.locator('.mobile-final-recovery-summary>div')).toHaveCount(2);
-  await expect(page.locator('.mobile-final-recovery-summary')).not.toContainText('Gold');
+  await expect(page.locator('.mobile-final-recovery-summary')).toHaveCount(0);
   await expect(page.locator('.mobile-recovery-portrait:visible')).toHaveCount(10);
   await expect(page.locator('.mobile-recovery-portrait img')).toHaveCount(10);
   await expect(page.locator('.mobile-recovery-identity small:visible')).toHaveCount(0);
@@ -166,6 +168,12 @@ test('mobile fallback recovers with readable teams, portraits, objectives, and r
   await expect(page.locator('.mobile-recovery-items:visible')).toHaveCount(0);
   await expect(page.locator('.role-player-items:visible')).toHaveCount(0);
   await expect(page.locator('.mobile-recovery-role:visible')).toHaveCount(0);
+
+  const frameBorders = await page.locator('.mobile-final-recovery').evaluate(element => {
+    const style = getComputedStyle(element);
+    return [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
+  });
+  expect(frameBorders).toEqual(['0px', '0px', '0px', '0px']);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

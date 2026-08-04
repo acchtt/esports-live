@@ -209,7 +209,7 @@ style.textContent = `
     border-radius:3px!important
   }
   body.mobile-demo-active .mobile-live-history-board[data-mobile-history-copy="true"] .role-gold-delta{
-    min-width:58px!important;
+    min-width:60px!important;
     margin:auto 1px!important
   }
 

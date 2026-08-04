@@ -7,19 +7,22 @@ const INVENTORY_SLOTS = 7;
 type CanonicalRole = 'top' | 'jungle' | 'mid' | 'bottom' | 'support';
 
 const ROLE_ORDER: readonly CanonicalRole[] = ['top', 'jungle', 'mid', 'bottom', 'support'];
+const gameContent = document.querySelector<HTMLElement>('#game-content');
+let latestSnapshot: LiveSnapshot<LolStats> | null = null;
+let boardObserver: MutationObserver | null = null;
 
 const style = document.createElement('style');
 style.textContent = `
   .live-dashboard-v2 .v2-matchup-row {
-    min-height: 82px !important;
+    min-height: 92px !important;
   }
 
   .live-dashboard-v2 .v2-player,
   .live-dashboard-v2 .v2-player.red {
-    grid-template-rows: minmax(42px, auto) 22px !important;
-    row-gap: 4px !important;
-    padding-top: 7px !important;
-    padding-bottom: 6px !important;
+    grid-template-rows: minmax(42px, auto) 30px !important;
+    row-gap: 6px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
   }
 
   .live-dashboard-v2 .v2-player {
@@ -72,8 +75,9 @@ style.textContent = `
     grid-area: items;
     display: flex;
     min-width: 0;
+    min-height: 28px;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     overflow: hidden;
   }
 
@@ -84,13 +88,14 @@ style.textContent = `
   .live-dashboard-v2 .v2-item-slot {
     position: relative;
     display: block;
-    width: 20px;
-    height: 20px;
-    flex: 0 0 20px;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
     overflow: hidden;
-    border: 1px solid rgba(132, 157, 190, 0.2);
-    border-radius: 4px;
-    background: rgba(2, 10, 19, 0.72);
+    border: 1px solid rgba(142, 171, 210, 0.34);
+    border-radius: 5px;
+    background: rgba(2, 10, 19, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
   }
 
   .live-dashboard-v2 .v2-item-slot img {
@@ -101,27 +106,33 @@ style.textContent = `
   }
 
   .live-dashboard-v2 .v2-item-slot.empty {
-    opacity: 0.28;
+    opacity: 0.22;
   }
 
   .live-dashboard-v2 .v2-item-slot.empty::after,
   .live-dashboard-v2 .v2-item-slot.image-missing::after {
     position: absolute;
-    inset: 6px;
-    border: 1px solid rgba(130, 151, 181, 0.22);
+    inset: 8px;
+    border: 1px solid rgba(142, 165, 198, 0.3);
     border-radius: 2px;
     content: '';
   }
 
   @media (max-width: 1180px) {
     .live-dashboard-v2 .v2-matchup-row {
-      min-height: 78px !important;
+      min-height: 86px !important;
+    }
+
+    .live-dashboard-v2 .v2-player,
+    .live-dashboard-v2 .v2-player.red {
+      grid-template-rows: minmax(40px, auto) 26px !important;
+      row-gap: 5px !important;
     }
 
     .live-dashboard-v2 .v2-item-slot {
-      width: 18px;
-      height: 18px;
-      flex-basis: 18px;
+      width: 23px;
+      height: 23px;
+      flex-basis: 23px;
     }
   }
 `;
@@ -235,22 +246,35 @@ function enhancePlayer(container: HTMLElement | null, player: LolPlayerState | n
   media.innerHTML = itemMarkup(player, patch);
 }
 
+function observeBoard(): void {
+  if (!gameContent) return;
+  boardObserver ??= new MutationObserver(() => {
+    if (latestSnapshot) renderAfterDashboard(latestSnapshot);
+  });
+  boardObserver.observe(gameContent, { childList: true, subtree: true });
+}
+
 function render(snapshot: LiveSnapshot<LolStats>): boolean {
   if (!snapshot.stats) return false;
   const board = document.querySelector<HTMLElement>(`.live-dashboard-v2[data-live-dashboard-game-id="${CSS.escape(snapshot.game.id)}"]`);
   if (!board) return false;
 
-  const patch = dataDragonPatch(snapshot.stats.patch);
-  const bluePlayers = orderedPlayers(snapshot.stats.blue);
-  const redPlayers = orderedPlayers(snapshot.stats.red);
-  const rows = [...board.querySelectorAll<HTMLElement>('.v2-matchup-row')];
+  boardObserver?.disconnect();
+  try {
+    const patch = dataDragonPatch(snapshot.stats.patch);
+    const bluePlayers = orderedPlayers(snapshot.stats.blue);
+    const redPlayers = orderedPlayers(snapshot.stats.red);
+    const rows = [...board.querySelectorAll<HTMLElement>('.v2-matchup-row')];
 
-  rows.forEach((row, index) => {
-    enhancePlayer(row.querySelector<HTMLElement>('.v2-player.blue'), bluePlayers[index] ?? null, patch);
-    enhancePlayer(row.querySelector<HTMLElement>('.v2-player.red'), redPlayers[index] ?? null, patch);
-  });
-  bindImageFallbacks(board);
-  return rows.length > 0;
+    rows.forEach((row, index) => {
+      enhancePlayer(row.querySelector<HTMLElement>('.v2-player.blue'), bluePlayers[index] ?? null, patch);
+      enhancePlayer(row.querySelector<HTMLElement>('.v2-player.red'), redPlayers[index] ?? null, patch);
+    });
+    bindImageFallbacks(board);
+    return rows.length > 0;
+  } finally {
+    observeBoard();
+  }
 }
 
 function renderAfterDashboard(snapshot: LiveSnapshot<LolStats>): void {
@@ -260,6 +284,9 @@ function renderAfterDashboard(snapshot: LiveSnapshot<LolStats>): void {
   });
 }
 
+observeBoard();
+
 window.addEventListener('esports-live:snapshot', event => {
-  renderAfterDashboard((event as CustomEvent<LiveSnapshot<LolStats>>).detail);
+  latestSnapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
+  renderAfterDashboard(latestSnapshot);
 });

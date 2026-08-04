@@ -1,4 +1,5 @@
 import './desktop-command-center-v5.css';
+import './desktop-command-center-v5-fixes.css';
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);

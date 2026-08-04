@@ -8,6 +8,15 @@ const style = document.createElement('style');
 style.textContent = `
 @media(max-width:760px){
   html body.mobile-demo-active #completed-match-detail
+  [data-mobile-scoreboard-renderer="shared-v1"]{
+    width:100%!important;
+    max-width:100%!important;
+    margin-right:0!important;
+    margin-left:0!important;
+    box-sizing:border-box!important
+  }
+
+  html body.mobile-demo-active #completed-match-detail
   [data-mobile-scoreboard-renderer="shared-v1"]>.mobile-unified-scoreboard-comparison,
   html body.mobile-demo-active[data-mobile-view="live"]
   [data-mobile-scoreboard-renderer="shared-v1"]>.mobile-unified-scoreboard-comparison{

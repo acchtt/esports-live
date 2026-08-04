@@ -182,7 +182,7 @@ function goldLeadState(
 }
 
 function renderTeamGoldLead(snapshot: LiveSnapshot<LolStats>, root: HTMLElement): void {
-  if (!media.matches || !snapshot.stats) return;
+  if (!media.matches || !snapshot.stats || !root.closest('#completed-match-detail')) return;
 
   const strip = root.querySelector<HTMLElement>('.mobile-completed-team-names');
   if (!strip) return;

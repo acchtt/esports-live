@@ -214,9 +214,9 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.13');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.14');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
-  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.13');
+  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.14');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
 });
@@ -226,7 +226,7 @@ test('primary mobile completed board resolves real names, removes the duplicate 
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page, finalSnapshot);
   await page.goto('/');
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.13');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.14');
   await installPrimaryFixtureBoard(page, finalSnapshot);
 
   const board = page.locator('.completed-final-game[data-final-game-id="game-mobile-recovery-1"]');
@@ -254,6 +254,18 @@ test('primary mobile completed board resolves real names, removes the duplicate 
   await expect(portraits.first()).toHaveAttribute('alt', 'Jayce portrait');
   await expect(board.locator('.role-player-portrait .telemetry-champion')).toHaveCount(0);
 
+  const primaryDeltaLayout = await board.locator('.role-gold-delta').first().evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    const strong = element.querySelector<HTMLElement>('strong');
+    if (!strong) throw new Error('Primary gold comparison is missing.');
+    return {
+      width: bounds.width,
+      fontSize: Number.parseFloat(getComputedStyle(strong).fontSize)
+    };
+  });
+  expect(primaryDeltaLayout.width).toBeGreaterThanOrEqual(60);
+  expect(primaryDeltaLayout.fontSize).toBeGreaterThanOrEqual(11);
+
   const panelClearance = await page.locator('.analysis-panel').evaluate(element => {
     const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
     if (!navElement) throw new Error('Navigation is missing.');
@@ -273,7 +285,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   await installFixtures(page);
   await openRecoveryBoard(page);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.13');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.14');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
@@ -328,6 +340,15 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   for (let index = 0; index < 5; index += 1) {
     await expect(deltas.nth(index)).toHaveText('+500');
   }
+  const fallbackDeltaLayout = await deltas.first().evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      width: bounds.width,
+      fontSize: Number.parseFloat(getComputedStyle(element).fontSize)
+    };
+  });
+  expect(fallbackDeltaLayout.width).toBeGreaterThanOrEqual(60);
+  expect(fallbackDeltaLayout.fontSize).toBeGreaterThanOrEqual(11);
 
   await expect(page.locator('.mobile-final-recovery-summary')).toHaveCount(0);
   await expect(page.locator('.mobile-recovery-portrait:visible')).toHaveCount(10);
@@ -348,7 +369,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   expect(boardBounds.right).toBeLessThanOrEqual(390.5);
 
   const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.13');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.14');
   const navLayout = await nav.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const style = getComputedStyle(element);

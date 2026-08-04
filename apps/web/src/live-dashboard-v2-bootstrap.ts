@@ -1,4 +1,4 @@
-export {};
+import './mobile-demo.ts';
 
 const workspace = document.querySelector<HTMLElement>('#workspace');
 const platformPanel = document.querySelector<HTMLElement>('#platform-panel');

@@ -128,6 +128,23 @@ test('refreshes the selected live player board on demand', async ({ page }) => {
   await expect(page.locator('[data-live-history-game-id="game-live-refresh"]')).toBeVisible();
   await expect.poll(liveRequests).toBeGreaterThan(0);
 
+  const summary = page.locator('[data-player-board-summary]');
+  await expect(summary).toBeVisible();
+  await expect(summary.locator('.player-board-summary-cell')).toHaveCount(5);
+  const summaryMutations = await page.evaluate(async () => {
+    const element = document.querySelector('[data-player-board-summary]');
+    if (!element) return Number.POSITIVE_INFINITY;
+    let mutations = 0;
+    const observer = new MutationObserver(records => {
+      mutations += records.length;
+    });
+    observer.observe(element, { childList: true, subtree: true });
+    await new Promise(resolve => window.setTimeout(resolve, 250));
+    observer.disconnect();
+    return mutations;
+  });
+  expect(summaryMutations).toBeLessThanOrEqual(1);
+
   const refreshButton = page.getByRole('button', { name: 'Refresh', exact: true });
   await expect(refreshButton).toBeVisible();
   const requestCount = liveRequests();

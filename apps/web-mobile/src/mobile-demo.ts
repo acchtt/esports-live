@@ -6,7 +6,7 @@ import './mobile-demo-version.css';
 type MobileView = 'matches' | 'live' | 'platform';
 
 const MOBILE_QUERY = '(max-width: 760px)';
-const MOBILE_DEMO_VERSION = '0.17.4';
+const MOBILE_DEMO_VERSION = '0.17.5';
 const media = window.matchMedia(MOBILE_QUERY);
 const body = document.body;
 const analysisPanel = document.querySelector<HTMLElement>('.analysis-panel');

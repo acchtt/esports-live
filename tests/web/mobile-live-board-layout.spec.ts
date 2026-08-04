@@ -133,7 +133,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('mobile live board keeps names, builds, and refresh controls readable', async ({ page }) => {
+test('mobile live board keeps the pre-board chrome compact and matchup rows readable', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -142,10 +142,27 @@ test('mobile live board keeps names, builds, and refresh controls readable', asy
   await page.goto('/');
   await page.locator('[data-series-id="series-mobile-layout"]').click();
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.2');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.3');
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-layout-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-layout', 'identity-items');
+  await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
+
+  await expect(page.locator('.series-hero-topline')).toBeHidden();
+  const chromeLayout = await page.evaluate(() => {
+    const matchup = document.querySelector<HTMLElement>('.series-hero-matchup');
+    const selector = document.querySelector<HTMLElement>('#game-selector');
+    const context = document.querySelector<HTMLElement>('.series-hero-live-context');
+    if (!matchup || !selector || !context) throw new Error('Compact live series chrome is incomplete.');
+    return {
+      matchupHeight: matchup.getBoundingClientRect().height,
+      selectorHeight: selector.getBoundingClientRect().height,
+      contextHeight: context.getBoundingClientRect().height
+    };
+  });
+  expect(chromeLayout.matchupHeight).toBeLessThanOrEqual(112);
+  expect(chromeLayout.selectorHeight).toBeLessThanOrEqual(54);
+  expect(chromeLayout.contextHeight).toBeLessThanOrEqual(34);
 
   const names = board.locator('.role-player-name strong');
   await expect(names).toHaveCount(10);
@@ -161,23 +178,33 @@ test('mobile live board keeps names, builds, and refresh controls readable', asy
       opacity: Number(style.opacity)
     };
   });
-  expect(nameLayout.width).toBeGreaterThan(45);
+  expect(nameLayout.width).toBeGreaterThan(42);
   expect(nameLayout.height).toBeGreaterThan(8);
   expect(nameLayout.display).not.toBe('none');
   expect(nameLayout.visibility).toBe('visible');
   expect(nameLayout.opacity).toBeGreaterThan(0.9);
+
+  const portraits = board.locator('.role-player-portrait');
+  await expect(portraits).toHaveCount(10);
+  const portraitLayout = await portraits.first().evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return { width: bounds.width, height: bounds.height };
+  });
+  expect(portraitLayout.width).toBeGreaterThanOrEqual(32);
+  expect(portraitLayout.height).toBeGreaterThanOrEqual(32);
 
   const itemRows = board.locator('.role-player-items');
   await expect(itemRows).toHaveCount(10);
   const slots = board.locator('.role-player-items .telemetry-item-slot');
   await expect(slots).toHaveCount(70);
   const slotWidth = await slots.first().evaluate(element => element.getBoundingClientRect().width);
-  expect(slotWidth).toBeGreaterThanOrEqual(14);
+  expect(slotWidth).toBeGreaterThanOrEqual(12);
 
   const firstRowHeight = await board.locator('.role-matchup-row').first().evaluate(
     element => element.getBoundingClientRect().height
   );
-  expect(firstRowHeight).toBeGreaterThanOrEqual(84);
+  expect(firstRowHeight).toBeGreaterThanOrEqual(72);
+  expect(firstRowHeight).toBeLessThanOrEqual(84);
 
   const toolbar = board.locator('.player-board-toolbar');
   await expect(toolbar).toBeVisible();
@@ -188,12 +215,26 @@ test('mobile live board keeps names, builds, and refresh controls readable', asy
     return {
       display: getComputedStyle(element).display,
       height: bounds.height,
-      buttonHeight: button.getBoundingClientRect().height
+      buttonHeight: button.getBoundingClientRect().height,
+      buttonWidth: button.getBoundingClientRect().width
     };
   });
   expect(toolbarLayout.display).toBe('grid');
-  expect(toolbarLayout.height).toBeLessThanOrEqual(70);
-  expect(toolbarLayout.buttonHeight).toBeGreaterThanOrEqual(40);
+  expect(toolbarLayout.height).toBeLessThanOrEqual(50);
+  expect(toolbarLayout.buttonHeight).toBeGreaterThanOrEqual(32);
+  expect(toolbarLayout.buttonHeight).toBeLessThanOrEqual(40);
+  expect(toolbarLayout.buttonWidth).toBeLessThanOrEqual(40);
+
+  const nav = page.locator('.mobile-app-nav');
+  await expect(nav).toHaveAttribute('data-mobile-nav-clearance', 'measured');
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const bottomClearance = await page.evaluate(() => {
+    const lastRow = document.querySelector<HTMLElement>('.mobile-live-history-board .role-matchup-row:last-child');
+    const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
+    if (!lastRow || !navElement) throw new Error('Last matchup row or navigation is missing.');
+    return navElement.getBoundingClientRect().top - lastRow.getBoundingClientRect().bottom;
+  });
+  expect(bottomClearance).toBeGreaterThanOrEqual(12);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

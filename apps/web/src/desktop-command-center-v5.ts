@@ -1,13 +1,15 @@
 import './desktop-command-center-v5.css';
 
-const analysisPanel = document.querySelector<HTMLElement>('.analysis-panel');
-const analysisHeader = document.querySelector<HTMLElement>('.analysis-header');
-const historyPanel = document.querySelector<HTMLElement>('#series-history');
-const gameContent = document.querySelector<HTMLElement>('#game-content');
-
-if (!analysisPanel || !analysisHeader || !historyPanel || !gameContent) {
-  throw new Error('Missing desktop command center elements');
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing desktop command center element: ${selector}`);
+  return element;
 }
+
+const analysisPanel = requiredElement<HTMLElement>('.analysis-panel');
+const analysisHeader = requiredElement<HTMLElement>('.analysis-header');
+const historyPanel = requiredElement<HTMLElement>('#series-history');
+const gameContent = requiredElement<HTMLElement>('#game-content');
 
 analysisPanel.classList.add('desktop-command-center-v5');
 

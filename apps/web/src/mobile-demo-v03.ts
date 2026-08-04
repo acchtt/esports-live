@@ -2,6 +2,7 @@ import './mobile-completed-scoreboard-recovery.ts';
 
 const VERSION = '0.4';
 const LABEL = 'DEMO v0.4';
+document.documentElement.dataset.mobileDemoVersion = VERSION;
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');

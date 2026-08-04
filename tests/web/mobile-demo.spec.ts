@@ -140,7 +140,7 @@ async function installFixtures(page: Page): Promise<void> {
   await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['26.15.1']));
 }
 
-test('mobile demo switches surfaces and uses the exact history scoreboard contract for live matches', async ({ page }) => {
+test('mobile demo switches surfaces and uses the current history card contract for live matches', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -153,7 +153,7 @@ test('mobile demo switches surfaces and uses the exact history scoreboard contra
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.4');
   await expect(nav).toBeVisible();
   await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
@@ -169,10 +169,12 @@ test('mobile demo switches surfaces and uses the exact history scoreboard contra
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-version', '0.17');
+  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
   await expect(board).toHaveClass(/completed-final-game/);
   await expect(board).toHaveClass(/mobile-final-recovery/);
-  await expect(board.locator('.mobile-completed-team-names')).toBeVisible();
-  await expect(board.locator('.mobile-completed-objectives')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-objectives')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+1.4K');
   await expect(board.locator('.completed-final-matchups')).toBeVisible();
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
@@ -199,8 +201,8 @@ test('mobile demo switches surfaces and uses the exact history scoreboard contra
       radius: style.borderRadius
     };
   });
-  expect(boardFrame.borders).toEqual(['0px', '0px', '0px', '0px']);
-  expect(boardFrame.radius).toBe('0px');
+  expect(boardFrame.borders).toEqual(['1px', '1px', '1px', '1px']);
+  expect(boardFrame.radius).not.toBe('0px');
 
   const horizontalOverflow = await page.evaluate(() => (
     document.documentElement.scrollWidth - window.innerWidth

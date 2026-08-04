@@ -55,6 +55,7 @@ jobs:
             tests/web/mobile-demo.spec.ts \
             tests/web/mobile-demo-history.spec.ts \
             tests/web/mobile-scoreboard-recovery.spec.ts \
+            tests/web/mobile-live-board-layout.spec.ts \
             tests/web/completed-board-merge.spec.ts \
             tests/web/history-mode-ownership.spec.ts \
             tests/web/live-poll-recovery.spec.ts \
@@ -118,7 +119,7 @@ jobs:
         run: |
           grep -R "$API_BASE_URL" apps/web/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
-          grep -R "DEMO v0.16" apps/web/dist/assets
+          grep -R "DEMO v0.17.1" apps/web/dist/assets
 
       - name: Deploy mobile Pages preview
         run: >-
@@ -140,7 +141,7 @@ jobs:
             if grep -q '<title>Esports Live</title>' <<<"$html" \
               && grep -q 'class="app-frame"' <<<"$html" \
               && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" \
-              && grep -q 'DEMO v0.16' <<<"$script"; then
+              && grep -q 'DEMO v0.17.1' <<<"$script"; then
               echo "Mobile demo build $VITE_BUILD_SHA_SHORT is available at $url"
               exit 0
             fi

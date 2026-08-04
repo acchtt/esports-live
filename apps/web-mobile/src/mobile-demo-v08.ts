@@ -193,6 +193,7 @@ function teamGold(value: number | null, side: 'blue' | 'red'): { className: stri
 }
 
 function mergeTeamHeaderAndLead(snapshot: LiveSnapshot<LolStats>, root: HTMLElement): void {
+  if (!root.closest('#completed-match-detail')) return;
   if (!snapshot.stats) return;
   root.querySelector('.mobile-final-recovery-summary')?.remove();
 

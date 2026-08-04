@@ -6,7 +6,7 @@ function updateScheduledLabel(selection: ScheduleEvent): void {
     const label = document.querySelector<HTMLElement>(
       '#series-hero .series-hero-live-context > span > span'
     );
-    if (label) label.textContent = 'Match scheduled';
+    if (label) label.textContent = 'Awaiting game';
   });
 }
 

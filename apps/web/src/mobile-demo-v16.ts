@@ -35,7 +35,7 @@ function clearPendingTimer(): void {
 }
 
 function applyPendingPresentation(element: HTMLElement, fromLoading = false): void {
-  if (!media.matches || !element.isConnected) return;
+  if (!element.isConnected) return;
   element.removeAttribute('data-selection-snapshot-loading');
   element.removeAttribute('data-selection-snapshot-waiting');
   element.setAttribute('data-selection-snapshot-pending', '');
@@ -57,7 +57,7 @@ function applyPendingPresentation(element: HTMLElement, fromLoading = false): vo
 
 function syncPendingPresentation(): void {
   clearPendingTimer();
-  if (!gameContent || !media.matches) return;
+  if (!gameContent) return;
 
   const waiting = gameContent.querySelector<HTMLElement>('[data-selection-snapshot-waiting]');
   if (waiting) {

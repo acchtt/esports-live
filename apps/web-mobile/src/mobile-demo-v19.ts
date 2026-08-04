@@ -213,16 +213,16 @@ style.textContent = `
     margin:auto 1px!important
   }
 
-  body.mobile-demo-active[data-mobile-view="live"] #game-content{
+  body.mobile-demo-active[data-mobile-view="live"]:not([data-mobile-context="history"]) #game-content{
     padding-bottom:calc(var(--mobile-live-nav-clearance,76px) + 18px + env(safe-area-inset-bottom))!important
   }
-  body.mobile-demo-active[data-mobile-view="live"] .mobile-app-nav{
+  body.mobile-demo-active[data-mobile-view="live"]:not([data-mobile-context="history"]) .mobile-app-nav{
     min-height:56px!important;
     bottom:calc(6px + env(safe-area-inset-bottom))!important;
     padding:4px!important;
     border-radius:16px!important
   }
-  body.mobile-demo-active[data-mobile-view="live"] .mobile-app-nav button{
+  body.mobile-demo-active[data-mobile-view="live"]:not([data-mobile-context="history"]) .mobile-app-nav button{
     min-height:44px!important;
     border-radius:11px!important
   }

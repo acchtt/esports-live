@@ -19,6 +19,9 @@ style.textContent = `
     padding-top:0!important
   }
   body.mobile-demo-active[data-mobile-view="live"] .mobile-context-bar{
+    position:static!important;
+    top:auto!important;
+    inset-block-start:auto!important;
     margin-top:0!important;
     margin-bottom:0!important
   }

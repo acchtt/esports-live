@@ -19,6 +19,7 @@ import './mobile-demo-v18-live-board-finalize.ts';
 import './mobile-demo-v19.ts';
 import './mobile-demo-v20.ts';
 import './mobile-demo-v20-board-owner.ts';
+import './mobile-demo-v20-width-fix.ts';
 
 const VERSION = '0.17.4';
 const LABEL = 'DEMO v0.17.4';

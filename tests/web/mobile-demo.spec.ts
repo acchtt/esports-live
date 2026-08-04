@@ -24,12 +24,13 @@ const series = {
 };
 
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
+const champions = ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'] as const;
 
 function players(side: 'blue' | 'red') {
   return roles.map((role, index) => ({
     id: String(index + (side === 'blue' ? 1 : 6)),
     handle: `${side === 'blue' ? 'Blue' : 'Red'} ${role}`,
-    championId: `${role} champion`,
+    championId: champions[index],
     role,
     level: 9 + index,
     kills: index === 0 ? 2 : 1,
@@ -136,9 +137,10 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 
   await page.route('**/v1/lol/games/**/live**', route => json(route, snapshot()));
+  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['26.15.1']));
 }
 
-test('mobile demo switches surfaces without horizontal page overflow', async ({ page }) => {
+test('mobile demo switches surfaces and uses the history board design for live matches', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -151,17 +153,36 @@ test('mobile demo switches surfaces without horizontal page overflow', async ({ 
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.15');
   await expect(nav).toBeVisible();
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.15');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   await expect(schedule).toBeVisible();
   await expect(analysis).toBeHidden();
 
   await page.locator('[data-series-id="series-mobile"]').click();
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
+  await expect(page.locator('body')).not.toHaveAttribute('data-mobile-context', 'history');
   await expect(analysis).toBeVisible();
   await expect(schedule).toBeHidden();
-  await expect(page.locator('[data-live-dashboard-game-id="game-mobile-1"]')).toBeVisible();
-  await expect(page.locator('.v2-matchup-row')).toHaveCount(5);
+
+  const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-1"]');
+  await expect(board).toBeVisible();
+  await expect(board.locator('.mobile-completed-team-names')).toBeVisible();
+  await expect(board.locator('.mobile-completed-objectives')).toBeVisible();
+  await expect(board.locator('.mobile-recovery-row')).toHaveCount(5);
+  await expect(page.locator('.v2-matchup-row')).toHaveCount(0);
+  await expect(page.locator('.role-scoreboard-board')).toHaveCount(0);
+
+  const deltaTypography = await board.locator('.mobile-recovery-gold-delta').first().evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      width: bounds.width,
+      fontSize: Number.parseFloat(getComputedStyle(element).fontSize)
+    };
+  });
+  expect(deltaTypography.width).toBeGreaterThanOrEqual(60);
+  expect(deltaTypography.fontSize).toBeGreaterThanOrEqual(11);
 
   const horizontalOverflow = await page.evaluate(() => (
     document.documentElement.scrollWidth - window.innerWidth

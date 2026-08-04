@@ -144,7 +144,7 @@ test('mobile match history stays on the list until a result is selected', async 
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.16');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
   await page.getByRole('button', { name: 'Open match history' }).click();
 
   const historyCard = page.locator('[data-completed-series-id="series-mobile-history"]');

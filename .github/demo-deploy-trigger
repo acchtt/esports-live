@@ -1,6 +1,6 @@
 # Demo deployment trigger
 
-requested_at: 2026-08-04T21:10:00+07:00
-source_head: 7e10fad2a00985e350b709b1e8c8fd34ece68b1f
+requested_at: 2026-08-04T21:21:00+07:00
+source_head: b0b98cfb75693b7d572426529b6531aac8251d9c
 
 This file is intentionally updated when a manual redeploy of the current `demo` branch is requested and workflow dispatch is unavailable through the connector.

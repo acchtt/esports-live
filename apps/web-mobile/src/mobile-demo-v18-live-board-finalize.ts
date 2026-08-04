@@ -90,6 +90,12 @@ function comparisonMarkup(snapshot: LiveSnapshot<LolStats>): string {
     </section>`;
 }
 
+function removeLegacyStrips(root: HTMLElement, comparison: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('.mobile-completed-team-names, .mobile-completed-objectives').forEach(element => {
+    if (!comparison.contains(element)) element.remove();
+  });
+}
+
 function finalizeLiveBoard(snapshot: LiveSnapshot<LolStats>, root: HTMLElement): void {
   if (!snapshot.stats || root.dataset.mobileHistoryCopy !== 'true') return;
 
@@ -103,6 +109,7 @@ function finalizeLiveBoard(snapshot: LiveSnapshot<LolStats>, root: HTMLElement):
   comparison.className = 'completed-team-comparison completed-history-dashboard-v2 objective-text-only';
   comparison.dataset.historyDashboardV2 = 'true';
   comparison.innerHTML = comparisonMarkup(snapshot);
+  removeLegacyStrips(root, comparison);
   root.dataset.mobileLiveBoardFinalized = 'true';
 }
 

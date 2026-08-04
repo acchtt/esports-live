@@ -143,9 +143,20 @@ function bindLogoFallbacks(): void {
   hero.querySelectorAll<HTMLImageElement>('.series-hero-team-logo img, .series-hero-game-mark img')
     .forEach(image => {
       const container = image.closest('.series-hero-team-logo, .series-hero-game-mark');
-      const markFailed = (): void => container?.classList.add('image-failed');
+      const markLoaded = (): void => {
+        container?.classList.remove('image-failed');
+        container?.classList.add('image-loaded');
+      };
+      const markFailed = (): void => {
+        container?.classList.remove('image-loaded');
+        container?.classList.add('image-failed');
+      };
+      image.addEventListener('load', markLoaded, { once: true });
       image.addEventListener('error', markFailed, { once: true });
-      if (image.complete && image.naturalWidth === 0) markFailed();
+      if (image.complete) {
+        if (image.naturalWidth > 0) markLoaded();
+        else markFailed();
+      }
     });
 }
 

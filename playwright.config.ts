@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+const webAppRoot = process.env.WEB_APP_ROOT ?? 'apps/web';
+
 export default defineConfig({
   testDir: './tests/web',
   fullyParallel: false,
@@ -16,7 +18,7 @@ export default defineConfig({
     trace: 'retain-on-failure'
   },
   webServer: {
-    command: 'npx vite preview apps/web --host 127.0.0.1 --port 4173',
+    command: `npx vite preview ${webAppRoot} --host 127.0.0.1 --port 4173`,
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000

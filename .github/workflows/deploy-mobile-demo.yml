@@ -4,6 +4,20 @@ on:
   push:
     branches:
       - mobile-demo
+    paths:
+      - apps/web-mobile/**
+      - apps/api/**
+      - packages/**
+      - tests/web/mobile-*.spec.ts
+      - tests/web/completed-board-merge.spec.ts
+      - tests/web/history-mode-ownership.spec.ts
+      - tests/web/live-poll-recovery.spec.ts
+      - tests/web/live-telemetry-pending.spec.ts
+      - package.json
+      - package-lock.json
+      - playwright.config.ts
+      - tsconfig.json
+      - .github/workflows/deploy-mobile-demo.yml
   workflow_dispatch:
 
 concurrency:
@@ -33,7 +47,7 @@ jobs:
             fs.writeFileSync("/tmp/mobile-preview-status.json", JSON.stringify({
               state: "pending",
               context: "esports-live/mobile-preview",
-              description: "Mobile preview validation is running",
+              description: "Mobile application validation is running",
               target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
             }));
           '
@@ -51,7 +65,7 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
 
-      - name: Check out mobile demo
+      - name: Check out mobile application
         uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
@@ -67,13 +81,15 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Validate application
+      - name: Validate shared application code
         run: npm run check
 
-      - name: Validate mobile browser layout
+      - name: Validate mobile application layout
+        env:
+          WEB_APP_ROOT: apps/web-mobile
         shell: bash
         run: |
-          npm run build:web
+          npm run build:web-mobile
           npx playwright test \
             tests/web/mobile-demo.spec.ts \
             tests/web/mobile-demo-history.spec.ts \
@@ -88,20 +104,20 @@ jobs:
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy
 
-      - name: Upload mobile demo API Worker version
+      - name: Upload shared API Worker preview
         id: api-preview
         shell: bash
         run: |
           output="$(npx wrangler versions upload \
             --preview-alias mobile-demo \
             --keep-vars \
-            --message "Mobile demo $MOBILE_DEMO_COMMIT_SHA" 2>&1)"
+            --message "Mobile application $MOBILE_DEMO_COMMIT_SHA" 2>&1)"
           echo "$output"
           url="$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' <<<"$output" | tail -n 1)"
           test -n "$url" || { echo "Wrangler did not return a Worker preview URL."; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      - name: Verify mobile demo API
+      - name: Verify shared API Worker preview
         env:
           API_BASE_URL: ${{ steps.api-preview.outputs.url }}
         shell: bash
@@ -113,14 +129,14 @@ jobs:
                 const value = JSON.parse(fs.readFileSync("/tmp/mobile-demo-health.json", "utf8"));
                 process.exit(value.ok === true && value.service === "esports-live-api" && value.adapters?.includes("lol") ? 0 : 1);
               '; then
-              echo "Mobile demo API is available at $API_BASE_URL"
+              echo "Mobile API preview is available at $API_BASE_URL"
               exit 0
             fi
-            echo "Mobile demo API not ready (attempt $attempt/12)."
+            echo "Mobile API preview not ready (attempt $attempt/12)."
             cat /tmp/mobile-demo-health.json 2>/dev/null || true
             sleep 5
           done
-          echo "Mobile demo API verification failed."
+          echo "Mobile API preview verification failed."
           exit 1
 
       - name: Prepare mobile build metadata
@@ -131,29 +147,29 @@ jobs:
           echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
-      - name: Build mobile demo application
-        run: npm run build:web
+      - name: Build isolated mobile application
+        run: npm run build:web-mobile
         env:
           VITE_API_BASE_URL: ${{ steps.api-preview.outputs.url }}
 
-      - name: Confirm preview API and build metadata are embedded
+      - name: Confirm mobile API and build metadata are embedded
         env:
           API_BASE_URL: ${{ steps.api-preview.outputs.url }}
         shell: bash
         run: |
-          grep -R "$API_BASE_URL" apps/web/dist/assets
-          grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
-          grep -R "DEMO v0.17.1" apps/web/dist/assets
+          grep -R "$API_BASE_URL" apps/web-mobile/dist/assets
+          grep -q "$VITE_BUILD_SHA_SHORT" apps/web-mobile/dist/index.html
+          grep -R "DEMO v0.17.1" apps/web-mobile/dist/assets
 
-      - name: Deploy mobile Pages preview
+      - name: Deploy isolated mobile Pages application
         run: >-
-          npx wrangler pages deploy apps/web/dist
+          npx wrangler pages deploy apps/web-mobile/dist
           --project-name esports-live
           --branch mobile-demo
           --commit-hash "$MOBILE_DEMO_COMMIT_SHA"
-          --commit-message "Mobile demo $MOBILE_DEMO_COMMIT_SHA"
+          --commit-message "Mobile application $MOBILE_DEMO_COMMIT_SHA"
 
-      - name: Verify mobile shell and version
+      - name: Verify isolated mobile application
         shell: bash
         run: |
           url="https://mobile-demo.esports-live.pages.dev/?commit=$MOBILE_DEMO_COMMIT_SHA"
@@ -166,16 +182,16 @@ jobs:
               && grep -q 'class="app-frame"' <<<"$html" \
               && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" \
               && grep -q 'DEMO v0.17.1' <<<"$script"; then
-              echo "Mobile demo build $VITE_BUILD_SHA_SHORT is available at $url"
+              echo "Mobile application $VITE_BUILD_SHA_SHORT is available at $url"
               exit 0
             fi
-            echo "Mobile demo build $VITE_BUILD_SHA_SHORT not ready (attempt $attempt/12)."
+            echo "Mobile application $VITE_BUILD_SHA_SHORT not ready (attempt $attempt/12)."
             sleep 5
           done
-          echo "Mobile demo verification failed for build $VITE_BUILD_SHA_SHORT."
+          echo "Mobile application verification failed for build $VITE_BUILD_SHA_SHORT."
           exit 1
 
-      - name: Publish mobile preview status
+      - name: Publish mobile application status
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -184,10 +200,10 @@ jobs:
         run: |
           if [[ "$DEPLOY_JOB_STATUS" == "success" ]]; then
             state="success"
-            description="Mobile preview deployed and verified"
+            description="Mobile application deployed and verified"
           else
             state="failure"
-            description="Mobile preview deployment failed"
+            description="Mobile application deployment failed"
           fi
           STATE="$state" DESCRIPTION="$description" node -e '
             const fs = require("node:fs");

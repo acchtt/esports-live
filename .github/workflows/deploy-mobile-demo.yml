@@ -31,7 +31,7 @@ jobs:
       - name: Check out mobile demo
         uses: actions/checkout@v6
         with:
-          ref: mobile-demo
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -56,7 +56,9 @@ jobs:
             tests/web/mobile-demo-history.spec.ts \
             tests/web/mobile-scoreboard-recovery.spec.ts \
             tests/web/completed-board-merge.spec.ts \
-            tests/web/history-mode-ownership.spec.ts
+            tests/web/history-mode-ownership.spec.ts \
+            tests/web/live-poll-recovery.spec.ts \
+            tests/web/live-telemetry-pending.spec.ts
 
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy
@@ -116,7 +118,7 @@ jobs:
         run: |
           grep -R "$API_BASE_URL" apps/web/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
-          grep -R "DEMO v0.9" apps/web/dist/assets
+          grep -R "DEMO v0.16" apps/web/dist/assets
 
       - name: Deploy mobile Pages preview
         run: >-
@@ -132,9 +134,13 @@ jobs:
           url="https://mobile-demo.esports-live.pages.dev/?commit=$MOBILE_DEMO_COMMIT_SHA"
           for attempt in {1..12}; do
             html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$url" || true)"
+            asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$html" | head -n 1 | cut -d'"' -f2)"
+            if [[ "$asset" == /* ]]; then asset="https://mobile-demo.esports-live.pages.dev$asset"; fi
+            script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$asset" || true)"
             if grep -q '<title>Esports Live</title>' <<<"$html" \
               && grep -q 'class="app-frame"' <<<"$html" \
-              && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html"; then
+              && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" \
+              && grep -q 'DEMO v0.16' <<<"$script"; then
               echo "Mobile demo build $VITE_BUILD_SHA_SHORT is available at $url"
               exit 0
             fi

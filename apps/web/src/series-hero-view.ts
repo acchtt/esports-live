@@ -192,42 +192,44 @@ function render(): void {
   hero.dataset.status = statusClass;
 
   hero.innerHTML = `
-    <div class="series-hero-topline">
-      <div class="series-hero-competition">
-        ${gameMark()}
-        <div>
-          <span>League of Legends</span>
-          <strong>${escapeHtml(competition)}</strong>
+    <div class="series-hero-stage">
+      <div class="series-hero-topline">
+        <div class="series-hero-competition">
+          ${gameMark()}
+          <div>
+            <span>League of Legends</span>
+            <strong>${escapeHtml(competition)}</strong>
+          </div>
         </div>
+        <span class="series-hero-status ${escapeHtml(statusClass)}">
+          ${escapeHtml(status)}
+        </span>
       </div>
-      <span class="series-hero-status ${escapeHtml(statusClass)}">
-        ${escapeHtml(status)}
-      </span>
-    </div>
 
-    <div class="series-hero-matchup">
-      ${teamMarkup(left, 'left')}
-      <div class="series-hero-score" aria-label="Series score ${leftWins} to ${rightWins}">
-        <span>Series score</span>
-        <div><strong>${leftWins}</strong><i>–</i><strong>${rightWins}</strong></div>
-        <small>Best of ${event.series.bestOf} · First to ${winsRequired}</small>
+      <div class="series-hero-matchup">
+        ${teamMarkup(left, 'left')}
+        <div class="series-hero-score" aria-label="Series score ${leftWins} to ${rightWins}">
+          <span>Series score</span>
+          <div><strong>${leftWins}</strong><i>–</i><strong>${rightWins}</strong></div>
+          <small>Best of ${event.series.bestOf} · First to ${winsRequired}</small>
+        </div>
+        ${teamMarkup(right, 'right')}
       </div>
-      ${teamMarkup(right, 'right')}
-    </div>
 
-    <div class="series-hero-footer">
-      <span class="series-hero-live-context">
-        <i></i><span><b>Current game</b><span>${escapeHtml(gameLabel)}</span></span>
-      </span>
-      <span class="series-hero-progress">
-        <span><b>Series progress</b><span>${progress.completed} of ${progress.total} games completed</span></span>
-      </span>
-      <time datetime="${escapeHtml(event.series.scheduledStart)}">
-        <span><b>Start time</b><span>${escapeHtml(formatStart(event.series.scheduledStart))}</span></span>
-      </time>
-      <span class="series-hero-patch">
-        <span><b>Patch</b><span>${escapeHtml(formatPatch(latestPatch))}</span></span>
-      </span>
+      <div class="series-hero-footer">
+        <span class="series-hero-live-context">
+          <i></i><span><b>Current game</b><span>${escapeHtml(gameLabel)}</span></span>
+        </span>
+        <span class="series-hero-progress">
+          <span><b>Series progress</b><span>${progress.completed} of ${progress.total} games completed</span></span>
+        </span>
+        <time datetime="${escapeHtml(event.series.scheduledStart)}">
+          <span><b>Start time</b><span>${escapeHtml(formatStart(event.series.scheduledStart))}</span></span>
+        </time>
+        <span class="series-hero-patch">
+          <span><b>Patch</b><span>${escapeHtml(formatPatch(latestPatch))}</span></span>
+        </span>
+      </div>
     </div>`;
 
   hero.hidden = false;

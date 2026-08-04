@@ -102,8 +102,19 @@ document.addEventListener('click', event => {
 }, { capture: true });
 
 window.addEventListener('esports-live:selection', updateTitle);
+window.addEventListener('esports-live:snapshot', () => {
+  if (media.matches && currentView() === 'platform') queueMicrotask(expandPlatform);
+});
 window.addEventListener('pageshow', () => syncViewport());
 media.addEventListener('change', syncViewport);
+
+if (platformPanel) {
+  new MutationObserver(() => {
+    if (media.matches && currentView() === 'platform' && platformPanel.hidden) {
+      queueMicrotask(expandPlatform);
+    }
+  }).observe(platformPanel, { attributes: true, attributeFilter: ['hidden'] });
+}
 
 if (selectedSeries) {
   new MutationObserver(updateTitle).observe(selectedSeries, {

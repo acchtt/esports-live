@@ -140,7 +140,7 @@ async function installFixtures(page: Page): Promise<void> {
   await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['26.15.1']));
 }
 
-test('mobile demo switches surfaces and uses the current history card contract for live matches', async ({ page }) => {
+test('mobile demo switches surfaces and uses the shared scoreboard contract for live matches', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -153,7 +153,7 @@ test('mobile demo switches surfaces and uses the current history card contract f
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.6');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
   await expect(nav).toBeVisible();
   await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
@@ -169,9 +169,12 @@ test('mobile demo switches surfaces and uses the current history card contract f
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-version', '0.17');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
   await expect(board).toHaveClass(/completed-final-game/);
   await expect(board).toHaveClass(/mobile-final-recovery/);
+  await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-objectives')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+1.4K');
@@ -185,7 +188,7 @@ test('mobile demo switches surfaces and uses the current history card contract f
   const deltaTypography = await board.locator('.role-gold-delta').first().evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const strong = element.querySelector<HTMLElement>('strong');
-    if (!strong) throw new Error('History-style live gold delta is missing.');
+    if (!strong) throw new Error('Shared live gold delta is missing.');
     return {
       width: bounds.width,
       fontSize: Number.parseFloat(getComputedStyle(strong).fontSize)

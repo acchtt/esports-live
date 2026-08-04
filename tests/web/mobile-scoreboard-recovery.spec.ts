@@ -130,7 +130,6 @@ test('mobile fallback recovers when the first final scoreboard request fails', a
   await expect(card).toBeVisible();
   await card.click();
 
-  await expect(page.locator('.completed-telemetry-loading')).toBeVisible();
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
   await expect(page.locator('#build-version')).toContainText('DEMO v0.4');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');

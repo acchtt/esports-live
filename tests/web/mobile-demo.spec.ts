@@ -140,7 +140,7 @@ async function installFixtures(page: Page): Promise<void> {
   await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['26.15.1']));
 }
 
-test('mobile demo switches surfaces and uses the history board design for live matches', async ({ page }) => {
+test('mobile demo switches surfaces and uses the exact history scoreboard contract for live matches', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
 
@@ -153,9 +153,9 @@ test('mobile demo switches surfaces and uses the history board design for live m
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.16');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17');
   await expect(nav).toBeVisible();
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.16');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   await expect(schedule).toBeVisible();
   await expect(analysis).toBeHidden();
@@ -168,21 +168,39 @@ test('mobile demo switches surfaces and uses the history board design for live m
 
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-1"]');
   await expect(board).toBeVisible();
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-version', '0.17');
+  await expect(board).toHaveClass(/completed-final-game/);
+  await expect(board).toHaveClass(/mobile-final-recovery/);
   await expect(board.locator('.mobile-completed-team-names')).toBeVisible();
   await expect(board.locator('.mobile-completed-objectives')).toBeVisible();
-  await expect(board.locator('.mobile-recovery-row')).toHaveCount(5);
+  await expect(board.locator('.completed-final-matchups')).toBeVisible();
+  await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
+  await expect(board.locator('.role-player-portrait')).toHaveCount(10);
+  await expect(board.locator('.mobile-recovery-row')).toHaveCount(0);
   await expect(page.locator('.v2-matchup-row')).toHaveCount(0);
   await expect(page.locator('.role-scoreboard-board')).toHaveCount(0);
 
-  const deltaTypography = await board.locator('.mobile-recovery-gold-delta').first().evaluate(element => {
+  const deltaTypography = await board.locator('.role-gold-delta').first().evaluate(element => {
     const bounds = element.getBoundingClientRect();
+    const strong = element.querySelector<HTMLElement>('strong');
+    if (!strong) throw new Error('History-style live gold delta is missing.');
     return {
       width: bounds.width,
-      fontSize: Number.parseFloat(getComputedStyle(element).fontSize)
+      fontSize: Number.parseFloat(getComputedStyle(strong).fontSize)
     };
   });
   expect(deltaTypography.width).toBeGreaterThanOrEqual(60);
   expect(deltaTypography.fontSize).toBeGreaterThanOrEqual(11);
+
+  const boardFrame = await board.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      borders: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+      radius: style.borderRadius
+    };
+  });
+  expect(boardFrame.borders).toEqual(['0px', '0px', '0px', '0px']);
+  expect(boardFrame.radius).toBe('0px');
 
   const horizontalOverflow = await page.evaluate(() => (
     document.documentElement.scrollWidth - window.innerWidth

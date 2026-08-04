@@ -36,7 +36,7 @@ function players(side: 'blue' | 'red') {
   }));
 }
 
-function snapshot() {
+function snapshot(blueGold = 35_000, redGold = 31_000) {
   return {
     schemaVersion: '1.0',
     esport: 'lol',
@@ -49,7 +49,7 @@ function snapshot() {
       blue: {
         ...blue,
         side: 'blue',
-        gold: 35_000,
+        gold: blueGold,
         kills: 12,
         objectives: { towers: 8, inhibitors: 1, dragons: ['infernal'], barons: 1, heralds: 1, grubs: 3 },
         players: players('blue')
@@ -57,7 +57,7 @@ function snapshot() {
       red: {
         ...red,
         side: 'red',
-        gold: 31_000,
+        gold: redGold,
         kills: 7,
         objectives: { towers: 3, inhibitors: 0, dragons: ['cloud'], barons: 0, heralds: 0, grubs: 1 },
         players: players('red')
@@ -80,7 +80,7 @@ async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
 }
 
-async function installFixtures(page: Page): Promise<void> {
+async function installFixtures(page: Page, finalSnapshot = snapshot()): Promise<void> {
   await page.route('**/health', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -118,21 +118,25 @@ async function installFixtures(page: Page): Promise<void> {
       await route.abort('failed');
       return;
     }
-    await json(route, snapshot());
+    await json(route, finalSnapshot);
   });
 }
 
-test('mobile fallback merges team gold into a borderless readable scoreboard', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await installFixtures(page);
+async function openRecoveryBoard(page: Page): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: 'Open match history' }).click();
   const card = page.locator('[data-completed-series-id="series-mobile-recovery"]');
   await expect(card).toBeVisible();
   await card.click();
-
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.8');
+}
+
+test('mobile fallback widens history, enlarges objectives, and shows only the red trailing deficit', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(page);
+  await openRecoveryBoard(page);
+
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.9');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
@@ -141,9 +145,14 @@ test('mobile fallback merges team gold into a borderless readable scoreboard', a
   const teams = page.locator('.mobile-completed-team-names');
   await expect(teams).toContainText('Recovery Blue');
   await expect(teams).toContainText('Recovery Red');
-  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(2);
-  await expect(teams.locator('.mobile-completed-team-gold.blue')).toHaveText('+4K');
-  await expect(teams.locator('.mobile-completed-team-gold.deficit')).toHaveText('−4K');
+  await expect(teams).toHaveAttribute('data-trailing-side', 'red');
+  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(1);
+  await expect(teams.locator('.mobile-completed-team-name.blue .mobile-completed-team-gold')).toHaveCount(0);
+  await expect(teams.locator('.mobile-completed-team-name.red .mobile-completed-team-gold.deficit')).toHaveText('−4K');
+  await expect(teams.locator('.mobile-completed-team-name.red .mobile-completed-team-gold.deficit')).toHaveAttribute(
+    'aria-label',
+    'Recovery Red trails by 4K gold'
+  );
 
   const objectives = page.locator('.mobile-completed-objectives');
   await expect(objectives).toContainText('Towers');
@@ -152,6 +161,21 @@ test('mobile fallback merges team gold into a borderless readable scoreboard', a
   await expect(objectives).toContainText('Dragons');
   await expect(objectives).toContainText('Barons');
   await expect(objectives).toContainText('Inhibitors');
+
+  const objectiveFontSizes = await objectives.evaluate(element => {
+    const title = element.querySelector<HTMLElement>('.mobile-completed-objectives-title');
+    const label = element.querySelector<HTMLElement>('.mobile-completed-objective > span');
+    const value = element.querySelector<HTMLElement>('.mobile-completed-objective strong');
+    if (!title || !label || !value) throw new Error('Objective typography is incomplete.');
+    return {
+      title: Number.parseFloat(getComputedStyle(title).fontSize),
+      label: Number.parseFloat(getComputedStyle(label).fontSize),
+      value: Number.parseFloat(getComputedStyle(value).fontSize)
+    };
+  });
+  expect(objectiveFontSizes.title).toBeGreaterThanOrEqual(9);
+  expect(objectiveFontSizes.label).toBeGreaterThanOrEqual(8.3);
+  expect(objectiveFontSizes.value).toBeGreaterThanOrEqual(11);
 
   const deltas = page.locator('.mobile-recovery-gold-delta');
   await expect(deltas).toHaveCount(5);
@@ -169,11 +193,34 @@ test('mobile fallback merges team gold into a borderless readable scoreboard', a
   await expect(page.locator('.role-player-items:visible')).toHaveCount(0);
   await expect(page.locator('.mobile-recovery-role:visible')).toHaveCount(0);
 
+  const boardBounds = await page.locator('.mobile-final-recovery').evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    return { width: bounds.width, left: bounds.left, right: bounds.right };
+  });
+  expect(boardBounds.width).toBeGreaterThanOrEqual(360);
+  expect(boardBounds.left).toBeGreaterThanOrEqual(-0.5);
+  expect(boardBounds.right).toBeLessThanOrEqual(390.5);
+
   const frameBorders = await page.locator('.mobile-final-recovery').evaluate(element => {
     const style = getComputedStyle(element);
     return [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
   });
   expect(frameBorders).toEqual(['0px', '0px', '0px', '0px']);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test('mobile completed gold deficit follows the blue trailing side', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(page, snapshot(31_000, 35_000));
+  await openRecoveryBoard(page);
+
+  const teams = page.locator('.mobile-completed-team-names');
+  await expect(teams).toHaveAttribute('data-trailing-side', 'blue');
+  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(1);
+  await expect(teams.locator('.mobile-completed-team-name.blue .mobile-completed-team-gold.deficit')).toHaveText('−4K');
+  await expect(teams.locator('.mobile-completed-team-name.red .mobile-completed-team-gold')).toHaveCount(0);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

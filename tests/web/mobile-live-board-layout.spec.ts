@@ -142,7 +142,7 @@ test('mobile live board keeps names, builds, and refresh controls readable', asy
   await page.goto('/');
   await page.locator('[data-series-id="series-mobile-layout"]').click();
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.1');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.2');
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-layout-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-layout', 'identity-items');

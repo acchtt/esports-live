@@ -149,6 +149,8 @@ async function installPrimaryFixtureBoard(page: Page, finalSnapshot: ReturnType<
   await page.evaluate(snapshotValue => {
     const detail = document.querySelector<HTMLElement>('#completed-match-detail');
     if (!detail) throw new Error('Completed detail host is missing.');
+    const gameId = snapshotValue.game?.id;
+    if (!gameId) throw new Error('Fixture game ID is missing.');
 
     document.body.dataset.mobileView = 'live';
     document.body.dataset.mobileContext = 'history';
@@ -171,7 +173,7 @@ async function installPrimaryFixtureBoard(page: Page, finalSnapshot: ReturnType<
 
     const root = document.createElement('article');
     root.className = 'completed-final-game';
-    root.dataset.finalGameId = snapshotValue.game.id;
+    root.dataset.finalGameId = gameId;
     root.innerHTML = `
       <div class="completed-final-game-header"><strong>Game 1 · Recovery Red Esports won</strong><span>30:00</span></div>
       <section class="completed-team-comparison">

@@ -87,9 +87,21 @@ function initials(name: string): string {
 }
 
 function teamLogo(name: string, imageUrl?: string): string {
-  return imageUrl
-    ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)} logo" />`
-    : `<span aria-hidden="true">${escapeHtml(initials(name))}</span>`;
+  const image = imageUrl
+    ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)} logo" decoding="async" referrerpolicy="no-referrer" />`
+    : '';
+  return `${image}<span class="v2-team-logo-fallback" aria-hidden="true">${escapeHtml(initials(name))}</span>`;
+}
+
+function bindTeamLogoFallbacks(root: ParentNode): void {
+  root.querySelectorAll<HTMLImageElement>('.v2-team-logo img').forEach(image => {
+    const showFallback = (): void => {
+      image.hidden = true;
+      image.parentElement?.classList.add('image-missing');
+    };
+    if (image.complete && image.naturalWidth === 0) showFallback();
+    else image.addEventListener('error', showFallback, { once: true });
+  });
 }
 
 function objectiveValue(team: LolTeamState, key: ObjectiveKey): number | null {
@@ -167,6 +179,7 @@ function render(snapshot: LiveSnapshot<LolStats>): void {
   if (platformPanel) platformPanel.hidden = true;
 
   gameContent.innerHTML = `<section class="live-dashboard-v2" data-live-dashboard-game-id="${escapeHtml(snapshot.game.id)}" data-live-history-game-id="${escapeHtml(snapshot.game.id)}"><header class="v2-hero"><div class="v2-team blue"><span class="v2-team-logo">${teamLogo(stats.blue.name, blueRef?.imageUrl)}</span><span class="v2-team-copy"><small>BLUE SIDE</small><strong>${escapeHtml(stats.blue.name)}</strong></span><span class="v2-team-kills">${formatNumber(stats.blue.kills)}</span></div><div class="v2-clock"><small>GAME ${snapshot.game.number}</small><strong id="live-game-clock">${formatClock(stats.gameClockSeconds)}</strong><span><i></i> LIVE</span></div><div class="v2-team red"><span class="v2-team-kills">${formatNumber(stats.red.kills)}</span><span class="v2-team-copy"><small>RED SIDE</small><strong>${escapeHtml(stats.red.name)}</strong></span><span class="v2-team-logo">${teamLogo(stats.red.name, redRef?.imageUrl)}</span></div></header><div class="v2-summary-row"><article class="v2-gold-card"><span>GOLD LEAD</span><strong class="${goldDifference === null ? 'neutral' : goldDifference >= 0 ? 'blue' : 'red'}">${escapeHtml(leader)}</strong><small>${formatCompact(stats.blue.gold)} vs ${formatCompact(stats.red.gold)}</small></article><article class="v2-objectives-card objective-hud-v3 objective-text-only"><div class="v3-objective-hud">${objectiveSide(stats.blue, 'blue')}<span class="v3-objective-center" aria-hidden="true"></span>${objectiveSide(stats.red, 'red')}</div></article></div><section class="v2-board"><div class="v2-board-head compact-matchup-header"><div class="v2-board-side blue"><span class="v2-board-side-label">BLUE</span><strong>${escapeHtml(stats.blue.name)}</strong><span class="v2-board-side-stats">${ICONS.kills}${formatNumber(stats.blue.kills)} ${ICONS.gold}${formatCompact(stats.blue.gold)}</span></div><div class="v2-board-center" aria-hidden="true"><small>LIVE BOARD</small><b>VS</b></div><div class="v2-board-side red"><span class="v2-board-side-stats">${ICONS.gold}${formatCompact(stats.red.gold)} ${ICONS.kills}${formatNumber(stats.red.kills)}</span><strong>${escapeHtml(stats.red.name)}</strong><span class="v2-board-side-label">RED</span></div></div><div class="v2-matchups">${matchupRows(stats.blue, stats.red)}</div></section><footer class="v2-footer"><span>${escapeHtml(stats.patch ? `Patch ${stats.patch}` : 'Patch unavailable')}</span><i></i><span>Summoner's Rift</span><i></i><span>Best of ${snapshot.series.bestOf} · Game ${snapshot.game.number}</span><em>LIVE</em></footer></section>`;
+  bindTeamLogoFallbacks(gameContent);
 }
 
 window.addEventListener('esports-live:snapshot', event => {

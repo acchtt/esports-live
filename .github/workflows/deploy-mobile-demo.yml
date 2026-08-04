@@ -89,7 +89,6 @@ jobs:
           echo "VITE_BUILD_SHA_SHORT=${MOBILE_DEMO_COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
           echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
-          echo "VITE_BUILD_CHANNEL=MOBILE" >> "$GITHUB_ENV"
 
       - name: Build mobile demo application
         run: npm run build:web
@@ -103,7 +102,6 @@ jobs:
         run: |
           grep -R "$API_BASE_URL" apps/web/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web/dist/index.html
-          grep -q "MOBILE R$VITE_BUILD_RUN" apps/web/dist/index.html
 
       - name: Deploy mobile Pages preview
         run: >-

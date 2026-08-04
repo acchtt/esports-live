@@ -1,8 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const provider = { id: 'fixture', name: 'Fixture provider' };
-const blue = { id: 'recovery-blue', name: 'Recovery Blue', code: 'RBL' };
-const red = { id: 'recovery-red', name: 'Recovery Red', code: 'RRD' };
+const blue = { id: 'recovery-blue', name: 'Recovery Blue Academy', code: 'RBL' };
+const red = { id: 'recovery-red', name: 'Recovery Red Esports', code: 'RRD' };
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
 
 function iso(offsetMs = 0): string {
@@ -131,28 +131,37 @@ async function openRecoveryBoard(page: Page): Promise<void> {
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
 }
 
-test('mobile fallback widens history, enlarges objectives, and shows only the red trailing deficit', async ({ page }) => {
+test('mobile fallback shows a readable blue gold lead and keeps the bottom navigation clear', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await openRecoveryBoard(page);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.9');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.10');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
   await expect(page.locator('.mobile-app-nav [data-mobile-view="live"] span')).toHaveText('History');
 
   const teams = page.locator('.mobile-completed-team-names');
-  await expect(teams).toContainText('Recovery Blue');
-  await expect(teams).toContainText('Recovery Red');
-  await expect(teams).toHaveAttribute('data-trailing-side', 'red');
-  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(1);
-  await expect(teams.locator('.mobile-completed-team-name.blue .mobile-completed-team-gold')).toHaveCount(0);
-  await expect(teams.locator('.mobile-completed-team-name.red .mobile-completed-team-gold.deficit')).toHaveText('−4K');
-  await expect(teams.locator('.mobile-completed-team-name.red .mobile-completed-team-gold.deficit')).toHaveAttribute(
-    'aria-label',
-    'Recovery Red trails by 4K gold'
-  );
+  await expect(teams).toContainText('Recovery Blue Academy');
+  await expect(teams).toContainText('Recovery Red Esports');
+  await expect(teams).toHaveAttribute('data-leading-side', 'blue');
+  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(0);
+
+  const goldLead = teams.locator('.mobile-completed-gold-lead.blue');
+  await expect(goldLead).toHaveCount(1);
+  await expect(goldLead.locator('small')).toHaveText('Gold lead');
+  await expect(goldLead.locator('strong')).toHaveText('+4K');
+  await expect(goldLead).toHaveAttribute('aria-label', 'Recovery Blue Academy leads by 4K gold');
+  await expect(teams.locator('.mobile-completed-team-name.blue')).toHaveClass(/leading/);
+  await expect(teams.locator('.mobile-completed-team-name.red')).not.toHaveClass(/leading/);
+
+  const teamNameLayout = await teams.locator('.mobile-completed-team-name.blue strong').evaluate(element => {
+    const style = getComputedStyle(element);
+    return { whiteSpace: style.whiteSpace, lineHeight: Number.parseFloat(style.lineHeight) };
+  });
+  expect(teamNameLayout.whiteSpace).toBe('normal');
+  expect(teamNameLayout.lineHeight).toBeGreaterThan(13);
 
   const objectives = page.locator('.mobile-completed-objectives');
   await expect(objectives).toContainText('Towers');
@@ -201,6 +210,41 @@ test('mobile fallback widens history, enlarges objectives, and shows only the re
   expect(boardBounds.left).toBeGreaterThanOrEqual(-0.5);
   expect(boardBounds.right).toBeLessThanOrEqual(390.5);
 
+  const nav = page.locator('.mobile-app-nav');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.10');
+  const navLayout = await nav.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      position: style.position,
+      borderRadius: style.borderRadius,
+      left: bounds.left,
+      right: bounds.right,
+      top: bounds.top,
+      bottom: bounds.bottom,
+      height: bounds.height,
+      bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom)
+    };
+  });
+  expect(navLayout.position).toBe('fixed');
+  expect(navLayout.borderRadius).toBe('0px');
+  expect(navLayout.left).toBeLessThanOrEqual(0.5);
+  expect(navLayout.right).toBeGreaterThanOrEqual(389.5);
+  expect(navLayout.bottom).toBeGreaterThanOrEqual(843.5);
+  expect(navLayout.bodyPaddingBottom).toBeGreaterThan(navLayout.height + 8);
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const clearance = await page.evaluate(() => {
+    const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
+    const lastRow = document.querySelector<HTMLElement>('.mobile-recovery-row:last-child');
+    if (!navElement || !lastRow) throw new Error('Navigation clearance targets are missing.');
+    return {
+      navTop: navElement.getBoundingClientRect().top,
+      lastRowBottom: lastRow.getBoundingClientRect().bottom
+    };
+  });
+  expect(clearance.lastRowBottom).toBeLessThanOrEqual(clearance.navTop - 4);
+
   const frameBorders = await page.locator('.mobile-final-recovery').evaluate(element => {
     const style = getComputedStyle(element);
     return [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth];
@@ -211,16 +255,21 @@ test('mobile fallback widens history, enlarges objectives, and shows only the re
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
-test('mobile completed gold deficit follows the blue trailing side', async ({ page }) => {
+test('mobile completed gold lead follows the red leading side', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page, snapshot(31_000, 35_000));
   await openRecoveryBoard(page);
 
   const teams = page.locator('.mobile-completed-team-names');
-  await expect(teams).toHaveAttribute('data-trailing-side', 'blue');
-  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(1);
-  await expect(teams.locator('.mobile-completed-team-name.blue .mobile-completed-team-gold.deficit')).toHaveText('−4K');
-  await expect(teams.locator('.mobile-completed-team-name.red .mobile-completed-team-gold')).toHaveCount(0);
+  await expect(teams).toHaveAttribute('data-leading-side', 'red');
+  await expect(teams.locator('.mobile-completed-team-gold')).toHaveCount(0);
+  await expect(teams.locator('.mobile-completed-gold-lead.red strong')).toHaveText('+4K');
+  await expect(teams.locator('.mobile-completed-gold-lead.red')).toHaveAttribute(
+    'aria-label',
+    'Recovery Red Esports leads by 4K gold'
+  );
+  await expect(teams.locator('.mobile-completed-team-name.red')).toHaveClass(/leading/);
+  await expect(teams.locator('.mobile-completed-team-name.blue')).not.toHaveClass(/leading/);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

@@ -2,6 +2,7 @@ import {
   LolAdapter,
   createLeaguepediaHistoryFallbackProvider,
   createRiotCurrentPlayerProvider,
+  createRiotDelayedLiveRecoveryProvider,
   createRiotLolConsistentProvider,
   createUsableScheduleProvider
 } from '@esports-live/adapter-lol';
@@ -26,11 +27,13 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
     const provider = createUsableScheduleProvider(
       createLeaguepediaHistoryFallbackProvider(
         createRiotCurrentPlayerProvider(
-          createRiotLolConsistentProvider({
-            apiKey,
-            includeDetails: false,
-            useDetailItemFallback: false
-          }),
+          createRiotDelayedLiveRecoveryProvider(
+            createRiotLolConsistentProvider({
+              apiKey,
+              includeDetails: false,
+              useDetailItemFallback: false
+            })
+          ),
           { useWindowOverlay: false }
         )
       )

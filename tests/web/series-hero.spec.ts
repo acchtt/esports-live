@@ -146,7 +146,8 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
   const footer = hero.locator('.series-hero-footer');
   await expect(footer).toContainText('Game 2 live');
   await expect(footer).toContainText('1 of 3 games completed');
-  await expect(footer.locator(':scope > *')).toHaveCount(3);
+  await expect(footer).toContainText('Patch');
+  await expect(footer.locator(':scope > *')).toHaveCount(4);
 
   const surfaces = await hero.evaluate(element => {
     const top = element.querySelector<HTMLElement>('.series-hero-topline');
@@ -169,7 +170,7 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
   expect(surfaces?.topBackground).toBe(surfaces?.footerBackground);
   expect(surfaces?.topBorder).toBe(surfaces?.footerBorder);
   expect(surfaces?.footerDisplay).toBe('grid');
-  expect(surfaces?.footerColumns).toBe(2);
+  expect(surfaces?.footerColumns).toBe(4);
 
   const headerBox = await page.locator('.analysis-header').boundingBox();
   const scoreBox = await hero.locator('.series-hero-score').boundingBox();

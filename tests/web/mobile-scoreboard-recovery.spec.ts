@@ -131,12 +131,33 @@ async function openRecoveryBoard(page: Page): Promise<void> {
   await expect(page.locator('.mobile-recovery-matchups .mobile-recovery-row')).toHaveCount(5, { timeout: 15_000 });
 }
 
+test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'ResizeObserver', {
+      configurable: true,
+      value: undefined
+    });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(page);
+  await page.goto('/');
+
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.11');
+  await expect(page.locator('.mobile-app-nav')).toBeVisible();
+  await expect(page.locator('.mobile-app-nav')).toHaveAttribute('data-mobile-nav-version', '0.11');
+  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
+  expect(pageErrors).toEqual([]);
+});
+
 test('mobile fallback shows a readable blue gold lead and keeps the bottom navigation clear', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await openRecoveryBoard(page);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.10');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.11');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-context', 'history');
   await expect(page.locator('.mobile-context-title')).toHaveText('Match History');
@@ -211,7 +232,7 @@ test('mobile fallback shows a readable blue gold lead and keeps the bottom navig
   expect(boardBounds.right).toBeLessThanOrEqual(390.5);
 
   const nav = page.locator('.mobile-app-nav');
-  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.10');
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.11');
   const navLayout = await nav.evaluate(element => {
     const bounds = element.getBoundingClientRect();
     const style = getComputedStyle(element);

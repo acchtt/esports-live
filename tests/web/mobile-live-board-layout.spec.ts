@@ -142,14 +142,14 @@ test('mobile live board keeps compact chrome and uses the current history card l
   await page.goto('/');
   await page.locator('[data-series-id="series-mobile-layout"]').click();
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.5');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-surface', 'v21');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.6');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-live-surface', 'v22');
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-layout-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-layout', 'identity-items');
   await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
   await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
-  await expect(board).toHaveAttribute('data-mobile-live-cleanup', 'v21');
+  await expect(board).toHaveAttribute('data-mobile-live-cleanup', 'v22');
 
   const topChrome = await page.evaluate(() => {
     const topbar = document.querySelector<HTMLElement>('.topbar');
@@ -183,8 +183,11 @@ test('mobile live board keeps compact chrome and uses the current history card l
   expect(chromeLayout.selectorHeight).toBeLessThanOrEqual(54);
   expect(chromeLayout.contextHeight).toBeLessThanOrEqual(34);
 
+  await expect(page.locator('.mobile-live-history-board > .mobile-completed-team-names')).toHaveCount(0);
+  await expect(page.locator('.mobile-live-history-board > .mobile-completed-objectives')).toHaveCount(0);
+
   const visibleObjectiveSurfaces = await page.evaluate(() => {
-    const selectors = '.mobile-live-parity-objectives, .history-v2-objectives, .v2-objectives-card, .objective-hud-v3';
+    const selectors = '.mobile-live-parity-objectives, .mobile-completed-objectives, .history-v2-objectives, .v2-objectives-card, .objective-hud-v3';
     return [...document.querySelectorAll<HTMLElement>(selectors)]
       .filter(element => {
         const bounds = element.getBoundingClientRect();
@@ -194,6 +197,16 @@ test('mobile live board keeps compact chrome and uses the current history card l
       .map(element => element.className);
   });
   expect(visibleObjectiveSurfaces).toEqual(['mobile-live-parity-objectives']);
+
+  await page.evaluate(() => {
+    const history = document.querySelector<HTMLElement>('#series-history');
+    if (!history) throw new Error('Series history panel is missing.');
+    history.className = 'live-series-message-panel';
+    history.hidden = false;
+    history.innerHTML = '<div class="live-series-message warning">Series context enrichment is still loading.</div>';
+  });
+  await expect(page.locator('#series-history')).toBeHidden();
+  await expect(page.locator('#series-history')).toHaveText('');
 
   const parityLayout = await board.locator('.mobile-live-parity-comparison').evaluate(element => {
     const boardElement = element.closest<HTMLElement>('.mobile-live-history-board');

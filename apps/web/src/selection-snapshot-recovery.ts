@@ -58,6 +58,13 @@ function selectedGameIsRendered(gameId: string): boolean {
     .some(element => element.dataset.liveDashboardGameId === gameId);
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
 function renderLoading(): void {
   if (!gameContent) return;
   gameContent.innerHTML = `
@@ -68,13 +75,29 @@ function renderLoading(): void {
     </div>`;
 }
 
+function waitingMessage(message: string): string {
+  return /no valid telemetry frame|source timestamp|normalized gameplay frame/i.test(message)
+    ? 'Riot has marked this game live, but its live feed has not published a timestamped gameplay frame yet.'
+    : message;
+}
+
+function renderWaiting(message: string): void {
+  if (!gameContent) return;
+  gameContent.innerHTML = `
+    <div class="analysis-empty" data-selection-snapshot-waiting>
+      <span class="analysis-empty-icon" aria-hidden="true">↻</span>
+      <h3>Waiting for live telemetry</h3>
+      <p>${escapeHtml(waitingMessage(message))} Retrying automatically.</p>
+    </div>`;
+}
+
 function renderUnavailable(message: string): void {
   if (!gameContent) return;
   gameContent.innerHTML = `
     <div class="analysis-empty" data-selection-snapshot-error>
       <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
       <h3>Selected game unavailable</h3>
-      <p>${message.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</p>
+      <p>${escapeHtml(message)}</p>
     </div>`;
 }
 
@@ -120,7 +143,8 @@ async function refreshSelectedSnapshot(force = false, showLoading = true): Promi
       if (!selectedGameIsRendered(selection.gameId)) {
         const reason = snapshot.quality.reasons.map(item => item.message).join(' ')
           || 'No normalized gameplay frame is available for this game yet.';
-        renderUnavailable(reason);
+        if (shouldRetry) renderWaiting(reason);
+        else renderUnavailable(reason);
       }
     }
   } catch (error) {
@@ -129,7 +153,9 @@ async function refreshSelectedSnapshot(force = false, showLoading = true): Promi
 
     shouldRetry = selection.gameState !== 'completed';
     if (!selectedGameIsRendered(selection.gameId)) {
-      renderUnavailable(error instanceof Error ? error.message : 'Unknown snapshot error.');
+      const message = error instanceof Error ? error.message : 'Unknown snapshot error.';
+      if (shouldRetry) renderWaiting(message);
+      else renderUnavailable(message);
     }
   } finally {
     if (generation !== requestGeneration) return;

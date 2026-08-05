@@ -1,11 +1,9 @@
 const gameSelector = document.querySelector<HTMLElement>('#game-selector');
 const historyPanel = document.querySelector<HTMLElement>('#series-history');
-const gameContent = document.querySelector<HTMLElement>('#game-content');
 
 let pinnedGameId: string | null = null;
 let reconcileQueued = false;
 let restoringSelection = false;
-let restorePending = false;
 
 const style = document.createElement('style');
 style.textContent = `
@@ -22,53 +20,54 @@ function activeGameId(): string | null {
   return gameSelector?.querySelector<HTMLButtonElement>('[data-game-id].active')?.dataset.gameId ?? null;
 }
 
-function renderedGameId(): string | null {
-  const board = gameContent?.querySelector<HTMLElement>(
-    '[data-live-history-game-id], [data-mobile-unified-game-id], [data-live-dashboard-game-id]'
-  );
-  return board?.dataset.liveHistoryGameId
-    ?? board?.dataset.mobileUnifiedGameId
-    ?? board?.dataset.liveDashboardGameId
-    ?? null;
+function buttonFor(gameId: string): HTMLButtonElement | null {
+  return gameSelector?.querySelector<HTMLButtonElement>(
+    `[data-game-id="${CSS.escape(gameId)}"]`
+  ) ?? null;
+}
+
+function publishPin(): void {
+  if (pinnedGameId) document.documentElement.dataset.mobilePinnedGameId = pinnedGameId;
+  else delete document.documentElement.dataset.mobilePinnedGameId;
+}
+
+function setPinnedGame(gameId: string | null): void {
+  pinnedGameId = gameId;
+  publishPin();
+}
+
+function intendedGameId(): string | null {
+  if (pinnedGameId && buttonFor(pinnedGameId)) return pinnedGameId;
+  return activeGameId();
 }
 
 function syncVisibleCards(): void {
-  const active = activeGameId();
+  const intended = intendedGameId();
   historyPanel?.querySelectorAll<HTMLElement>('[data-history-game-id]').forEach(card => {
-    const selected = Boolean(active) && card.dataset.historyGameId === active;
+    const selected = Boolean(intended) && card.dataset.historyGameId === intended;
     card.classList.toggle('selected', selected);
     card.setAttribute('aria-current', selected ? 'true' : 'false');
   });
 }
 
-function requestRestore(button: HTMLButtonElement): void {
-  if (restorePending) return;
-  restorePending = true;
+function restorePinnedSelection(): void {
+  if (!pinnedGameId || restoringSelection) return;
+  const button = buttonFor(pinnedGameId);
+  if (!button || button.classList.contains('active')) return;
+
   restoringSelection = true;
   try {
     button.click();
   } finally {
-    restoringSelection = false;
-    window.setTimeout(() => {
-      restorePending = false;
+    queueMicrotask(() => {
+      restoringSelection = false;
       queueReconcile();
-    }, 400);
+    });
   }
 }
 
 function reconcile(): void {
-  if (!gameSelector) return;
-
-  if (pinnedGameId) {
-    const selector = `[data-game-id="${CSS.escape(pinnedGameId)}"]`;
-    const button = gameSelector.querySelector<HTMLButtonElement>(selector);
-    if (button) {
-      const active = button.classList.contains('active');
-      const rendered = renderedGameId();
-      if (!active || (rendered !== null && rendered !== pinnedGameId)) requestRestore(button);
-    }
-  }
-
+  restorePinnedSelection();
   syncVisibleCards();
 }
 
@@ -87,21 +86,21 @@ document.addEventListener('click', event => {
   if (!target) return;
 
   if (target.closest('[data-series-id], [data-completed-series-id]')) {
-    pinnedGameId = null;
+    setPinnedGame(null);
     queueReconcile();
     return;
   }
 
   const historyCard = target.closest<HTMLElement>('[data-history-game-id]');
   if (historyCard?.dataset.historyGameId) {
-    pinnedGameId = historyCard.dataset.historyGameId;
+    setPinnedGame(historyCard.dataset.historyGameId);
     queueReconcile();
     return;
   }
 
   const gameButton = target.closest<HTMLButtonElement>('[data-game-id]');
   if (gameButton?.dataset.gameId) {
-    pinnedGameId = gameButton.dataset.gameId;
+    setPinnedGame(gameButton.dataset.gameId);
     queueReconcile();
   }
 }, { capture: true });
@@ -122,17 +121,9 @@ if (historyPanel) {
   });
 }
 
-if (gameContent) {
-  new MutationObserver(queueReconcile).observe(gameContent, {
-    childList: true,
-    subtree: true
-  });
-}
-
-window.addEventListener('esports-live:snapshot', queueReconcile);
 window.addEventListener('pageshow', queueReconcile);
-document.documentElement.dataset.completedGameSelectionPersistence = 'explicit-pin-all-states';
-document.documentElement.dataset.gameSelectionPersistence = 'visible-card-board-sync';
+document.documentElement.dataset.completedGameSelectionPersistence = 'explicit-pin-v2';
+document.documentElement.dataset.gameSelectionPersistence = 'active-selector-contract-v27';
 queueReconcile();
 
 export {};

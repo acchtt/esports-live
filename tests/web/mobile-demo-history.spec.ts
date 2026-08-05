@@ -140,7 +140,7 @@ test('mobile match history stays on the list until selected and then uses the sh
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.10');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.11');
   await page.getByRole('button', { name: 'Open match history' }).click();
 
   const historyCard = page.locator('[data-completed-series-id="series-mobile-history"]');
@@ -157,11 +157,14 @@ test('mobile match history stays on the list until selected and then uses the sh
   await expect(page.locator('.analysis-header')).toBeHidden();
 
   const board = page.locator('#completed-match-detail [data-final-game-id="game-mobile-history-1"]');
+  const header = board.locator('.completed-final-game-header');
   await expect(board).toBeVisible({ timeout: 15_000 });
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'history');
-  await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v24');
-  await expect(board.locator('.completed-final-game-header .mobile-scoreboard-game-clock')).toHaveText('31:42');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v25');
+  await expect(header.locator(':scope > *')).toHaveCount(2);
+  await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('31:42');
+  await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Final');
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
   await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('14');

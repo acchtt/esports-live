@@ -23,6 +23,7 @@ import './mobile-demo-v20-width-fix.ts';
 import './mobile-demo-v21.ts';
 import './mobile-demo-v22.ts';
 import './mobile-demo-v23.ts';
+import './completed-game-selection-persistence.ts';
 
 const VERSION = '0.17.8';
 const LABEL = 'DEMO v0.17.8';

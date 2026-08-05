@@ -44,9 +44,8 @@ function teamStats(team: typeof blue, side: 'blue' | 'red', gold: number) {
   };
 }
 
-function snapshot(gameId: string, requestNumber: number) {
-  const gameTwo = gameId === 'game-live-2';
-  const currentSeries = series(gameTwo);
+function snapshot(gameId: string, requestNumber: number, gameTwoLive = gameId === 'game-live-2') {
+  const currentSeries = series(gameTwoLive);
   const game = currentSeries.games.find(candidate => candidate.id === gameId)!;
   return {
     schemaVersion: '1.0',
@@ -55,19 +54,19 @@ function snapshot(gameId: string, requestNumber: number) {
     series: currentSeries,
     game,
     stats: {
-      gameClockSeconds: gameTwo ? 90 + requestNumber : 1_200 + requestNumber,
+      gameClockSeconds: gameId === 'game-live-2' ? 90 + requestNumber : 1_200 + requestNumber,
       patch: '26.15.1',
       blue: teamStats(blue, 'blue', 32_000 + requestNumber * 100),
       red: teamStats(red, 'red', 30_500 + requestNumber * 90)
     },
     quality: {
-      freshness: 'fresh',
+      freshness: game.state === 'completed' ? 'historical' : 'fresh',
       sourceTimestamp: iso(requestNumber * 1_000),
       observedAt: iso(),
-      ageSeconds: 1,
+      ageSeconds: game.state === 'completed' ? 60 : 1,
       complete: true,
-      advancing: true,
-      safeForLiveAnalysis: true,
+      advancing: game.state !== 'completed',
+      safeForLiveAnalysis: game.state !== 'completed',
       reasons: []
     }
   };
@@ -146,13 +145,14 @@ async function installRaceFixtures(page: Page) {
   await page.route('**/v1/lol/games/**/live**', async route => {
     const match = new URL(route.request().url()).pathname.match(/\/games\/([^/]+)\/live$/);
     const gameId = decodeURIComponent(match?.[1] ?? 'game-live-1');
+    const gameTwoLive = activeScheduleRequests >= 2;
     if (gameId === 'game-live-1') {
       gameOneRequests += 1;
       if (gameOneRequests === 2) await staleRequestGate;
-      return fulfillJson(route, snapshot(gameId, gameOneRequests));
+      return fulfillJson(route, snapshot(gameId, gameOneRequests, gameTwoLive));
     }
     gameTwoRequests += 1;
-    return fulfillJson(route, snapshot(gameId, gameTwoRequests));
+    return fulfillJson(route, snapshot(gameId, gameTwoRequests, gameTwoLive));
   });
 
   return {
@@ -179,4 +179,14 @@ test('continues polling the newly selected live game after an older request fini
 
   await expect.poll(requests.gameTwoRequests).toBeGreaterThan(0);
   await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
+
+  await page.locator('[data-game-id="game-live-1"]').click();
+  await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(3);
+  await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-game-id="game-live-2"]')).not.toHaveClass(/active/);
+  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
 });

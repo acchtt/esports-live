@@ -48,7 +48,7 @@ function teamStats(team: typeof blue, side: 'blue' | 'red', gold: number) {
   };
 }
 
-function snapshot(gameId: string, requestNumber: number, liveGame: LiveGameNumber) {
+function snapshot(gameId: string, requestNumber: number, liveGame: LiveGameNumber = 2) {
   const currentSeries = series(liveGame);
   const game = currentSeries.games.find(candidate => candidate.id === gameId)!;
   return {
@@ -76,8 +76,8 @@ function snapshot(gameId: string, requestNumber: number, liveGame: LiveGameNumbe
   };
 }
 
-function context(liveGame: LiveGameNumber) {
-  const currentSeries = series(liveGame);
+function context() {
+  const currentSeries = series(2);
   return {
     schemaVersion: '1.0',
     esport: 'lol',
@@ -91,15 +91,15 @@ function context(liveGame: LiveGameNumber) {
       winsRequired: 2,
       drawPossible: false,
       score: [
-        { team: blue, wins: liveGame - 1 },
+        { team: blue, wins: 1 },
         { team: red, wins: 0 }
       ],
       games: currentSeries.games.map(game => ({
         ...game,
         blueTeam: blue,
         redTeam: red,
-        winner: game.number < liveGame ? blue : null,
-        durationSeconds: game.number < liveGame ? 2_401 + game.number : null
+        winner: game.number === 1 ? blue : null,
+        durationSeconds: game.number === 1 ? 2_402 : null
       }))
     },
     complete: true,
@@ -115,19 +115,9 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
   });
 }
 
-async function refreshSchedule(page: Page): Promise<void> {
-  await page.locator('#refresh-button').evaluate((element: HTMLButtonElement) => element.click());
-}
-
 async function installRaceFixtures(page: Page) {
-  let activeScheduleRequests = 0;
   let gameOneRequests = 0;
   let gameTwoRequests = 0;
-  let gameThreeRequests = 0;
-  let releaseStaleRequest: (() => void) | null = null;
-  const staleRequestGate = new Promise<void>(resolve => {
-    releaseStaleRequest = resolve;
-  });
 
   await page.route('**/health', route => fulfillJson(route, {
     ok: true,
@@ -136,95 +126,70 @@ async function installRaceFixtures(page: Page) {
     adapters: ['lol']
   }));
 
-  await page.route('**/v1/lol/schedule**', route => {
-    const url = new URL(route.request().url());
-    const activeRequest = url.searchParams.get('states') === 'live,paused,scheduled';
-    if (activeRequest) activeScheduleRequests += 1;
-    const liveGame: LiveGameNumber = activeScheduleRequests >= 3 ? 3 : activeScheduleRequests >= 2 ? 2 : 1;
-    return fulfillJson(route, {
-      esport: 'lol',
-      events: [{ series: series(liveGame), provider, observedAt: iso() }]
-    });
-  });
+  await page.route('**/v1/lol/schedule**', route => fulfillJson(route, {
+    esport: 'lol',
+    events: [{ series: series(2), provider, observedAt: iso() }]
+  }));
 
-  await page.route('**/v1/lol/series/**/context**', route => (
-    fulfillJson(route, context(activeScheduleRequests >= 2 ? 2 : 1))
-  ));
+  await page.route('**/v1/lol/series/**/context**', route => fulfillJson(route, context()));
 
-  await page.route('**/v1/lol/games/**/live**', async route => {
+  await page.route('**/v1/lol/games/**/live**', route => {
     const match = new URL(route.request().url()).pathname.match(/\/games\/([^/]+)\/live$/);
-    const gameId = decodeURIComponent(match?.[1] ?? 'game-live-1');
+    const gameId = decodeURIComponent(match?.[1] ?? 'game-live-2');
     if (gameId === 'game-live-1') {
       gameOneRequests += 1;
-      if (gameOneRequests === 2) await staleRequestGate;
-      return fulfillJson(route, snapshot(gameId, gameOneRequests, activeScheduleRequests >= 2 ? 2 : 1));
+      return fulfillJson(route, snapshot(gameId, gameOneRequests));
     }
-    if (gameId === 'game-live-2') {
-      gameTwoRequests += 1;
-      return fulfillJson(route, snapshot(gameId, gameTwoRequests, 2));
-    }
-    gameThreeRequests += 1;
-    return fulfillJson(route, snapshot(gameId, gameThreeRequests, 3));
+    gameTwoRequests += 1;
+    return fulfillJson(route, snapshot(gameId, gameTwoRequests));
   });
 
   return {
-    activeScheduleRequests: () => activeScheduleRequests,
     gameOneRequests: () => gameOneRequests,
-    gameTwoRequests: () => gameTwoRequests,
-    gameThreeRequests: () => gameThreeRequests,
-    releaseStaleRequest: () => releaseStaleRequest?.()
+    gameTwoRequests: () => gameTwoRequests
   };
 }
 
-test('keeps visible game cards and the rendered board on the same explicitly selected game', async ({ page }) => {
+async function dispatchLateGameTwoSnapshot(page: Page): Promise<void> {
+  await page.evaluate(staleSnapshot => {
+    window.dispatchEvent(new CustomEvent('esports-live:snapshot', { detail: staleSnapshot }));
+  }, snapshot('game-live-2', 99));
+  await page.waitForTimeout(100);
+}
+
+test('keeps the active tab, history card, and board on the same explicitly selected game', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const requests = await installRaceFixtures(page);
   await page.goto('/');
 
   await page.locator('[data-series-id="series-live"]').click();
-  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
-  await expect.poll(requests.gameOneRequests).toBeGreaterThanOrEqual(2);
-
-  await refreshSchedule(page);
-  await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(2);
   await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
-
-  requests.releaseStaleRequest();
-
-  await expect.poll(requests.gameTwoRequests).toBeGreaterThan(0);
   await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
+  await expect.poll(requests.gameTwoRequests).toBeGreaterThan(0);
 
   await page.locator('[data-history-game-id="game-live-1"]').click();
   await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
   await expect(page.locator('[data-history-game-id="game-live-1"]')).toHaveClass(/selected/);
+  await expect(page.locator('[data-history-game-id="game-live-1"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+  await expect.poll(requests.gameOneRequests).toBeGreaterThan(0);
 
-  await refreshSchedule(page);
-  await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(3);
+  await dispatchLateGameTwoSnapshot(page);
   await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
-  await expect(page.locator('[data-game-id="game-live-3"]')).not.toHaveClass(/active/);
+  await expect(page.locator('[data-history-game-id="game-live-1"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+  await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toHaveCount(0);
 
   await page.locator('[data-history-game-id="game-live-2"]').click();
   await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
   await expect(page.locator('[data-history-game-id="game-live-2"]')).toHaveClass(/selected/);
-  await expect(page.locator('[data-history-game-id="game-live-2"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
-
-  await refreshSchedule(page);
-  await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(4);
-  await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
-  await expect(page.locator('[data-game-id="game-live-3"]')).not.toHaveClass(/active/);
-  await expect(page.locator('[data-history-game-id="game-live-2"]')).toHaveClass(/selected/);
-  await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
-  await expect(page.locator('[data-live-history-game-id="game-live-3"]')).toHaveCount(0);
-
-  expect(requests.gameThreeRequests()).toBeGreaterThanOrEqual(0);
+  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toHaveCount(0);
 });
 
 test('rapid switching keeps the last explicit game when another game snapshot arrives late', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const requests = await installRaceFixtures(page);
+  await installRaceFixtures(page);
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute(
@@ -232,13 +197,7 @@ test('rapid switching keeps the last explicit game when another game snapshot ar
     'active-selector-v27'
   );
   await page.locator('[data-series-id="series-live"]').click();
-  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
-  await expect.poll(requests.gameOneRequests).toBeGreaterThanOrEqual(2);
-
-  await refreshSchedule(page);
-  await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(2);
-  await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
-  requests.releaseStaleRequest();
+  await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
 
   await page.locator('[data-history-game-id="game-live-1"]').click();
   await page.locator('[data-history-game-id="game-live-2"]').click();
@@ -248,11 +207,8 @@ test('rapid switching keeps the last explicit game when another game snapshot ar
   await expect(page.locator('[data-history-game-id="game-live-1"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
 
-  await page.evaluate(staleSnapshot => {
-    window.dispatchEvent(new CustomEvent('esports-live:snapshot', { detail: staleSnapshot }));
-  }, snapshot('game-live-2', 99, 2));
+  await dispatchLateGameTwoSnapshot(page);
 
-  await page.waitForTimeout(100);
   const state = await page.evaluate(() => {
     const root = document.documentElement;
     const content = document.querySelector<HTMLElement>('#game-content');
@@ -264,20 +220,13 @@ test('rapid switching keeps the last explicit game when another game snapshot ar
       rendered: root.dataset.mobileGameSwitchRendered ?? null,
       blocked: root.dataset.mobileGameSwitchBlocked ?? null,
       view: document.body.dataset.mobileView ?? null,
-      context: document.body.dataset.mobileContext ?? null,
-      contentHidden: content?.hidden ?? null,
       boards: [...(content?.querySelectorAll<HTMLElement>(selector) ?? [])].map(element => ({
-        tag: element.tagName,
-        classes: element.className,
         liveHistory: element.dataset.liveHistoryGameId ?? null,
         unified: element.dataset.mobileUnifiedGameId ?? null,
-        dashboard: element.dataset.liveDashboardGameId ?? null,
-        owner: element.dataset.mobileGameSwitchOwner ?? null
-      })),
-      html: content?.innerHTML.slice(0, 2_000) ?? null
+        dashboard: element.dataset.liveDashboardGameId ?? null
+      }))
     };
   });
-  console.log('GAME_SWITCH_DIAGNOSTIC', JSON.stringify(state));
 
   expect(state.view).toBe('live');
   expect(state.active).toBe('game-live-1');

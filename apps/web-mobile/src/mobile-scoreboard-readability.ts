@@ -25,7 +25,7 @@ style.textContent = `
     align-items:center!important;
     justify-content:space-between!important;
     gap:16px!important;
-    min-height:42px!important;
+    min-height:46px!important;
     padding:8px 12px!important;
     color:#dce8f7!important;
     background:rgba(6,18,34,.82)!important
@@ -34,9 +34,9 @@ style.textContent = `
     overflow:hidden!important;
     min-width:0!important;
     color:#f4f8ff!important;
-    font-size:.78rem!important;
+    font-size:20px!important;
     font-weight:900!important;
-    line-height:1.15!important;
+    line-height:1.1!important;
     text-align:right!important;
     text-overflow:ellipsis!important;
     white-space:nowrap!important
@@ -44,13 +44,13 @@ style.textContent = `
   body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-game-clock{
     display:block!important;
     flex:0 0 auto!important;
-    min-width:58px!important;
+    min-width:66px!important;
     color:#c7e4ff!important;
-    font-size:17px!important;
+    font-size:20px!important;
     font-weight:950!important;
     font-variant-numeric:tabular-nums!important;
     letter-spacing:.025em!important;
-    line-height:1!important;
+    line-height:1.1!important;
     text-align:left!important
   }
 

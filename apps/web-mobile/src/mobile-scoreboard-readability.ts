@@ -24,32 +24,34 @@ style.textContent = `
     display:flex!important;
     align-items:center!important;
     justify-content:space-between!important;
-    gap:12px!important;
+    gap:16px!important;
     min-height:42px!important;
     padding:8px 12px!important;
     color:#dce8f7!important;
     background:rgba(6,18,34,.82)!important
   }
-  body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .completed-final-game-header strong{
+  body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-game-label{
     overflow:hidden!important;
     min-width:0!important;
     color:#f4f8ff!important;
-    font-size:.72rem!important;
+    font-size:.78rem!important;
     font-weight:900!important;
     line-height:1.15!important;
+    text-align:right!important;
     text-overflow:ellipsis!important;
     white-space:nowrap!important
   }
   body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-game-clock{
     display:block!important;
     flex:0 0 auto!important;
-    min-width:42px!important;
-    color:#9fcaf4!important;
-    font-size:.74rem!important;
-    font-weight:900!important;
+    min-width:54px!important;
+    color:#c7e4ff!important;
+    font-size:1rem!important;
+    font-weight:950!important;
     font-variant-numeric:tabular-nums!important;
-    letter-spacing:.02em!important;
-    text-align:right!important
+    letter-spacing:.025em!important;
+    line-height:1!important;
+    text-align:left!important
   }
 
   body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-objective-title,
@@ -166,30 +168,27 @@ function applyReadability(detail: MobileScoreboardRenderedDetail): void {
     clockText
   });
   const hasObjectiveTitle = Boolean(root.querySelector(OBJECTIVE_TITLE_SELECTOR));
+  const header = directHeader(root);
+  const hasStrictHeader = header.children.length === 2
+    && header.firstElementChild?.classList.contains('mobile-scoreboard-game-clock')
+    && header.lastElementChild?.classList.contains('mobile-scoreboard-game-label');
   if (
     appliedKeys.get(root) === key
     && !hasObjectiveTitle
-    && root.dataset.mobileScoreboardReadability === 'v24'
+    && hasStrictHeader
+    && root.dataset.mobileScoreboardReadability === 'v25'
   ) return;
 
-  const header = directHeader(root);
-  let heading = header.querySelector<HTMLElement>(':scope > strong');
-  if (!heading) {
-    heading = document.createElement('strong');
-    header.append(heading);
-  }
-  let clock = header.querySelector<HTMLElement>(':scope > span');
-  if (!clock) {
-    clock = document.createElement('span');
-    header.append(clock);
-  }
+  let clock = header.querySelector<HTMLElement>(':scope > .mobile-scoreboard-game-clock');
+  if (!clock) clock = document.createElement('span');
+  clock.className = 'mobile-scoreboard-game-clock';
 
-  if (snapshot?.game.number !== undefined) {
-    setText(heading, `Game ${snapshot.game.number} · ${stateLabel(detail)}`);
-  }
-  if (!clock.classList.contains('mobile-scoreboard-game-clock')) {
-    clock.classList.add('mobile-scoreboard-game-clock');
-  }
+  let heading = header.querySelector<HTMLElement>(':scope > .mobile-scoreboard-game-label');
+  if (!heading) heading = document.createElement('strong');
+  heading.className = 'mobile-scoreboard-game-label';
+
+  const gameNumber = snapshot?.game.number;
+  setText(heading, gameNumber === undefined ? stateLabel(detail) : `Game ${gameNumber} · ${stateLabel(detail)}`);
   if (mode === 'live') {
     if (clock.id !== 'live-game-clock') clock.id = 'live-game-clock';
   } else if (clock.hasAttribute('id')) {
@@ -197,9 +196,18 @@ function applyReadability(detail: MobileScoreboardRenderedDetail): void {
   }
   setText(clock, clockText);
   setAttribute(clock, 'aria-label', `Game time ${clockText}`);
+
+  if (
+    header.children.length !== 2
+    || header.firstElementChild !== clock
+    || header.lastElementChild !== heading
+  ) {
+    header.replaceChildren(clock, heading);
+  }
+
   removeObjectiveTitles(root);
-  if (root.dataset.mobileScoreboardReadability !== 'v24') {
-    root.dataset.mobileScoreboardReadability = 'v24';
+  if (root.dataset.mobileScoreboardReadability !== 'v25') {
+    root.dataset.mobileScoreboardReadability = 'v25';
   }
   appliedKeys.set(root, key);
 }
@@ -213,15 +221,12 @@ window.addEventListener('esports-live:mobile-scoreboard-rendered', event => {
 function cleanExistingBoards(): void {
   document.querySelectorAll<HTMLElement>(BOARD_SELECTOR).forEach(root => {
     removeObjectiveTitles(root);
-    if (root.dataset.mobileScoreboardReadability !== 'v24') {
-      root.dataset.mobileScoreboardReadability = 'v24';
-    }
   });
-  document.documentElement.dataset.mobileScoreboardReadability = 'game-clock-objectives-v24';
+  document.documentElement.dataset.mobileScoreboardReadability = 'large-clock-single-game-label-v25';
 }
 
 queueMicrotask(cleanExistingBoards);
 window.addEventListener('pageshow', cleanExistingBoards);
-document.documentElement.dataset.mobileScoreboardReadability = 'game-clock-objectives-v24';
+document.documentElement.dataset.mobileScoreboardReadability = 'large-clock-single-game-label-v25';
 
 export {};

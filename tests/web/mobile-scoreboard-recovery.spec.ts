@@ -132,7 +132,7 @@ async function installFixtureBoard(page: Page, value: ReturnType<typeof snapshot
     root.className = 'completed-final-game';
     root.dataset.finalGameId = gameId;
     root.innerHTML = `
-      <div class="completed-final-game-header"><strong>Game 1 · Recovery Blue Academy won</strong><span>30:00</span></div>
+      <div class="completed-final-game-header"><span>30:00</span><span>Game 1 · Recovery Blue Academy won</span><strong>Game 1 · Recovery Blue Academy won</strong></div>
       <section class="completed-team-comparison">
         <div class="completed-comparison-team blue"><strong>Recovery Blue Academy</strong></div>
         <div class="completed-comparison-team red"><strong>Recovery Red Esports</strong></div>
@@ -154,7 +154,7 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.10');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.11');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
@@ -169,11 +169,14 @@ test('recovered history boards use the same shared renderer as live matches', as
   await installFixtureBoard(page, snapshot());
 
   const board = page.locator('[data-final-game-id="game-mobile-recovery-1"]');
+  const header = board.locator('.completed-final-game-header');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'history');
-  await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v24');
-  await expect(board.locator('.completed-final-game-header .mobile-scoreboard-game-clock')).toHaveText('30:00');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v25');
+  await expect(header.locator(':scope > *')).toHaveCount(2);
+  await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('30:00');
+  await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Final');
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-name')).toHaveText(blue.name);
   await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-name')).toHaveText(red.name);

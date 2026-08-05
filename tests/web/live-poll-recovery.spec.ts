@@ -216,3 +216,38 @@ test('keeps visible game cards and the rendered board on the same explicitly sel
 
   expect(requests.gameThreeRequests()).toBeGreaterThanOrEqual(0);
 });
+
+test('rapid switching keeps the last explicit game when another game snapshot arrives late', async ({ page }) => {
+  const requests = await installRaceFixtures(page);
+  await page.goto('/');
+
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-mobile-game-switch-owner',
+    'active-selector-v27'
+  );
+  await page.locator('[data-series-id="series-live"]').click();
+  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+  await expect.poll(requests.gameOneRequests).toBeGreaterThanOrEqual(2);
+
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
+  requests.releaseStaleRequest();
+
+  await page.locator('[data-history-game-id="game-live-1"]').click();
+  await page.locator('[data-history-game-id="game-live-2"]').click();
+  await page.locator('[data-history-game-id="game-live-1"]').click();
+
+  await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-history-game-id="game-live-1"]')).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+
+  await page.evaluate(staleSnapshot => {
+    window.dispatchEvent(new CustomEvent('esports-live:snapshot', { detail: staleSnapshot }));
+  }, snapshot('game-live-2', 99, 2));
+
+  await page.waitForTimeout(100);
+  await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+  await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toHaveCount(0);
+});

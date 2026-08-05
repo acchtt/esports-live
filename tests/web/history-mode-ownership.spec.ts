@@ -74,7 +74,7 @@ test('keeps the live series board hidden while Match History owns the analysis p
   expect(pageErrors).toEqual([]);
 });
 
-test('shared mobile scoreboard exposes game time and readable objectives without a heading', async ({ page }) => {
+test('shared mobile scoreboard exposes one game label, a larger clock, and readable objectives', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.setViewportSize({ width: 390, height: 844 });
@@ -87,7 +87,7 @@ test('shared mobile scoreboard exposes game time and readable objectives without
     root.dataset.mobileScoreboardRenderer = 'shared-v1';
     root.dataset.liveBoardState = 'verified';
     root.innerHTML = `
-      <div class="completed-final-game-header"><strong>Game 2 · Live</strong><span>--:--</span></div>
+      <div class="completed-final-game-header"><span>20:34</span><span>Game 2 · Live</span><strong>Game 2 · Live</strong></div>
       <section class="completed-team-comparison mobile-unified-scoreboard-comparison">
         <section class="mobile-scoreboard-objectives">
           <div class="mobile-scoreboard-objective-title">OBJECTIVES · BLUE – RED</div>
@@ -114,25 +114,32 @@ test('shared mobile scoreboard exposes game time and readable objectives without
     }));
   });
 
-  const board = page.locator('[data-mobile-scoreboard-readability="v24"]');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-demo-version', '0.17.10');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-readability', 'game-clock-objectives-v24');
-  await expect(board.locator('#live-game-clock')).toHaveText('20:34');
+  const board = page.locator('[data-mobile-scoreboard-readability="v25"]');
+  const header = board.locator('.completed-final-game-header');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-demo-version', '0.17.11');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-readability', 'large-clock-single-game-label-v25');
+  await expect(header.locator(':scope > *')).toHaveCount(2);
+  await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('20:34');
+  await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 2 · Live');
   await expect(board.locator('.mobile-scoreboard-objective-title, .mobile-live-parity-objective-title')).toHaveCount(0);
   await expect(board.locator('.mobile-scoreboard-objective')).toHaveCount(4);
 
   const readability = await board.locator('.mobile-scoreboard-objective').first().evaluate(element => {
     const label = element.querySelector<HTMLElement>(':scope > span');
     const value = element.querySelector<HTMLElement>('.mobile-scoreboard-objective-values strong');
-    if (!label || !value) throw new Error('Objective typography is incomplete.');
+    const clock = element.closest<HTMLElement>('[data-mobile-scoreboard-readability]')
+      ?.querySelector<HTMLElement>('.mobile-scoreboard-game-clock');
+    if (!label || !value || !clock) throw new Error('Scoreboard typography is incomplete.');
     return {
       height: element.getBoundingClientRect().height,
       labelSize: Number.parseFloat(getComputedStyle(label).fontSize),
-      valueSize: Number.parseFloat(getComputedStyle(value).fontSize)
+      valueSize: Number.parseFloat(getComputedStyle(value).fontSize),
+      clockSize: Number.parseFloat(getComputedStyle(clock).fontSize)
     };
   });
   expect(readability.height).toBeGreaterThanOrEqual(54);
   expect(readability.labelSize).toBeGreaterThanOrEqual(8);
   expect(readability.valueSize).toBeGreaterThanOrEqual(14);
+  expect(readability.clockSize).toBeGreaterThanOrEqual(16);
   expect(pageErrors).toEqual([]);
 });

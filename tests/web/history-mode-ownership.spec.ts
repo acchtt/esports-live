@@ -116,7 +116,7 @@ test('shared mobile scoreboard exposes one game label, a larger clock, and reada
 
   const board = page.locator('[data-mobile-scoreboard-readability="v25"]');
   const header = board.locator('.completed-final-game-header');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-demo-version', '0.17.12');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-demo-version', '0.17.13');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-readability', 'large-clock-single-game-label-v25');
   await expect(header.locator(':scope > *')).toHaveCount(2);
   await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('20:34');

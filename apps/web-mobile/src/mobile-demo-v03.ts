@@ -25,13 +25,14 @@ import './mobile-demo-v22.ts';
 import './mobile-demo-v23.ts';
 import './mobile-scoreboard-readability.ts';
 import './completed-game-selection-persistence.ts';
+import './mobile-game-switch-stability.ts';
 
 const VERSION = '0.17.13';
 const LABEL = 'DEMO v0.17.13';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'shared-renderer';
 document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';
-document.documentElement.dataset.mobileDemoRedeploy = '2026-08-05T23:15:00+07:00';
+document.documentElement.dataset.mobileDemoRedeploy = '2026-08-05T23:44:00+07:00';
 // The deployment workflow still validates its previous marker. Keep it non-visible until the workflow version is updated separately.
 document.documentElement.dataset.mobileDeploymentCompatibility = 'DEMO v0.17.2';
 

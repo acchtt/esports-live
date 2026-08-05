@@ -153,7 +153,7 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.10');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.11');
   await expect(nav).toBeVisible();
   await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
@@ -167,13 +167,18 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   await expect(schedule).toBeHidden();
 
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-1"]');
+  const header = board.locator('.completed-final-game-header');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-version', '0.17');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v25');
   await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
   await expect(board).toHaveClass(/completed-final-game/);
   await expect(board).toHaveClass(/mobile-final-recovery/);
+  await expect(header.locator(':scope > *')).toHaveCount(2);
+  await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('20:45');
+  await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Live');
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
   await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('8');

@@ -8,7 +8,7 @@ style.textContent = `
     min-width:0!important;
     margin:0!important;
     color:#8ca0b7!important;
-    font-size:.5rem!important;
+    font-size:.54rem!important;
     font-weight:900!important;
     line-height:1!important;
     letter-spacing:.04em!important;
@@ -25,7 +25,7 @@ style.textContent = `
     display:inline!important;
     overflow:visible!important;
     color:#38bdf8!important;
-    font-size:.9rem!important;
+    font-size:.96rem!important;
     font-weight:950!important;
     line-height:1!important;
     text-overflow:clip!important;
@@ -82,6 +82,6 @@ style.textContent = `
 }
 `;
 document.head.append(style);
-document.documentElement.dataset.mobileScoreboardDetails = 'large-portraits-large-kills-no-items';
+document.documentElement.dataset.mobileScoreboardDetails = 'team-kills-no-items';
 
 export {};

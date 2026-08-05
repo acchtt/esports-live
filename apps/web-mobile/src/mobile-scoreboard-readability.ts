@@ -7,6 +7,16 @@ interface MobileScoreboardRenderedDetail {
   mode: 'live' | 'history';
 }
 
+const appliedKeys = new WeakMap<HTMLElement, string>();
+const BOARD_SELECTOR = [
+  '.mobile-live-history-board[data-mobile-scoreboard-renderer="shared-v1"]',
+  '#completed-match-detail [data-mobile-scoreboard-renderer="shared-v1"]'
+].join(', ');
+const OBJECTIVE_TITLE_SELECTOR = [
+  '.mobile-scoreboard-objective-title',
+  '.mobile-live-parity-objective-title'
+].join(', ');
+
 const style = document.createElement('style');
 style.textContent = `
 @media(max-width:760px){
@@ -128,26 +138,70 @@ function directHeader(root: HTMLElement): HTMLElement {
   return header;
 }
 
+function setText(element: HTMLElement, value: string): void {
+  if (element.textContent !== value) element.textContent = value;
+}
+
+function setAttribute(element: HTMLElement, name: string, value: string): void {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
+function removeObjectiveTitles(root: HTMLElement): boolean {
+  const titles = root.querySelectorAll<HTMLElement>(OBJECTIVE_TITLE_SELECTOR);
+  titles.forEach(element => element.remove());
+  return titles.length > 0;
+}
+
 function applyReadability(detail: MobileScoreboardRenderedDetail): void {
   const { root, snapshot, mode } = detail;
+  if (!(root instanceof HTMLElement) || root === document.documentElement) return;
+
+  const clockText = formatClock(snapshot?.stats?.gameClockSeconds);
+  const key = JSON.stringify({
+    mode,
+    gameId: snapshot?.game.id ?? root.dataset.finalGameId ?? '',
+    gameNumber: snapshot?.game.number ?? null,
+    gameState: snapshot?.game.state ?? '',
+    boardState: root.dataset.liveBoardState ?? '',
+    clockText
+  });
+  const hasObjectiveTitle = Boolean(root.querySelector(OBJECTIVE_TITLE_SELECTOR));
+  if (
+    appliedKeys.get(root) === key
+    && !hasObjectiveTitle
+    && root.dataset.mobileScoreboardReadability === 'v24'
+  ) return;
+
   const header = directHeader(root);
-  const gameNumber = snapshot?.game.number;
-  const heading = header.querySelector<HTMLElement>('strong') ?? document.createElement('strong');
-  const clock = header.querySelector<HTMLElement>('span') ?? document.createElement('span');
+  let heading = header.querySelector<HTMLElement>(':scope > strong');
+  if (!heading) {
+    heading = document.createElement('strong');
+    header.append(heading);
+  }
+  let clock = header.querySelector<HTMLElement>(':scope > span');
+  if (!clock) {
+    clock = document.createElement('span');
+    header.append(clock);
+  }
 
-  if (!heading.isConnected) header.append(heading);
-  if (!clock.isConnected) header.append(clock);
-  if (gameNumber !== undefined) heading.textContent = `Game ${gameNumber} · ${stateLabel(detail)}`;
-  clock.className = 'mobile-scoreboard-game-clock';
-  if (mode === 'live') clock.id = 'live-game-clock';
-  else clock.removeAttribute('id');
-  clock.textContent = formatClock(snapshot?.stats?.gameClockSeconds);
-  clock.setAttribute('aria-label', `Game time ${clock.textContent}`);
-
-  root.querySelectorAll<HTMLElement>(
-    '.mobile-scoreboard-objective-title, .mobile-live-parity-objective-title'
-  ).forEach(element => element.remove());
-  root.dataset.mobileScoreboardReadability = 'v24';
+  if (snapshot?.game.number !== undefined) {
+    setText(heading, `Game ${snapshot.game.number} · ${stateLabel(detail)}`);
+  }
+  if (!clock.classList.contains('mobile-scoreboard-game-clock')) {
+    clock.classList.add('mobile-scoreboard-game-clock');
+  }
+  if (mode === 'live') {
+    if (clock.id !== 'live-game-clock') clock.id = 'live-game-clock';
+  } else if (clock.hasAttribute('id')) {
+    clock.removeAttribute('id');
+  }
+  setText(clock, clockText);
+  setAttribute(clock, 'aria-label', `Game time ${clockText}`);
+  removeObjectiveTitles(root);
+  if (root.dataset.mobileScoreboardReadability !== 'v24') {
+    root.dataset.mobileScoreboardReadability = 'v24';
+  }
+  appliedKeys.set(root, key);
 }
 
 window.addEventListener('esports-live:mobile-scoreboard-rendered', event => {
@@ -157,12 +211,13 @@ window.addEventListener('esports-live:mobile-scoreboard-rendered', event => {
 });
 
 function cleanExistingBoards(): void {
-  document.querySelectorAll<HTMLElement>('[data-mobile-scoreboard-renderer="shared-v1"]').forEach(root => {
-    root.querySelectorAll<HTMLElement>(
-      '.mobile-scoreboard-objective-title, .mobile-live-parity-objective-title'
-    ).forEach(element => element.remove());
-    root.dataset.mobileScoreboardReadability = 'v24';
+  document.querySelectorAll<HTMLElement>(BOARD_SELECTOR).forEach(root => {
+    removeObjectiveTitles(root);
+    if (root.dataset.mobileScoreboardReadability !== 'v24') {
+      root.dataset.mobileScoreboardReadability = 'v24';
+    }
   });
+  document.documentElement.dataset.mobileScoreboardReadability = 'game-clock-objectives-v24';
 }
 
 queueMicrotask(cleanExistingBoards);

@@ -97,7 +97,7 @@ style.textContent = `
     font-variant-numeric:tabular-nums!important
   }
   body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-objective-values strong{
-    font-size:.92rem!important;
+    font-size:1rem!important;
     font-weight:950!important;
     line-height:1!important
   }

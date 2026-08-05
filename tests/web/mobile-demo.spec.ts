@@ -153,7 +153,7 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.11');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.12');
   await expect(nav).toBeVisible();
   await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
@@ -179,6 +179,19 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   await expect(header.locator(':scope > *')).toHaveCount(2);
   await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('20:45');
   await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Live');
+
+  const headerTypography = await header.evaluate(element => {
+    const clock = element.querySelector<HTMLElement>('.mobile-scoreboard-game-clock');
+    const label = element.querySelector<HTMLElement>('.mobile-scoreboard-game-label');
+    if (!clock || !label) throw new Error('Mobile scoreboard header typography is incomplete.');
+    return {
+      clockSize: Number.parseFloat(getComputedStyle(clock).fontSize),
+      labelSize: Number.parseFloat(getComputedStyle(label).fontSize)
+    };
+  });
+  expect(headerTypography.clockSize).toBeGreaterThanOrEqual(20);
+  expect(headerTypography.clockSize).toBeCloseTo(headerTypography.labelSize, 1);
+
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
   await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('8');

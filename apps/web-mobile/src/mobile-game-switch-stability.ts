@@ -94,7 +94,7 @@ function boardMarkup(
   const state = snapshot?.stats ? 'verified' : 'pending';
   const notice = snapshot?.stats
     ? ''
-    : '<div class="mobile-live-board-notice" role="status">Loading the selected game. Older game responses will not replace this board.</div>';
+    : '<div class="mobile-live-board-notice" role="status">Waiting for Riot to publish telemetry for the selected game.</div>';
 
   return `<article
     class="completed-final-game mobile-final-recovery mobile-live-history-board"
@@ -164,9 +164,17 @@ window.addEventListener('esports-live:selection', event => {
 
 window.addEventListener('esports-live:snapshot', event => {
   const snapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
-  if (snapshot?.game?.id) snapshots.set(snapshot.game.id, snapshot);
+  if (!snapshot?.game?.id) return;
+  snapshots.set(snapshot.game.id, snapshot);
+
+  const intended = intendedGameId();
+  if (liveModeActive() && intended && snapshot.game.id !== intended) {
+    event.stopImmediatePropagation();
+    renderSelectedBoard();
+    return;
+  }
   queueRender();
-});
+}, { capture: true });
 
 if (gameSelector) {
   new MutationObserver(queueRender).observe(gameSelector, {

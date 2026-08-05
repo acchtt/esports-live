@@ -10,6 +10,7 @@ const gameContent = document.querySelector<HTMLElement>('#game-content');
 const snapshots = new Map<string, LiveSnapshot<LolStats>>();
 let selection: ScheduleEvent | null = null;
 let renderQueued = false;
+let frameQueued = false;
 let rendering = false;
 
 function liveModeActive(): boolean {
@@ -29,11 +30,11 @@ function activeGameId(): string | null {
 }
 
 function intendedGameId(): string | null {
-  const pinned = document.documentElement.dataset.mobilePinnedGameId ?? null;
-  if (pinned && buttonFor(pinned)) return pinned;
-
   const active = activeGameId();
   if (active) return active;
+
+  const pinned = document.documentElement.dataset.mobilePinnedGameId ?? null;
+  if (pinned && buttonFor(pinned)) return pinned;
 
   const games = selection?.series.games ?? [];
   return games.find(game => game.state === 'live')?.id
@@ -124,6 +125,8 @@ function renderSelectedBoard(): void {
 
   const gameId = intendedGameId();
   if (!gameId) return;
+  document.documentElement.dataset.mobileGameSwitchIntended = gameId;
+
   const game = selectedGame(gameId);
   const cached = snapshots.get(gameId) ?? null;
   const snapshot = cached && (!selection || cached.series.id === selection.series.id) ? cached : null;
@@ -134,7 +137,10 @@ function renderSelectedBoard(): void {
   if (
     current?.dataset.mobileGameSwitchKey === key
     && current.dataset.mobileUnifiedGameId === gameId
-  ) return;
+  ) {
+    document.documentElement.dataset.mobileGameSwitchRendered = gameId;
+    return;
+  }
 
   const host = document.createElement('div');
   host.innerHTML = boardMarkup(gameId, game, snapshot);
@@ -146,15 +152,24 @@ function renderSelectedBoard(): void {
     applyMobileScoreboard(board, snapshot, { mode: 'live' });
     board.dataset.mobileGameSwitchKey = key;
     gameContent.replaceChildren(board);
+    document.documentElement.dataset.mobileGameSwitchRendered = gameId;
   } finally {
     rendering = false;
   }
 }
 
 function queueRender(): void {
-  if (renderQueued) return;
-  renderQueued = true;
-  queueMicrotask(renderSelectedBoard);
+  if (!renderQueued) {
+    renderQueued = true;
+    queueMicrotask(renderSelectedBoard);
+  }
+  if (!frameQueued) {
+    frameQueued = true;
+    requestAnimationFrame(() => {
+      frameQueued = false;
+      renderSelectedBoard();
+    });
+  }
 }
 
 window.addEventListener('esports-live:selection', event => {
@@ -170,7 +185,9 @@ window.addEventListener('esports-live:snapshot', event => {
   const intended = intendedGameId();
   if (liveModeActive() && intended && snapshot.game.id !== intended) {
     event.stopImmediatePropagation();
+    document.documentElement.dataset.mobileGameSwitchBlocked = snapshot.game.id;
     renderSelectedBoard();
+    queueRender();
     return;
   }
   queueRender();

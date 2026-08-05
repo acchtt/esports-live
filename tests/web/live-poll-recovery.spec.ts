@@ -173,6 +173,7 @@ async function installRaceFixtures(page: Page) {
 }
 
 test('keeps visible game cards and the rendered board on the same explicitly selected game', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const requests = await installRaceFixtures(page);
   await page.goto('/');
 
@@ -218,6 +219,7 @@ test('keeps visible game cards and the rendered board on the same explicitly sel
 });
 
 test('rapid switching keeps the last explicit game when another game snapshot arrives late', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const requests = await installRaceFixtures(page);
   await page.goto('/');
 
@@ -273,6 +275,7 @@ test('rapid switching keeps the last explicit game when another game snapshot ar
   });
   console.log('GAME_SWITCH_DIAGNOSTIC', JSON.stringify(state));
 
+  expect(state.view).toBe('live');
   expect(state.active).toBe('game-live-1');
   expect(state.pinned).toBe('game-live-1');
   expect(state.intended).toBe('game-live-1');

@@ -140,7 +140,7 @@ test('mobile match history stays on the list until selected and then uses the sh
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.8');
   await page.getByRole('button', { name: 'Open match history' }).click();
 
   const historyCard = page.locator('[data-completed-series-id="series-mobile-history"]');
@@ -162,11 +162,13 @@ test('mobile match history stays on the list until selected and then uses the sh
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'history');
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
+  await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('14');
+  await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-kills strong')).toHaveText('7');
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+4.7K');
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
-  await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
+  await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
   await expect(board.locator('.history-v2-summary')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);

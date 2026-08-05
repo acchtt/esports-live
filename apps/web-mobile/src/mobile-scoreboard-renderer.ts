@@ -90,17 +90,6 @@ function championMarkup(player: LolPlayerState | null, patch: string | null): st
   return `<div class="role-player-portrait"><div class="telemetry-champion">${image}<span class="telemetry-champion-fallback">${esc(initials)}</span></div></div>`;
 }
 
-function inventoryMarkup(player: LolPlayerState | null, patch: string | null): string {
-  const slots = Array.from({ length: 7 }, (_, index) => {
-    const id = player?.items?.[index] ?? null;
-    const image = id && patch
-      ? `<img src="${DDRAGON_CDN}/${encodeURIComponent(patch)}/img/item/${encodeURIComponent(id)}.png" alt="Item ${esc(id)}">`
-      : '';
-    return `<span class="telemetry-item-slot${id ? '' : ' empty'}">${image}</span>`;
-  }).join('');
-  return `<div class="role-player-items"><div class="telemetry-inventory"><span class="telemetry-inventory-label">BUILD</span>${slots}</div></div>`;
-}
-
 function playerMarkup(player: LolPlayerState | null, role: Role, side: Side, patch: string | null): string {
   const name = player?.handle ?? 'Player unavailable';
   const champion = player?.championId ?? 'Champion unavailable';
@@ -115,7 +104,6 @@ function playerMarkup(player: LolPlayerState | null, role: Role, side: Side, pat
       <span><small>CS</small><strong>${number(player?.creepScore ?? null)}</strong></span>
       <span><small>GOLD</small><strong>${number(player?.totalGold ?? null)}</strong></span>
     </div>
-    ${inventoryMarkup(player, patch)}
   </div>`;
 }
 
@@ -156,8 +144,16 @@ function fallbackName(root: HTMLElement, snapshot: LiveSnapshot<LolStats> | null
   const seriesTeam = snapshot?.series?.teams?.[side === 'blue' ? 0 : 1]?.name;
   if (seriesTeam) return seriesTeam;
   return root.querySelector<HTMLElement>(
-    `.mobile-live-parity-team.${side} strong, .history-v2-team.${side} strong, .mobile-completed-team-name.${side} strong, .completed-comparison-team.${side} strong`
+    `.mobile-live-parity-team.${side} .mobile-scoreboard-team-name, .history-v2-team.${side} strong, .mobile-completed-team-name.${side} strong, .completed-comparison-team.${side} strong`
   )?.textContent?.trim() || (side === 'blue' ? 'Blue team' : 'Red team');
+}
+
+function teamMarkup(name: string, kills: number | null, side: Side): string {
+  return `<div class="mobile-live-parity-team mobile-scoreboard-team ${side}">
+    <span>${side === 'blue' ? 'BLUE SIDE' : 'RED SIDE'}</span>
+    <strong class="mobile-scoreboard-team-name" title="${esc(name)}">${esc(name)}</strong>
+    <small class="mobile-scoreboard-team-kills" aria-label="${esc(name)} kills: ${number(kills)}"><b>KILLS</b><strong>${number(kills)}</strong></small>
+  </div>`;
 }
 
 function comparisonMarkup(root: HTMLElement, snapshot: LiveSnapshot<LolStats> | null): string {
@@ -177,9 +173,9 @@ function comparisonMarkup(root: HTMLElement, snapshot: LiveSnapshot<LolStats> | 
       : `${difference > 0 ? blueName : redName} leads by ${Math.abs(difference).toLocaleString()} gold`;
 
   return `<header class="mobile-live-parity-team-strip mobile-scoreboard-team-strip">
-    <div class="mobile-live-parity-team mobile-scoreboard-team blue"><span>BLUE SIDE</span><strong title="${esc(blueName)}">${esc(blueName)}</strong></div>
+    ${teamMarkup(blueName, stats?.blue.kills ?? null, 'blue')}
     <div class="mobile-live-parity-gold mobile-scoreboard-gold ${leadClass}" data-leading-side="${leadSide}" aria-label="${esc(leadLabel)}"><span>GOLD LEAD</span><strong>${lead}</strong></div>
-    <div class="mobile-live-parity-team mobile-scoreboard-team red"><span>RED SIDE</span><strong title="${esc(redName)}">${esc(redName)}</strong></div>
+    ${teamMarkup(redName, stats?.red.kills ?? null, 'red')}
   </header>
   <section class="mobile-live-parity-objectives mobile-scoreboard-objectives" aria-label="Objectives, blue versus red">
     <div class="mobile-live-parity-objective-title mobile-scoreboard-objective-title">OBJECTIVES · BLUE – RED</div>
@@ -204,13 +200,13 @@ function renderKey(root: HTMLElement, snapshot: LiveSnapshot<LolStats> | null, m
       gold: stats.blue.gold,
       kills: stats.blue.kills,
       objectives: stats.blue.objectives,
-      players: stats.blue.players.map(player => [player.id, player.handle, player.championId, player.role, player.kills, player.deaths, player.assists, player.creepScore, player.totalGold, player.items])
+      players: stats.blue.players.map(player => [player.id, player.handle, player.championId, player.role, player.kills, player.deaths, player.assists, player.creepScore, player.totalGold])
     } : null,
     red: stats ? {
       gold: stats.red.gold,
       kills: stats.red.kills,
       objectives: stats.red.objectives,
-      players: stats.red.players.map(player => [player.id, player.handle, player.championId, player.role, player.kills, player.deaths, player.assists, player.creepScore, player.totalGold, player.items])
+      players: stats.red.players.map(player => [player.id, player.handle, player.championId, player.role, player.kills, player.deaths, player.assists, player.creepScore, player.totalGold])
     } : null
   });
 }
@@ -255,8 +251,10 @@ export function applyMobileScoreboard(
   const matchups = matchupHost(root);
   const complete = root.dataset.mobileSharedRenderKey === key
     && comparison.querySelector('.mobile-live-parity-team-strip')
+    && comparison.querySelectorAll('.mobile-scoreboard-team-kills').length === 2
     && comparison.querySelectorAll('.mobile-live-parity-objective').length === 4
-    && matchups.querySelectorAll('.role-matchup-row').length === 5;
+    && matchups.querySelectorAll('.role-matchup-row').length === 5
+    && matchups.querySelectorAll('.role-player-items, .telemetry-item-slot').length === 0;
 
   root.classList.add('completed-final-game', 'mobile-final-recovery', 'mobile-live-history-board');
   root.dataset.mobileHistoryCopy = 'true';
@@ -279,6 +277,7 @@ export function applyMobileScoreboard(
   removeLegacyLayers(root, comparison, matchups);
   root.querySelector<HTMLElement>('.player-board-toolbar')?.setAttribute('data-mobile-live-toolbar', 'hidden');
   document.documentElement.dataset.mobileScoreboardRenderer = 'shared-v1';
+  document.documentElement.dataset.mobileScoreboardDetails = 'team-kills-no-items';
   window.dispatchEvent(new CustomEvent('esports-live:mobile-scoreboard-rendered', {
     detail: { root, snapshot, mode: options.mode }
   }));

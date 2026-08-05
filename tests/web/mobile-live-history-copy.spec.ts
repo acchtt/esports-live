@@ -146,8 +146,9 @@ test('live matches use the shared mobile scoreboard renderer', async ({ page }) 
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.8');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-details', 'team-kills-no-items');
 
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   await expect(board).toBeVisible();
@@ -156,11 +157,13 @@ test('live matches use the shared mobile scoreboard renderer', async ({ page }) 
   await expect(board).toHaveAttribute('data-live-board-state', 'verified');
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
+  await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('11');
+  await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-kills strong')).toHaveText('7');
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+2.5K');
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
-  await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
+  await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
   await expect(board.locator('.history-v2-summary')).toHaveCount(0);
@@ -203,9 +206,11 @@ test('pending live matches keep the same shared scoreboard shell', async ({ page
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-live-board-state', 'pending');
+  await expect(board.locator('.mobile-scoreboard-team-kills strong')).toHaveText(['—', '—']);
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('—');
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
+  await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
   await expect(board.locator('.mobile-live-board-notice')).toContainText('Waiting for Riot');
   await expect(page.getByRole('heading', { name: 'Waiting for verified gameplay' })).toHaveCount(0);
 

@@ -57,7 +57,7 @@ style.textContent = `
     display:none!important
   }
   body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-objectives{
-    padding:11px 9px 12px!important
+    padding:10px 9px 11px!important
   }
   body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-objective-grid{
     display:grid!important;

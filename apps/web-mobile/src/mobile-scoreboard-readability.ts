@@ -44,9 +44,9 @@ style.textContent = `
   body.mobile-demo-active [data-mobile-scoreboard-renderer="shared-v1"] .mobile-scoreboard-game-clock{
     display:block!important;
     flex:0 0 auto!important;
-    min-width:54px!important;
+    min-width:58px!important;
     color:#c7e4ff!important;
-    font-size:1rem!important;
+    font-size:17px!important;
     font-weight:950!important;
     font-variant-numeric:tabular-nums!important;
     letter-spacing:.025em!important;
@@ -140,6 +140,43 @@ function directHeader(root: HTMLElement): HTMLElement {
   return header;
 }
 
+function positiveInteger(value: string | undefined): number | undefined {
+  const parsed = value ? Number.parseInt(value, 10) : Number.NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function gameNumberFor(
+  root: HTMLElement,
+  header: HTMLElement,
+  snapshot: LiveSnapshot<LolStats> | null
+): number | undefined {
+  if (snapshot?.game.number !== undefined) return snapshot.game.number;
+
+  const datasetNumber = positiveInteger(
+    root.dataset.mobileUnifiedGameNumber
+      ?? root.dataset.finalGameNumber
+      ?? root.dataset.gameNumber
+  );
+  if (datasetNumber !== undefined) return datasetNumber;
+
+  const headerMatch = header.textContent?.match(/\bGame\s+(\d+)\b/i);
+  const headerNumber = positiveInteger(headerMatch?.[1]);
+  if (headerNumber !== undefined) return headerNumber;
+
+  const gameIds = [
+    snapshot?.game.id,
+    root.dataset.mobileUnifiedGameId,
+    root.dataset.liveHistoryGameId,
+    root.dataset.finalGameId
+  ];
+  for (const gameId of gameIds) {
+    const idMatch = gameId?.match(/(?:^|[-_])(\d+)$/);
+    const idNumber = positiveInteger(idMatch?.[1]);
+    if (idNumber !== undefined) return idNumber;
+  }
+  return undefined;
+}
+
 function setText(element: HTMLElement, value: string): void {
   if (element.textContent !== value) element.textContent = value;
 }
@@ -158,17 +195,18 @@ function applyReadability(detail: MobileScoreboardRenderedDetail): void {
   const { root, snapshot, mode } = detail;
   if (!(root instanceof HTMLElement) || root === document.documentElement) return;
 
+  const header = directHeader(root);
+  const gameNumber = gameNumberFor(root, header, snapshot);
   const clockText = formatClock(snapshot?.stats?.gameClockSeconds);
   const key = JSON.stringify({
     mode,
     gameId: snapshot?.game.id ?? root.dataset.finalGameId ?? '',
-    gameNumber: snapshot?.game.number ?? null,
+    gameNumber: gameNumber ?? null,
     gameState: snapshot?.game.state ?? '',
     boardState: root.dataset.liveBoardState ?? '',
     clockText
   });
   const hasObjectiveTitle = Boolean(root.querySelector(OBJECTIVE_TITLE_SELECTOR));
-  const header = directHeader(root);
   const hasStrictHeader = header.children.length === 2
     && header.firstElementChild?.classList.contains('mobile-scoreboard-game-clock')
     && header.lastElementChild?.classList.contains('mobile-scoreboard-game-label');
@@ -187,7 +225,6 @@ function applyReadability(detail: MobileScoreboardRenderedDetail): void {
   if (!heading) heading = document.createElement('strong');
   heading.className = 'mobile-scoreboard-game-label';
 
-  const gameNumber = snapshot?.game.number;
   setText(heading, gameNumber === undefined ? stateLabel(detail) : `Game ${gameNumber} · ${stateLabel(detail)}`);
   if (mode === 'live') {
     if (clock.id !== 'live-game-clock') clock.id = 'live-game-clock';

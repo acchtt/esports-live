@@ -247,7 +247,45 @@ test('rapid switching keeps the last explicit game when another game snapshot ar
   }, snapshot('game-live-2', 99, 2));
 
   await page.waitForTimeout(100);
-  await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
-  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
-  await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toHaveCount(0);
+  const state = await page.evaluate(() => {
+    const root = document.documentElement;
+    const content = document.querySelector<HTMLElement>('#game-content');
+    const selector = '[data-live-history-game-id], [data-mobile-unified-game-id], [data-live-dashboard-game-id], .v2-live-dashboard';
+    return {
+      active: document.querySelector<HTMLElement>('#game-selector [data-game-id].active')?.dataset.gameId ?? null,
+      pinned: root.dataset.mobilePinnedGameId ?? null,
+      intended: root.dataset.mobileGameSwitchIntended ?? null,
+      rendered: root.dataset.mobileGameSwitchRendered ?? null,
+      blocked: root.dataset.mobileGameSwitchBlocked ?? null,
+      view: document.body.dataset.mobileView ?? null,
+      context: document.body.dataset.mobileContext ?? null,
+      contentHidden: content?.hidden ?? null,
+      boards: [...(content?.querySelectorAll<HTMLElement>(selector) ?? [])].map(element => ({
+        tag: element.tagName,
+        classes: element.className,
+        liveHistory: element.dataset.liveHistoryGameId ?? null,
+        unified: element.dataset.mobileUnifiedGameId ?? null,
+        dashboard: element.dataset.liveDashboardGameId ?? null,
+        owner: element.dataset.mobileGameSwitchOwner ?? null
+      })),
+      html: content?.innerHTML.slice(0, 2_000) ?? null
+    };
+  });
+  console.log('GAME_SWITCH_DIAGNOSTIC', JSON.stringify(state));
+
+  expect(state.active).toBe('game-live-1');
+  expect(state.pinned).toBe('game-live-1');
+  expect(state.intended).toBe('game-live-1');
+  expect(state.rendered).toBe('game-live-1');
+  expect(state.blocked).toBe('game-live-2');
+  expect(state.boards.some(board => (
+    board.liveHistory === 'game-live-1'
+    || board.unified === 'game-live-1'
+    || board.dashboard === 'game-live-1'
+  ))).toBe(true);
+  expect(state.boards.some(board => (
+    board.liveHistory === 'game-live-2'
+    || board.unified === 'game-live-2'
+    || board.dashboard === 'game-live-2'
+  ))).toBe(false);
 });

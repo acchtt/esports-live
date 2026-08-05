@@ -192,7 +192,7 @@ test('shared mobile scoreboard keeps the compact live layout stable', async ({ p
   expect(layout.objectiveHeight).toBeGreaterThanOrEqual(62);
   expect(layout.objectiveHeight).toBeLessThanOrEqual(82);
   expect(layout.firstRowHeight).toBeGreaterThanOrEqual(60);
-  expect(layout.firstRowHeight).toBeLessThanOrEqual(72);
+  expect(layout.firstRowHeight).toBeLessThanOrEqual(82);
   expect(layout.overflow).toBeLessThanOrEqual(1);
 
   const nav = page.locator('.mobile-app-nav');

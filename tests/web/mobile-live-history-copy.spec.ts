@@ -146,15 +146,20 @@ test('live matches use the shared mobile scoreboard renderer', async ({ page }) 
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.10');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.11');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-details', 'team-kills-no-items');
 
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
+  const header = board.locator('.completed-final-game-header');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v25');
   await expect(board).toHaveAttribute('data-live-board-state', 'verified');
+  await expect(header.locator(':scope > *')).toHaveCount(2);
+  await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('22:52');
+  await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Live');
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
   await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('11');
@@ -202,10 +207,14 @@ test('pending live matches keep the same shared scoreboard shell', async ({ page
   await openLiveMatch(page, false);
 
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
+  const header = board.locator('.completed-final-game-header');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-live-board-state', 'pending');
+  await expect(header.locator(':scope > *')).toHaveCount(2);
+  await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('--:--');
+  await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Telemetry pending');
   await expect(board.locator('.mobile-scoreboard-team-kills strong')).toHaveText(['—', '—']);
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('—');
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);

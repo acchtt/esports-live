@@ -140,7 +140,7 @@ test('mobile match history stays on the list until selected and then uses the sh
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.12');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.13');
   await page.getByRole('button', { name: 'Open match history' }).click();
 
   const historyCard = page.locator('[data-completed-series-id="series-mobile-history"]');
@@ -178,6 +178,24 @@ test('mobile match history stays on the list until selected and then uses the sh
   await expect(board.locator('.history-v2-summary')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
+
+  const scoreboardSizing = await board.evaluate(element => {
+    const portrait = element.querySelector<HTMLElement>('.role-player-portrait');
+    const killLabel = element.querySelector<HTMLElement>('.mobile-scoreboard-team-kills b');
+    const killValue = element.querySelector<HTMLElement>('.mobile-scoreboard-team-kills strong');
+    if (!portrait || !killLabel || !killValue) throw new Error('History portrait or kill typography is missing.');
+    const portraitBounds = portrait.getBoundingClientRect();
+    return {
+      portraitWidth: portraitBounds.width,
+      portraitHeight: portraitBounds.height,
+      killLabelSize: Number.parseFloat(getComputedStyle(killLabel).fontSize),
+      killValueSize: Number.parseFloat(getComputedStyle(killValue).fontSize)
+    };
+  });
+  expect(scoreboardSizing.portraitWidth).toBeGreaterThanOrEqual(44);
+  expect(scoreboardSizing.portraitHeight).toBeGreaterThanOrEqual(44);
+  expect(scoreboardSizing.killLabelSize).toBeGreaterThanOrEqual(8);
+  expect(scoreboardSizing.killValueSize).toBeGreaterThanOrEqual(14);
 
   const historyChrome = await page.evaluate(() => {
     const panel = document.querySelector<HTMLElement>('.analysis-panel');

@@ -140,7 +140,7 @@ test('mobile match history stays on the list until selected and then uses the sh
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.11');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.12');
   await page.getByRole('button', { name: 'Open match history' }).click();
 
   const historyCard = page.locator('[data-completed-series-id="series-mobile-history"]');
@@ -197,5 +197,141 @@ test('mobile match history stays on the list until selected and then uses the sh
   expect(Math.abs(historyChrome.gap)).toBeLessThanOrEqual(2);
   expect(historyChrome.contextHeight).toBeLessThanOrEqual(50);
   expect(historyChrome.overflow).toBeLessThanOrEqual(1);
+  expect(pageErrors).toEqual([]);
+});
+
+test('match history retries transient contexts and includes the newest stale-state result', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  let newestContextRequests = 0;
+
+  const newestSeries = {
+    id: 'series-mobile-history-newest',
+    esport: 'lol',
+    competition: { id: 'competition-history', name: 'Mobile History League', stage: 'Latest' },
+    teams: [blue, red],
+    bestOf: 1,
+    state: 'scheduled',
+    scheduledStart: iso(-30 * 60 * 1_000),
+    games: [{ id: 'game-mobile-history-newest-1', number: 1, state: 'completed' }]
+  };
+  const olderSeries = Array.from({ length: 17 }, (_, index) => ({
+    id: `series-mobile-history-old-${index + 1}`,
+    esport: 'lol',
+    competition: { id: 'competition-history', name: 'Mobile History League', stage: `Older ${index + 1}` },
+    teams: [blue, red],
+    bestOf: 1,
+    state: 'completed',
+    scheduledStart: iso(-(index + 2) * 60 * 60 * 1_000),
+    games: [{ id: `game-mobile-history-old-${index + 1}-1`, number: 1, state: 'completed' }]
+  }));
+
+  await page.route('**/health', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+  await page.route('**/v1/lol/schedule**', route => {
+    const activeOnly = route.request().url().includes('states=live,paused,scheduled');
+    const events = activeOnly
+      ? []
+      : [
+        ...olderSeries.map(series => ({ series, provider, observedAt: iso() })),
+        { series: newestSeries, provider, observedAt: iso() }
+      ];
+    return json(route, { esport: 'lol', events });
+  });
+  await page.route('**/v1/lol/series/**/context**', async route => {
+    const url = new URL(route.request().url());
+    const match = url.pathname.match(/\/series\/([^/]+)\/context$/);
+    const seriesId = match?.[1] ? decodeURIComponent(match[1]) : '';
+    if (seriesId === newestSeries.id) {
+      newestContextRequests += 1;
+      if (newestContextRequests === 1) {
+        await route.fulfill({
+          status: 502,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'upstream_failure', message: 'Temporary context failure' })
+        });
+        return;
+      }
+      await json(route, {
+        schemaVersion: '1.0',
+        esport: 'lol',
+        seriesId,
+        provider,
+        observedAt: iso(),
+        rosters: [],
+        standings: [],
+        history: {
+          bestOf: 1,
+          winsRequired: 1,
+          drawPossible: false,
+          score: [{ team: blue, wins: 1 }, { team: red, wins: 0 }],
+          games: [{
+            ...newestSeries.games[0],
+            blueTeam: blue,
+            redTeam: red,
+            winner: blue,
+            durationSeconds: 1_902
+          }]
+        },
+        complete: true,
+        reasons: []
+      });
+      return;
+    }
+
+    await json(route, {
+      schemaVersion: '1.0',
+      esport: 'lol',
+      seriesId,
+      provider,
+      observedAt: iso(),
+      rosters: [],
+      standings: [],
+      history: {
+        bestOf: 1,
+        winsRequired: 1,
+        drawPossible: false,
+        score: [{ team: blue, wins: 0 }, { team: red, wins: 0 }],
+        games: [{
+          id: `game-${seriesId}-1`,
+          number: 1,
+          state: 'unstarted',
+          blueTeam: blue,
+          redTeam: red,
+          winner: null,
+          durationSeconds: null
+        }]
+      },
+      complete: true,
+      reasons: []
+    });
+  });
+  await page.route('**/v1/lol/games/**/live**', route => json(route, {
+    ...completedSnapshot(),
+    series: newestSeries,
+    game: newestSeries.games[0]
+  }));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#334155"/></svg>'
+  }));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-mobile-history-reliability',
+    'network-first-v26'
+  );
+  await page.getByRole('button', { name: 'Open match history' }).click();
+
+  const cards = page.locator('#completed-match-list [data-completed-series-id]');
+  await expect(cards.first()).toHaveAttribute('data-completed-series-id', newestSeries.id, { timeout: 15_000 });
+  await expect(page.locator(`[data-completed-series-id="${newestSeries.id}"]`)).toBeVisible();
+  expect(newestContextRequests).toBeGreaterThanOrEqual(2);
   expect(pageErrors).toEqual([]);
 });

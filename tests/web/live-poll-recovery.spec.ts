@@ -180,7 +180,7 @@ test('continues polling the newly selected live game after an older request fini
   await expect.poll(requests.gameTwoRequests).toBeGreaterThan(0);
   await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
 
-  await page.locator('[data-game-id="game-live-1"]').click();
+  await page.locator('[data-history-game-id="game-live-1"]').click();
   await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
   await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
 

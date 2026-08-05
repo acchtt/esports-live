@@ -153,7 +153,7 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.12');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.13');
   await expect(nav).toBeVisible();
   await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
@@ -205,6 +205,24 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   await expect(board.locator('.mobile-recovery-row')).toHaveCount(0);
   await expect(page.locator('.v2-matchup-row')).toHaveCount(0);
   await expect(page.locator('.role-scoreboard-board')).toHaveCount(0);
+
+  const scoreboardSizing = await board.evaluate(element => {
+    const portrait = element.querySelector<HTMLElement>('.role-player-portrait');
+    const killLabel = element.querySelector<HTMLElement>('.mobile-scoreboard-team-kills b');
+    const killValue = element.querySelector<HTMLElement>('.mobile-scoreboard-team-kills strong');
+    if (!portrait || !killLabel || !killValue) throw new Error('Mobile portrait or kill typography is missing.');
+    const portraitBounds = portrait.getBoundingClientRect();
+    return {
+      portraitWidth: portraitBounds.width,
+      portraitHeight: portraitBounds.height,
+      killLabelSize: Number.parseFloat(getComputedStyle(killLabel).fontSize),
+      killValueSize: Number.parseFloat(getComputedStyle(killValue).fontSize)
+    };
+  });
+  expect(scoreboardSizing.portraitWidth).toBeGreaterThanOrEqual(44);
+  expect(scoreboardSizing.portraitHeight).toBeGreaterThanOrEqual(44);
+  expect(scoreboardSizing.killLabelSize).toBeGreaterThanOrEqual(8);
+  expect(scoreboardSizing.killValueSize).toBeGreaterThanOrEqual(14);
 
   const deltaTypography = await board.locator('.role-gold-delta').first().evaluate(element => {
     const bounds = element.getBoundingClientRect();

@@ -115,6 +115,10 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
   });
 }
 
+async function refreshSchedule(page: Page): Promise<void> {
+  await page.locator('#refresh-button').evaluate((element: HTMLButtonElement) => element.click());
+}
+
 async function installRaceFixtures(page: Page) {
   let activeScheduleRequests = 0;
   let gameOneRequests = 0;
@@ -181,7 +185,7 @@ test('keeps visible game cards and the rendered board on the same explicitly sel
   await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
   await expect.poll(requests.gameOneRequests).toBeGreaterThanOrEqual(2);
 
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await refreshSchedule(page);
   await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(2);
   await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
 
@@ -195,7 +199,7 @@ test('keeps visible game cards and the rendered board on the same explicitly sel
   await expect(page.locator('[data-history-game-id="game-live-1"]')).toHaveClass(/selected/);
   await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await refreshSchedule(page);
   await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(3);
   await expect(page.locator('[data-game-id="game-live-1"]')).toHaveClass(/active/);
   await expect(page.locator('[data-game-id="game-live-3"]')).not.toHaveClass(/active/);
@@ -207,7 +211,7 @@ test('keeps visible game cards and the rendered board on the same explicitly sel
   await expect(page.locator('[data-history-game-id="game-live-2"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await refreshSchedule(page);
   await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(4);
   await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
   await expect(page.locator('[data-game-id="game-live-3"]')).not.toHaveClass(/active/);
@@ -231,7 +235,7 @@ test('rapid switching keeps the last explicit game when another game snapshot ar
   await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
   await expect.poll(requests.gameOneRequests).toBeGreaterThanOrEqual(2);
 
-  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await refreshSchedule(page);
   await expect.poll(requests.activeScheduleRequests).toBeGreaterThanOrEqual(2);
   await expect(page.locator('[data-game-id="game-live-2"]')).toHaveClass(/active/);
   requests.releaseStaleRequest();

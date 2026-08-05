@@ -141,25 +141,27 @@ test('shared mobile scoreboard keeps the compact live layout stable', async ({ p
   await page.goto('/');
   await page.locator('[data-series-id="series-mobile-layout"]').click();
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.8');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-details', 'team-kills-no-items');
   const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-layout-1"]');
   await expect(board).toBeVisible();
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
-  await expect(board).toHaveAttribute('data-mobile-scoreboard-layout', 'identity-items');
   await expect(board).toHaveAttribute('data-mobile-compact-layout', 'v19');
   await expect(board).toHaveAttribute('data-mobile-live-cleanup', 'v22');
 
   await expect(page.locator('.series-hero-topline')).toBeHidden();
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toHaveCount(1);
+  await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('5');
+  await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-kills strong')).toHaveText('3');
   await expect(board.locator('.mobile-live-parity-objectives')).toHaveCount(1);
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
   await expect(board.locator('.role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-name strong')).toHaveCount(10);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
-  await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
+  await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
 
@@ -184,13 +186,13 @@ test('shared mobile scoreboard keeps the compact live layout stable', async ({ p
   expect(layout.width).toBeLessThanOrEqual(380);
   expect(layout.radius).not.toBe('0px');
   expect(layout.teamStripHeight).toBeGreaterThanOrEqual(70);
-  expect(layout.teamStripHeight).toBeLessThanOrEqual(94);
+  expect(layout.teamStripHeight).toBeLessThanOrEqual(100);
   expect(layout.goldWidth).toBeGreaterThanOrEqual(74);
   expect(layout.goldWidth).toBeLessThanOrEqual(82);
   expect(layout.objectiveHeight).toBeGreaterThanOrEqual(62);
   expect(layout.objectiveHeight).toBeLessThanOrEqual(82);
-  expect(layout.firstRowHeight).toBeGreaterThanOrEqual(72);
-  expect(layout.firstRowHeight).toBeLessThanOrEqual(84);
+  expect(layout.firstRowHeight).toBeGreaterThanOrEqual(60);
+  expect(layout.firstRowHeight).toBeLessThanOrEqual(72);
   expect(layout.overflow).toBeLessThanOrEqual(1);
 
   const nav = page.locator('.mobile-app-nav');

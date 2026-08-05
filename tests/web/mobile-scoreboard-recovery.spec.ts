@@ -154,7 +154,7 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.8');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);
@@ -173,14 +173,16 @@ test('recovered history boards use the same shared renderer as live matches', as
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'history');
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
-  await expect(board.locator('.mobile-live-parity-team.blue strong')).toHaveText(blue.name);
-  await expect(board.locator('.mobile-live-parity-team.red strong')).toHaveText(red.name);
+  await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-name')).toHaveText(blue.name);
+  await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-name')).toHaveText(red.name);
+  await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('12');
+  await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-kills strong')).toHaveText('7');
   await expect(board.locator('.mobile-live-parity-gold')).toHaveAttribute('data-leading-side', 'blue');
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+4K');
   await expect(board.locator('.mobile-live-parity-objective')).toHaveCount(4);
   await expect(board.locator('.role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
-  await expect(board.locator('.telemetry-item-slot')).toHaveCount(70);
+  await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-team-names')).toHaveCount(0);
   await expect(board.locator(':scope > .mobile-completed-objectives')).toHaveCount(0);
   await expect(board.locator('.history-v2-summary')).toHaveCount(0);

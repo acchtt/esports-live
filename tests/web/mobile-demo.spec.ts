@@ -153,7 +153,7 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.7');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.8');
   await expect(nav).toBeVisible();
   await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
@@ -176,11 +176,14 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   await expect(board).toHaveClass(/mobile-final-recovery/);
   await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
+  await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('8');
+  await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-kills strong')).toHaveText('5');
   await expect(board.locator('.mobile-live-parity-objectives')).toBeVisible();
   await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+1.4K');
   await expect(board.locator('.completed-final-matchups')).toBeVisible();
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
+  await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
   await expect(board.locator('.mobile-recovery-row')).toHaveCount(0);
   await expect(page.locator('.v2-matchup-row')).toHaveCount(0);
   await expect(page.locator('.role-scoreboard-board')).toHaveCount(0);

@@ -37,8 +37,10 @@ function setPinnedGame(gameId: string | null): void {
 }
 
 function intendedGameId(): string | null {
+  const active = activeGameId();
+  if (active) return active;
   if (pinnedGameId && buttonFor(pinnedGameId)) return pinnedGameId;
-  return activeGameId();
+  return null;
 }
 
 function syncVisibleCards(): void {

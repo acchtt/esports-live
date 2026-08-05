@@ -182,7 +182,24 @@ function setText(element: HTMLElement, value: string): void {
 }
 
 function setAttribute(element: HTMLElement, name: string, value: string): void {
-  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+  if (element.getAttribute(name) !== value) element.setAttribute(name, name === 'aria-label' ? value : value);
+}
+
+function enforceHeaderTypography(
+  header: HTMLElement,
+  clock: HTMLElement,
+  heading: HTMLElement
+): void {
+  header.style.setProperty('min-height', '46px', 'important');
+  header.style.setProperty('padding', '8px 12px', 'important');
+  clock.style.setProperty('display', 'block', 'important');
+  clock.style.setProperty('min-width', '66px', 'important');
+  clock.style.setProperty('font-size', '20px', 'important');
+  clock.style.setProperty('font-weight', '950', 'important');
+  clock.style.setProperty('line-height', '1.1', 'important');
+  heading.style.setProperty('font-size', '20px', 'important');
+  heading.style.setProperty('font-weight', '900', 'important');
+  heading.style.setProperty('line-height', '1.1', 'important');
 }
 
 function removeObjectiveTitles(root: HTMLElement): boolean {
@@ -233,6 +250,7 @@ function applyReadability(detail: MobileScoreboardRenderedDetail): void {
   }
   setText(clock, clockText);
   setAttribute(clock, 'aria-label', `Game time ${clockText}`);
+  enforceHeaderTypography(header, clock, heading);
 
   if (
     header.children.length !== 2

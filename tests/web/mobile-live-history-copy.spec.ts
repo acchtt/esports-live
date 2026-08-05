@@ -148,7 +148,7 @@ test('live matches use the shared mobile scoreboard renderer', async ({ page }) 
 
   await expect(page.locator('#build-version')).toContainText('DEMO v0.17.13');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-details', 'large-portraits-large-kills-no-items');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-details', 'team-kills-no-items');
 
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   const header = board.locator('.completed-final-game-header');

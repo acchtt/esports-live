@@ -188,6 +188,18 @@ test('ended games remain final when stale live telemetry arrives and the header 
       </div>`;
     document.body.append(root);
 
+    window.dispatchEvent(new CustomEvent('esports-live:ended-snapshot', {
+      detail: {
+        root,
+        snapshot: {
+          game: { id: gameId, number: 1, state: 'completed' },
+          stats: null
+        }
+      }
+    }));
+
+    const label = root.querySelector<HTMLElement>('.mobile-scoreboard-game-label');
+    if (label) label.textContent = 'Game 1 · Live';
     window.dispatchEvent(new CustomEvent('esports-live:mobile-scoreboard-rendered', {
       detail: {
         root,

@@ -29,8 +29,8 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 const SNAPSHOT_TIMEOUT_MS = 25_000;
 const COMPLETED_SNAPSHOT_ATTEMPTS = 2;
 const CONTEXT_CACHE_MS = 5 * 60 * 1_000;
-const CONTEXT_CONCURRENCY = 4;
 const FUTURE_COMPLETION_TOLERANCE_MS = 5 * 60 * 1_000;
+const LAZY_HISTORY_GAME_PREFIX = 'series-history:';
 const contextCache = new Map<string, CachedContext>();
 
 async function requestJson<T>(
@@ -79,10 +79,29 @@ function snapshotPath(
   return `/v1/lol/games/${encodeURIComponent(gameId)}/live${suffix}`;
 }
 
-function normalizeImpossibleFutureCompletion(
+function activeGameState(event: ScheduleEvent): 'live' | 'paused' | null {
+  const active = event.series.games.find(game => (
+    game.state === 'live' || game.state === 'draft' || game.state === 'paused'
+  ));
+  if (!active) return null;
+  return active.state === 'paused' ? 'paused' : 'live';
+}
+
+function normalizeScheduleEvent(
   event: ScheduleEvent,
   now = Date.now()
 ): ScheduleEvent {
+  const activeState = activeGameState(event);
+  if (activeState && event.series.state !== activeState) {
+    return {
+      ...event,
+      series: {
+        ...event.series,
+        state: activeState
+      }
+    };
+  }
+
   if (event.series.state !== 'completed') return event;
   const scheduledStart = Date.parse(event.series.scheduledStart);
   if (!Number.isFinite(scheduledStart)) return event;
@@ -101,47 +120,32 @@ function normalizeImpossibleFutureCompletion(
   };
 }
 
-function historyGames(context: SeriesContext): readonly SeriesGameRef[] {
-  return context.history?.games.map(game => ({
-    id: game.id,
-    number: game.number,
-    state: game.state
-  })) ?? [];
+function lazyHistoryGameId(seriesId: string): string {
+  return `${LAZY_HISTORY_GAME_PREFIX}${encodeURIComponent(seriesId)}`;
 }
 
-async function hydrateCompletedEvents(
-  events: readonly ScheduleEvent[],
-  signal?: AbortSignal
-): Promise<readonly ScheduleEvent[]> {
-  const hydrated = [...events];
-  let cursor = 0;
-  const workers = Array.from(
-    { length: Math.min(CONTEXT_CONCURRENCY, events.length) },
-    async () => {
-      while (cursor < events.length) {
-        const index = cursor;
-        cursor += 1;
-        const event = events[index]!;
-        if (event.series.games.length || event.series.state !== 'completed') continue;
-        try {
-          const context = await loadSeriesContext(event.series.id, signal);
-          const games = historyGames(context);
-          if (!games.length) continue;
-          hydrated[index] = {
-            ...event,
-            series: {
-              ...event.series,
-              games
-            }
-          };
-        } catch (error) {
-          if (signal?.aborted) throw error;
-        }
-      }
+function lazyHistorySeriesId(gameId: string): string | null {
+  if (!gameId.startsWith(LAZY_HISTORY_GAME_PREFIX)) return null;
+  try {
+    return decodeURIComponent(gameId.slice(LAZY_HISTORY_GAME_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+function ensureSelectableCompletedEvent(event: ScheduleEvent): ScheduleEvent {
+  if (event.series.state !== 'completed' || event.series.games.length) return event;
+  return {
+    ...event,
+    series: {
+      ...event.series,
+      games: [{
+        id: lazyHistoryGameId(event.series.id),
+        number: 1,
+        state: 'completed'
+      }]
     }
-  );
-  await Promise.all(workers);
-  return hydrated;
+  };
 }
 
 function aliasCompletedSnapshot(
@@ -225,6 +229,29 @@ async function loadCompletedSnapshot(
   );
 }
 
+async function loadLazyHistorySnapshot(
+  seriesId: string,
+  signal?: AbortSignal
+): Promise<LiveSnapshot<LolStats>> {
+  const context = await loadSeriesContext(seriesId, signal);
+  const canonicalGame = [...(context.history?.games ?? [])]
+    .reverse()
+    .find(game => game.state === 'completed')
+    ?? context.history?.games.at(-1)
+    ?? null;
+  if (!canonicalGame) {
+    throw new Error('Completed game history is not available for this match yet.');
+  }
+
+  const snapshot = await requestJson<LiveSnapshot<LolStats>>(
+    snapshotPath(canonicalGame.id, null, String(Date.now())),
+    signal,
+    SNAPSHOT_TIMEOUT_MS
+  );
+  if (snapshot.stats) return snapshot;
+  return loadCompletedSnapshot(snapshot, canonicalGame.id, signal);
+}
+
 export function loadHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return requestJson<HealthResponse>('/health', signal);
 }
@@ -250,14 +277,16 @@ export async function loadSchedule(
   view: DataView,
   signal?: AbortSignal
 ): Promise<readonly ScheduleEvent[]> {
-  const states = view === 'matches' ? 'live,paused,scheduled' : 'completed';
+  const states = view === 'matches'
+    ? 'live,paused,scheduled,unknown'
+    : 'completed';
   const payload = await requestJson<ScheduleResponse>(
     `/v1/lol/schedule?states=${states}`,
     signal
   );
-  const events = payload.events.map(event => normalizeImpossibleFutureCompletion(event));
+  const events = payload.events.map(event => normalizeScheduleEvent(event));
   return view === 'history'
-    ? hydrateCompletedEvents(events, signal)
+    ? events.map(event => ensureSelectableCompletedEvent(event))
     : events;
 }
 
@@ -266,6 +295,9 @@ export async function loadSnapshot(
   after: string | null,
   signal?: AbortSignal
 ): Promise<LiveSnapshot<LolStats>> {
+  const lazySeriesId = lazyHistorySeriesId(gameId);
+  if (lazySeriesId) return loadLazyHistorySnapshot(lazySeriesId, signal);
+
   const snapshot = await requestJson<LiveSnapshot<LolStats>>(
     snapshotPath(gameId, after, after ? null : String(Date.now())),
     signal,

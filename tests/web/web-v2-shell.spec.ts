@@ -194,7 +194,7 @@ test('web v2 index includes live, upcoming and ended matches and opens the full 
 
   const scoreboard = page.locator('#scoreboard');
   await scoreboard.evaluate(element => { element.dataset.identity = 'persistent'; });
-  await page.getByRole('button', { name: /Matches/ }).last().click();
+  await page.getByRole('button', { name: 'Matches', exact: true }).last().click();
   await expect(page.locator('#catalogue-panel')).toBeVisible();
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await page.locator('[data-series-id="series-v2-live"]').click();
@@ -206,7 +206,7 @@ test('web v2 index includes live, upcoming and ended matches and opens the full 
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
   await expect(scoreboard).toHaveAttribute('data-identity', 'persistent');
 
-  await page.getByRole('button', { name: /Platform/ }).click();
+  await page.getByRole('button', { name: 'Platform', exact: true }).click();
   await expect(page.locator('#platform-panel')).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -226,7 +226,7 @@ test('web v2 mobile match detail follows the reference board without horizontal 
   await expect(page.locator('.team-banner')).toBeVisible();
   await expect(page.locator('.objective-grid article')).toHaveCount(4);
   await expect(page.locator('.player-row')).toHaveCount(5);
-  await expect(navigation.getByRole('button', { name: /Match/ })).toHaveClass(/active/);
+  await expect(navigation.getByRole('button', { name: 'Match', exact: true })).toHaveClass(/active/);
 
   const viewport = await page.evaluate(() => ({
     width: window.innerWidth,
@@ -234,6 +234,6 @@ test('web v2 mobile match detail follows the reference board without horizontal 
   }));
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
 
-  await navigation.getByRole('button', { name: /Matches/ }).click();
+  await navigation.getByRole('button', { name: 'Matches', exact: true }).click();
   await expect(page.locator('#catalogue-panel')).toBeVisible();
 });

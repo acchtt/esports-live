@@ -7,6 +7,8 @@ const delta = { id: 'delta', name: 'Delta Club', code: 'DLC' };
 const echo = { id: 'echo', name: 'Echo Squad', code: 'ECH' };
 const future = { id: 'future', name: 'Future Gaming', code: 'FTR' };
 const nova = { id: 'nova', name: 'Nova Prime', code: 'NVP' };
+const lplBlue = { id: 'lpl-blue', name: 'LPL Blue', code: 'LPB' };
+const lplRed = { id: 'lpl-red', name: 'LPL Red', code: 'LPR' };
 
 const blueHandles = ['Doran', 'Oner', 'Faker', 'Peyz', 'Keria'];
 const redHandles = ['Siwoo', 'Lucid', 'ShowMaker', 'Smash', 'Career'];
@@ -43,6 +45,27 @@ const upcomingSeries = {
   games: [
     { id: 'game-v2-upcoming-1', number: 1, state: 'unstarted' },
     { id: 'game-v2-upcoming-2', number: 2, state: 'unstarted' }
+  ]
+};
+
+const scheduledLplSeries = {
+  id: 'series-v2-lpl-future',
+  esport: 'lol',
+  competition: { id: 'competition-lpl', name: 'LPL', stage: 'Regular Season' },
+  teams: [lplBlue, lplRed],
+  bestOf: 3,
+  state: 'scheduled',
+  scheduledStart: iso(4 * 60 * 60 * 1_000),
+  games: [
+    { id: 'game-v2-lpl-future-1', number: 1, state: 'unstarted' }
+  ]
+};
+
+const misclassifiedLplSeries = {
+  ...scheduledLplSeries,
+  state: 'completed',
+  games: [
+    { id: 'game-v2-lpl-future-1', number: 1, state: 'completed' }
   ]
 };
 
@@ -220,10 +243,14 @@ async function installFixtures(page: Page): Promise<void> {
     return json(route, {
       esport: 'lol',
       events: history
-        ? [{ series: historySeries, provider, observedAt: iso() }]
+        ? [
+            { series: historySeries, provider, observedAt: iso() },
+            { series: misclassifiedLplSeries, provider, observedAt: iso() }
+          ]
         : [
             { series: activeSeries, provider, observedAt: iso() },
-            { series: upcomingSeries, provider, observedAt: iso() }
+            { series: upcomingSeries, provider, observedAt: iso() },
+            { series: scheduledLplSeries, provider, observedAt: iso() }
           ]
     });
   });
@@ -234,7 +261,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('web v2 hydrates ended game tabs and opens the full stats board', async ({ page }) => {
+test('web v2 corrects future completed flags and hydrates real ended game tabs', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -244,14 +271,24 @@ test('web v2 hydrates ended game tabs and opens the full stats board', async ({ 
   await expect(page.getByRole('link', { name: 'Current site' })).toHaveAttribute('href', '../');
   await expect(page.locator('[data-series-id="series-v2-live"]')).toBeVisible();
   await expect(page.locator('[data-series-id="series-v2-upcoming"]')).toBeVisible();
+  await expect(page.locator('[data-series-id="series-v2-lpl-future"]')).toBeVisible();
   await expect(page.locator('[data-series-id="series-v2-history"]')).toBeVisible();
-  await expect(page.locator('#catalogue-meta')).toContainText('3 matches');
+  await expect(page.locator('#catalogue-meta')).toContainText('4 matches');
 
   await page.getByRole('button', { name: 'Ended', exact: true }).click();
   await expect(page.locator('[data-series-id="series-v2-history"]')).toBeVisible();
+  await expect(page.locator('[data-series-id="series-v2-lpl-future"]')).toBeHidden();
   await expect(page.locator('[data-series-id="series-v2-live"]')).toBeHidden();
   await expect(page.locator('[data-series-id="series-v2-upcoming"]')).toBeHidden();
 
+  await page.getByRole('button', { name: 'Upcoming', exact: true }).click();
+  const lplCard = page.locator('[data-series-id="series-v2-lpl-future"]');
+  await expect(lplCard).toBeVisible();
+  await expect(lplCard).toContainText('UPCOMING');
+  await expect(lplCard).toHaveAttribute('data-source-view', 'matches');
+  await expect(page.locator('[data-series-id="series-v2-history"]')).toBeHidden();
+
+  await page.getByRole('button', { name: 'Ended', exact: true }).click();
   await page.locator('[data-series-id="series-v2-history"]').click();
   await expect(page.locator('#match-panel')).toBeVisible();
   await expect(page.locator('#detail-title')).toHaveText('Delta Club vs Echo Squad');

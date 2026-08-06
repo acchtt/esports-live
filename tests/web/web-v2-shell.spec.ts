@@ -55,9 +55,58 @@ const historySeries = {
   state: 'completed',
   scheduledStart: iso(-2 * 60 * 60 * 1_000),
   games: [
+    { id: 'slot-v2-history-1', number: 1, state: 'completed' },
+    { id: 'slot-v2-history-2', number: 2, state: 'completed' }
+  ]
+};
+
+const canonicalHistorySeries = {
+  ...historySeries,
+  games: [
     { id: 'game-v2-history-1', number: 1, state: 'completed' },
     { id: 'game-v2-history-2', number: 2, state: 'completed' }
   ]
+};
+
+const historyContext = {
+  schemaVersion: '1.0',
+  esport: 'lol',
+  seriesId: historySeries.id,
+  provider,
+  observedAt: iso(),
+  rosters: [],
+  standings: [],
+  history: {
+    bestOf: 3,
+    winsRequired: 2,
+    drawPossible: false,
+    score: [
+      { team: delta, wins: 2 },
+      { team: echo, wins: 0 }
+    ],
+    games: [
+      {
+        id: 'game-v2-history-1',
+        number: 1,
+        state: 'completed',
+        blueTeam: delta,
+        redTeam: echo,
+        winner: delta,
+        durationSeconds: 2_101
+      },
+      {
+        id: 'game-v2-history-2',
+        number: 2,
+        state: 'completed',
+        blueTeam: delta,
+        redTeam: echo,
+        winner: delta,
+        durationSeconds: 2_217
+      }
+    ]
+  },
+  complete: true,
+  reasons: []
 };
 
 function players(side: 'blue' | 'red', live: boolean) {
@@ -99,9 +148,32 @@ function team(teamRef: typeof alpha, side: 'blue' | 'red', live: boolean) {
   };
 }
 
+function blankHistorySnapshot(gameId: string) {
+  const game = historySeries.games.find(item => item.id === gameId) ?? historySeries.games[0]!;
+  return {
+    schemaVersion: '1.0',
+    esport: 'lol',
+    provider,
+    series: historySeries,
+    game,
+    stats: null,
+    quality: {
+      freshness: 'unavailable',
+      sourceTimestamp: null,
+      observedAt: iso(),
+      ageSeconds: null,
+      complete: false,
+      advancing: false,
+      safeForLiveAnalysis: false,
+      reasons: [{ code: 'final-frame-missing', message: 'Schedule slot has no final frame.' }]
+    }
+  };
+}
+
 function snapshot(gameId: string) {
+  if (gameId.startsWith('slot-v2-history')) return blankHistorySnapshot(gameId);
   const historical = gameId !== 'game-v2-2';
-  const series = gameId.startsWith('game-v2-history') ? historySeries : activeSeries;
+  const series = gameId.startsWith('game-v2-history') ? canonicalHistorySeries : activeSeries;
   const game = series.games.find(item => item.id === gameId) ?? series.games[0]!;
   const left = series.teams[0]!;
   const right = series.teams[1]!;
@@ -157,6 +229,7 @@ async function installFixtures(page: Page): Promise<void> {
           ]
     });
   });
+  await page.route('**/v1/lol/series/**/context**', route => json(route, historyContext));
   await page.route('**/v1/lol/games/**/live**', route => {
     const match = route.request().url().match(/games\/([^/]+)\/live/);
     return json(route, snapshot(decodeURIComponent(match?.[1] ?? 'game-v2-2')));
@@ -191,6 +264,7 @@ test('web v2 index includes live, upcoming and ended matches and opens the full 
   await expect(page.locator('.blue-player .player-copy').first()).toContainText('DLC Doran');
   await expect(page.locator('.red-player .player-copy').first()).toContainText('ECH Siwoo');
   await expect(page.locator('.lane-gold').first()).toHaveText('+906');
+  await expect(page.locator('#quality-text')).toContainText('complete');
 
   const scoreboard = page.locator('#scoreboard');
   await scoreboard.evaluate(element => { element.dataset.identity = 'persistent'; });

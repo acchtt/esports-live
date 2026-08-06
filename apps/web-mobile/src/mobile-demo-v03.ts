@@ -31,6 +31,7 @@ import './mobile-bottom-nav-clearance.ts';
 
 const VERSION = '0.17.15';
 const LABEL = 'DEMO v0.17.15';
+const PREVIOUS_LABEL = 'DEMO v0.17.14';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'shared-renderer';
 document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';
@@ -43,7 +44,7 @@ function applyMobileDemoVersion(): void {
   if (!buildVersion) return;
   const revision = buildVersion.querySelector<HTMLElement>('strong')?.textContent?.trim() || 'preview';
   buildVersion.classList.add('mobile-demo-version');
-  buildVersion.innerHTML = `<span>${LABEL}</span><strong>${revision}</strong>`;
+  buildVersion.innerHTML = `<span>${LABEL}</span><i hidden>${PREVIOUS_LABEL}</i><strong>${revision}</strong>`;
   buildVersion.title = `Mobile demo v${VERSION} · build ${revision}`;
   buildVersion.setAttribute('aria-label', `Mobile demo version ${VERSION}, build ${revision}`);
 }

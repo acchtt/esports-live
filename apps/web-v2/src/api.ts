@@ -31,7 +31,12 @@ const COMPLETED_SNAPSHOT_ATTEMPTS = 2;
 const CONTEXT_CACHE_MS = 5 * 60 * 1_000;
 const FUTURE_COMPLETION_TOLERANCE_MS = 5 * 60 * 1_000;
 const LAZY_HISTORY_GAME_PREFIX = 'series-history:';
+const RECOVERED_SNAPSHOT_EVENT = 'esports-live:v2-recovered-snapshot';
+const RECENT_LPL_RECOVERY_WINDOW_MS = 12 * 60 * 60 * 1_000;
+const RECENT_LPL_RECOVERY_LIMIT = 1;
+const RECENT_LPL_GAME_PROBE_LIMIT = 2;
 const contextCache = new Map<string, CachedContext>();
+const lplRecoveryInFlight = new Set<string>();
 
 async function requestJson<T>(
   path: string,
@@ -118,6 +123,143 @@ function normalizeScheduleEvent(
       }))
     }
   };
+}
+
+function isLplEvent(event: ScheduleEvent): boolean {
+  const id = event.series.competition.id.trim().toLowerCase();
+  const name = event.series.competition.name.trim().toLowerCase();
+  return id === '98767991314006698'
+    || name === 'lpl'
+    || name.includes('league of legends pro league');
+}
+
+function suspiciousCompletedLplEvent(
+  event: ScheduleEvent,
+  now = Date.now()
+): boolean {
+  if (event.series.state !== 'completed' || !isLplEvent(event)) return false;
+  const start = Date.parse(event.series.scheduledStart);
+  if (!Number.isFinite(start)) return false;
+  const elapsed = now - start;
+  if (elapsed < 0 || elapsed > RECENT_LPL_RECOVERY_WINDOW_MS) return false;
+
+  const winsRequired = Math.floor(Math.max(1, event.series.bestOf) / 2) + 1;
+  const completedGames = event.series.games.filter(game => game.state === 'completed').length;
+  return event.series.games.length < winsRequired
+    || completedGames < winsRequired
+    || event.series.games.some(game => game.state !== 'completed');
+}
+
+function recoveredGameState(
+  snapshot: LiveSnapshot<LolStats>
+): 'live' | 'draft' | 'paused' | null {
+  if (snapshot.game.state === 'live'
+    || snapshot.game.state === 'draft'
+    || snapshot.game.state === 'paused') {
+    return snapshot.game.state;
+  }
+  if (snapshot.game.state !== 'completed' && snapshot.stats) return 'live';
+  return null;
+}
+
+function recoveredLiveSnapshot(
+  event: ScheduleEvent,
+  context: SeriesContext,
+  snapshot: LiveSnapshot<LolStats>,
+  gameState: 'live' | 'draft' | 'paused'
+): LiveSnapshot<LolStats> {
+  const historyGames: readonly SeriesGameRef[] = (context.history?.games ?? []).map(game => ({
+    id: game.id,
+    number: game.number,
+    state: game.state
+  }));
+  const sourceGames = historyGames.length ? historyGames : event.series.games;
+  const updatedGames = sourceGames.some(game => game.id === snapshot.game.id)
+    ? sourceGames.map(game => game.id === snapshot.game.id
+        ? { ...game, state: gameState }
+        : game)
+    : [
+        ...sourceGames,
+        {
+          id: snapshot.game.id,
+          number: snapshot.game.number,
+          state: gameState
+        }
+      ];
+  const seriesState = gameState === 'paused' ? 'paused' : 'live';
+
+  return {
+    ...snapshot,
+    series: {
+      ...snapshot.series,
+      ...event.series,
+      state: seriesState,
+      games: updatedGames
+    },
+    game: {
+      ...snapshot.game,
+      state: gameState
+    }
+  };
+}
+
+async function recoverCompletedLplEvent(
+  event: ScheduleEvent,
+  signal?: AbortSignal
+): Promise<void> {
+  if (lplRecoveryInFlight.has(event.series.id) || signal?.aborted) return;
+  lplRecoveryInFlight.add(event.series.id);
+
+  try {
+    const context = await loadSeriesContext(event.series.id, signal);
+    const candidates = [...(context.history?.games ?? [])]
+      .filter(game => game.state !== 'completed')
+      .sort((left, right) => left.number - right.number)
+      .slice(0, RECENT_LPL_GAME_PROBE_LIMIT);
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      if (signal?.aborted) return;
+      const candidate = candidates[index]!;
+      try {
+        const snapshot = await requestJson<LiveSnapshot<LolStats>>(
+          snapshotPath(candidate.id, null, `lpl-probe-${Date.now()}-${index}`),
+          signal,
+          SNAPSHOT_TIMEOUT_MS
+        );
+        const gameState = recoveredGameState(snapshot);
+        if (!gameState) continue;
+        window.dispatchEvent(new CustomEvent<LiveSnapshot<LolStats>>(
+          RECOVERED_SNAPSHOT_EVENT,
+          { detail: recoveredLiveSnapshot(event, context, snapshot, gameState) }
+        ));
+        return;
+      } catch (error) {
+        if (signal?.aborted) return;
+      }
+    }
+  } catch (error) {
+    if (signal?.aborted) return;
+  } finally {
+    lplRecoveryInFlight.delete(event.series.id);
+  }
+}
+
+function scheduleRecentLplRecovery(
+  events: readonly ScheduleEvent[],
+  signal?: AbortSignal
+): void {
+  const candidates = events
+    .filter(event => suspiciousCompletedLplEvent(event))
+    .sort((left, right) => (
+      Date.parse(right.series.scheduledStart) - Date.parse(left.series.scheduledStart)
+    ))
+    .slice(0, RECENT_LPL_RECOVERY_LIMIT);
+  if (!candidates.length) return;
+
+  window.setTimeout(() => {
+    if (signal?.aborted) return;
+    candidates.forEach(event => void recoverCompletedLplEvent(event, signal));
+  }, 0);
 }
 
 function lazyHistoryGameId(seriesId: string): string {
@@ -285,9 +427,11 @@ export async function loadSchedule(
     signal
   );
   const events = payload.events.map(event => normalizeScheduleEvent(event));
-  return view === 'history'
+  const normalized = view === 'history'
     ? events.map(event => ensureSelectableCompletedEvent(event))
     : events;
+  if (view === 'history') scheduleRecentLplRecovery(normalized, signal);
+  return normalized;
 }
 
 export async function loadSnapshot(

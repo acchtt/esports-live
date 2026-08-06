@@ -1,39 +1,81 @@
 const DATA_DRAGON_LOADING_ART = /\/loading\/([^/?#]+)_0\.jpg(?:[?#].*)?$/i;
-const COMMUNITY_DRAGON_ROOT = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/characters';
+const DATA_DRAGON_ROOT = 'https://ddragon.leagueoflegends.com';
+const DATA_DRAGON_VERSION_FALLBACK = '16.15.1';
+const VERSION_TIMEOUT_MS = 3_000;
 
-function squarePortraitUrl(source: string): string | null {
+let versionRequest: Promise<string> | null = null;
+
+function championKey(source: string): string | null {
   const match = source.match(DATA_DRAGON_LOADING_ART);
   if (!match?.[1]) return null;
 
-  let championKey = match[1];
   try {
-    championKey = decodeURIComponent(championKey);
+    const value = decodeURIComponent(match[1]).replace(/[^a-z0-9]/gi, '');
+    return value || null;
   } catch {
     return null;
   }
-
-  const slug = championKey.replace(/[^a-z0-9]/gi, '').toLowerCase();
-  if (!slug) return null;
-  return `${COMMUNITY_DRAGON_ROOT}/${encodeURIComponent(slug)}/hud/${encodeURIComponent(slug)}_square.png`;
 }
 
-function normalizePortrait(image: HTMLImageElement): void {
+async function latestDataDragonVersion(): Promise<string> {
+  if (versionRequest) return versionRequest;
+  versionRequest = (async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), VERSION_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${DATA_DRAGON_ROOT}/api/versions.json`, {
+        cache: 'force-cache',
+        signal: controller.signal
+      });
+      if (!response.ok) return DATA_DRAGON_VERSION_FALLBACK;
+      const versions = await response.json() as unknown;
+      const latest = Array.isArray(versions) ? versions[0] : null;
+      return typeof latest === 'string' && /^\d+\.\d+\.\d+$/.test(latest)
+        ? latest
+        : DATA_DRAGON_VERSION_FALLBACK;
+    } catch {
+      return DATA_DRAGON_VERSION_FALLBACK;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  })();
+  return versionRequest;
+}
+
+function squarePortraitUrl(version: string, key: string): string {
+  return `${DATA_DRAGON_ROOT}/cdn/${encodeURIComponent(version)}/img/champion/${encodeURIComponent(key)}.png`;
+}
+
+async function normalizePortrait(image: HTMLImageElement): Promise<void> {
   if (image.dataset.championPortraitNormalized === 'true') return;
-  const squareSource = squarePortraitUrl(image.getAttribute('src') ?? image.src);
-  if (!squareSource) return;
+  const key = championKey(image.getAttribute('src') ?? image.src);
+  if (!key) return;
 
   image.dataset.championPortraitNormalized = 'true';
-  image.dataset.championPortraitSource = 'square';
+  image.dataset.championPortraitSource = 'loading';
   image.decoding = 'async';
-  image.src = squareSource;
-  image.addEventListener('error', () => {
-    image.dataset.championPortraitSource = 'fallback';
-    image.remove();
-  }, { once: true });
+
+  const version = await latestDataDragonVersion();
+  if (!image.isConnected) return;
+  const source = squarePortraitUrl(version, key);
+  const probe = new Image();
+  probe.decoding = 'async';
+  probe.onload = () => {
+    if (!image.isConnected) return;
+    image.dataset.championPortraitSource = 'square';
+    image.src = source;
+  };
+  probe.onerror = () => {
+    if (!image.isConnected) return;
+    image.dataset.championPortraitSource = 'loading-fallback';
+  };
+  probe.src = source;
 }
 
 function scan(root: ParentNode): void {
-  root.querySelectorAll<HTMLImageElement>('.champion-portrait img').forEach(normalizePortrait);
+  root.querySelectorAll<HTMLImageElement>('.champion-portrait img').forEach(image => {
+    void normalizePortrait(image);
+  });
 }
 
 export function installChampionPortraitAssets(root: HTMLElement): () => void {
@@ -42,7 +84,7 @@ export function installChampionPortraitAssets(root: HTMLElement): () => void {
     records.forEach(record => {
       record.addedNodes.forEach(node => {
         if (!(node instanceof Element)) return;
-        if (node.matches('.champion-portrait img')) normalizePortrait(node as HTMLImageElement);
+        if (node.matches('.champion-portrait img')) void normalizePortrait(node as HTMLImageElement);
         scan(node);
       });
     });

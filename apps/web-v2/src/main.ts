@@ -1,4 +1,5 @@
 import './styles.css';
+import './compact-scoreboard.css';
 import { startWebV2 } from './app.ts';
 
 const root = document.querySelector<HTMLElement>('#app');

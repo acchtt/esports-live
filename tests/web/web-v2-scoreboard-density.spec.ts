@@ -5,6 +5,7 @@ const blueTeam = { id: 'blue-team', name: "Anyone's Legend", code: 'AL' };
 const redTeam = { id: 'red-team', name: "Xi'an Team WE", code: 'WE' };
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'];
 const champions = ['Ornn', 'Vi', 'Syndra', 'Jinx', 'Rakan'];
+const squareIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#152238"/></svg>';
 
 function players(side: 'blue' | 'red') {
   return roles.map((role, index) => ({
@@ -96,10 +97,16 @@ async function json(route: Route, value: unknown): Promise<void> {
 }
 
 async function installFixtures(page: Page): Promise<void> {
-  await page.route('https://raw.communitydragon.org/**', route => route.fulfill({
+  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['16.15.1']));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/img/champion/loading/**', route => route.fulfill({
     status: 200,
     contentType: 'image/svg+xml',
-    body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#152238"/></svg>'
+    body: squareIcon
+  }));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**/img/champion/*.png', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: squareIcon
   }));
   await page.route('**/health', route => json(route, {
     ok: true,
@@ -129,12 +136,24 @@ test('V2 mobile statboard matches the compact legacy density and clears the nav'
   const portraits = page.locator('.champion-portrait img');
   await expect(portraits).toHaveCount(10);
   await expect(portraits.first()).toHaveAttribute('data-champion-portrait-source', 'square');
-  const portraitSources = await portraits.evaluateAll(images => (
-    images.map(image => (image as HTMLImageElement).src)
-  ));
-  expect(portraitSources.every(source => source.includes('/hud/') && source.endsWith('_square.png'))).toBe(true);
-  expect(portraitSources.some(source => source.includes('/loading/'))).toBe(false);
-  expect(portraitSources[0]).toContain('/characters/ornn/hud/ornn_square.png');
+  const portraitState = await portraits.evaluateAll(images => images.map(image => {
+    const portrait = image as HTMLImageElement;
+    return {
+      source: portrait.src,
+      complete: portrait.complete,
+      naturalWidth: portrait.naturalWidth,
+      naturalHeight: portrait.naturalHeight
+    };
+  }));
+  expect(portraitState.every(portrait => (
+    portrait.source.includes('/cdn/16.15.1/img/champion/')
+    && portrait.source.endsWith('.png')
+    && !portrait.source.includes('/loading/')
+    && portrait.complete
+    && portrait.naturalWidth > 0
+    && portrait.naturalHeight > 0
+  ))).toBe(true);
+  expect(portraitState[0]?.source).toContain('/Ornn.png');
 
   const teamBanner = await page.locator('.team-banner').boundingBox();
   const objectiveCard = await page.locator('.objective-grid article').first().boundingBox();

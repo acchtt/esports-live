@@ -23,6 +23,26 @@ const series = {
   ]
 };
 
+const scheduleSeries = [
+  series,
+  ...Array.from({ length: 5 }, (_, index) => {
+    const number = index + 2;
+    const blueTeam = { ...blue, id: `blue-${number}`, name: `Blue Mobile ${number}`, code: `B${number}` };
+    const redTeam = { ...red, id: `red-${number}`, name: `Red Mobile ${number}`, code: `R${number}` };
+    return {
+      ...series,
+      id: `series-mobile-${number}`,
+      competition: { ...series.competition, id: `competition-mobile-${number}` },
+      teams: [blueTeam, redTeam],
+      scheduledStart: iso((-45 + number) * 60 * 1_000),
+      games: series.games.map(game => ({
+        ...game,
+        id: `game-mobile-${number}-${game.number}`
+      }))
+    };
+  })
+];
+
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
 const champions = ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'] as const;
 
@@ -105,7 +125,7 @@ async function installFixtures(page: Page): Promise<void> {
 
   await page.route('**/v1/lol/schedule**', route => json(route, {
     esport: 'lol',
-    events: [{ series, provider, observedAt: iso() }]
+    events: scheduleSeries.map(value => ({ series: value, provider, observedAt: iso() }))
   }));
 
   await page.route('**/v1/lol/series/**/context**', route => json(route, {
@@ -158,12 +178,33 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   const analysis = page.locator('.analysis-panel');
   const platform = page.locator('#platform-panel');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.14');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.15');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-bottom-nav-clearance', 'v29');
   await expect(nav).toBeVisible();
   await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   await expect(schedule).toBeVisible();
   await expect(analysis).toBeHidden();
+
+  const finalScheduleCard = page.locator('[data-series-id="series-mobile-6"]');
+  await expect(finalScheduleCard).toHaveCount(1);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() => {
+    const scrolling = document.scrollingElement;
+    if (!scrolling) return 0;
+    return scrolling.scrollHeight - scrolling.scrollTop - window.innerHeight;
+  })).toBeLessThanOrEqual(1);
+  const bottomNavClearance = await page.evaluate(() => {
+    const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
+    const cardElement = document.querySelector<HTMLElement>('[data-series-id="series-mobile-6"]');
+    if (!navElement || !cardElement) throw new Error('Mobile navigation or final schedule card is missing.');
+    return {
+      navTop: navElement.getBoundingClientRect().top,
+      cardBottom: cardElement.getBoundingClientRect().bottom
+    };
+  });
+  expect(bottomNavClearance.cardBottom).toBeLessThanOrEqual(bottomNavClearance.navTop - 8);
+  await page.evaluate(() => window.scrollTo(0, 0));
 
   await page.locator('[data-series-id="series-mobile"]').click();
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');

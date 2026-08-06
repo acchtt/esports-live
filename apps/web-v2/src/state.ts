@@ -51,6 +51,7 @@ export type AppAction =
   | { type: 'snapshot-failed'; gameId: string; message: string };
 
 const EMPTY_SELECTION: SelectionState = { seriesId: null, gameId: null };
+const LAZY_HISTORY_GAME_PREFIX = 'series-history:';
 
 const GAME_STATE_RANK: Record<GameState, number> = {
   unknown: 0,
@@ -87,6 +88,10 @@ export const initialState: AppState = {
   snapshotStatus: {},
   snapshotError: {}
 };
+
+function isLazyHistoryGameId(gameId: string | null | undefined): boolean {
+  return Boolean(gameId?.startsWith(LAZY_HISTORY_GAME_PREFIX));
+}
 
 function snapshotTime(snapshot: LiveSnapshot<LolStats>): number {
   const value = snapshot.quality.sourceTimestamp ?? snapshot.quality.observedAt;
@@ -155,10 +160,37 @@ function selectionForEvents(
   };
 }
 
+function mergeScheduleEvents(
+  previous: readonly ScheduleEvent[],
+  incoming: readonly ScheduleEvent[]
+): readonly ScheduleEvent[] {
+  return incoming.map(event => {
+    const existing = previous.find(item => item.series.id === event.series.id);
+    if (!existing) return event;
+    const incomingOnlyHasLazyGame = event.series.games.length > 0
+      && event.series.games.every(game => isLazyHistoryGameId(game.id));
+    const existingHasCanonicalGames = existing.series.games.some(game => (
+      !isLazyHistoryGameId(game.id)
+    ));
+    if (!incomingOnlyHasLazyGame || !existingHasCanonicalGames) return event;
+    return {
+      ...event,
+      series: {
+        ...event.series,
+        games: existing.series.games
+      }
+    };
+  });
+}
+
 function catalogueStateRank(event: ScheduleEvent): number {
   if (event.series.state === 'live' || event.series.state === 'paused') return 0;
   if (event.series.state === 'completed') return 2;
   return 1;
+}
+
+function isActiveEvent(event: ScheduleEvent): boolean {
+  return event.series.state === 'live' || event.series.state === 'paused';
 }
 
 function shouldReplaceCatalogueEntry(
@@ -166,12 +198,15 @@ function shouldReplaceCatalogueEntry(
   event: ScheduleEvent,
   view: DataView
 ): boolean {
-  const currentRank = catalogueStateRank(current.event);
-  const nextRank = catalogueStateRank(event);
-  if (nextRank !== currentRank) return nextRank > currentRank;
-  if (event.series.state === 'completed') {
-    return view === 'history' && current.view !== 'history';
-  }
+  const currentActive = isActiveEvent(current.event);
+  const nextActive = isActiveEvent(event);
+  if (currentActive !== nextActive) return nextActive;
+
+  const currentCompleted = current.event.series.state === 'completed';
+  const nextCompleted = event.series.state === 'completed';
+  if (currentCompleted !== nextCompleted) return nextCompleted;
+
+  if (nextCompleted) return view === 'history' && current.view !== 'history';
   return view === 'matches' && current.view !== 'matches';
 }
 
@@ -225,6 +260,35 @@ export function selectedGame(state: AppState): SeriesGameRef | null {
   return event?.series.games.find(game => game.id === selection.gameId) ?? null;
 }
 
+function eventsWithSnapshotSeries(
+  events: readonly ScheduleEvent[],
+  snapshot: LiveSnapshot<LolStats>
+): readonly ScheduleEvent[] {
+  return events.map(event => event.series.id !== snapshot.series.id
+    ? event
+    : {
+        ...event,
+        series: {
+          ...event.series,
+          state: snapshot.series.state,
+          games: snapshot.series.games
+        }
+      });
+}
+
+function selectionWithSnapshotGame(
+  selection: SelectionState,
+  snapshot: LiveSnapshot<LolStats>
+): SelectionState {
+  if (selection.seriesId !== snapshot.series.id) return selection;
+  const selectedGameStillExists = snapshot.series.games.some(game => game.id === selection.gameId);
+  if (selectedGameStillExists && !isLazyHistoryGameId(selection.gameId)) return selection;
+  return {
+    ...selection,
+    gameId: snapshot.game.id
+  };
+}
+
 export function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'set-view':
@@ -244,14 +308,15 @@ export function reducer(state: AppState, action: AppAction): AppState {
         scheduleError: { ...state.scheduleError, [action.view]: null }
       };
     case 'schedule-loaded': {
+      const nextEvents = mergeScheduleEvents(state.events[action.view], action.events);
       const nextSelection = selectionForEvents(
-        action.events,
+        nextEvents,
         state.selections[action.view],
         action.view
       );
       return {
         ...state,
-        events: { ...state.events, [action.view]: action.events },
+        events: { ...state.events, [action.view]: nextEvents },
         scheduleStatus: { ...state.scheduleStatus, [action.view]: 'ready' },
         scheduleError: { ...state.scheduleError, [action.view]: null },
         selections: { ...state.selections, [action.view]: nextSelection }
@@ -304,8 +369,18 @@ export function reducer(state: AppState, action: AppAction): AppState {
     case 'snapshot-received': {
       const gameId = action.snapshot.game.id;
       const snapshot = mergeSnapshot(state.snapshots[gameId], action.snapshot);
+      const nextEvents = {
+        matches: eventsWithSnapshotSeries(state.events.matches, snapshot),
+        history: eventsWithSnapshotSeries(state.events.history, snapshot)
+      };
+      const nextSelections = {
+        matches: selectionWithSnapshotGame(state.selections.matches, snapshot),
+        history: selectionWithSnapshotGame(state.selections.history, snapshot)
+      };
       return {
         ...state,
+        events: nextEvents,
+        selections: nextSelections,
         snapshots: { ...state.snapshots, [gameId]: snapshot },
         snapshotStatus: { ...state.snapshotStatus, [gameId]: 'ready' },
         snapshotError: { ...state.snapshotError, [gameId]: null }

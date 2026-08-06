@@ -54,10 +54,7 @@ const historySeries = {
   bestOf: 3,
   state: 'completed',
   scheduledStart: iso(-2 * 60 * 60 * 1_000),
-  games: [
-    { id: 'slot-v2-history-1', number: 1, state: 'completed' },
-    { id: 'slot-v2-history-2', number: 2, state: 'completed' }
-  ]
+  games: []
 };
 
 const canonicalHistorySeries = {
@@ -149,12 +146,13 @@ function team(teamRef: typeof alpha, side: 'blue' | 'red', live: boolean) {
 }
 
 function blankHistorySnapshot(gameId: string) {
-  const game = historySeries.games.find(item => item.id === gameId) ?? historySeries.games[0]!;
+  const game = canonicalHistorySeries.games.find(item => item.id === gameId)
+    ?? canonicalHistorySeries.games[0]!;
   return {
     schemaVersion: '1.0',
     esport: 'lol',
     provider,
-    series: historySeries,
+    series: canonicalHistorySeries,
     game,
     stats: null,
     quality: {
@@ -236,7 +234,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('web v2 index includes live, upcoming and ended matches and opens the full stats board', async ({ page }) => {
+test('web v2 hydrates ended game tabs and opens the full stats board', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -257,6 +255,7 @@ test('web v2 index includes live, upcoming and ended matches and opens the full 
   await page.locator('[data-series-id="series-v2-history"]').click();
   await expect(page.locator('#match-panel')).toBeVisible();
   await expect(page.locator('#detail-title')).toHaveText('Delta Club vs Echo Squad');
+  await expect(page.locator('#game-tabs [data-game-id]')).toHaveCount(2);
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Final');
   await expect(page.locator('#game-clock')).toHaveText('36:57');
   await expect(page.locator('.objective-grid article')).toHaveCount(4);

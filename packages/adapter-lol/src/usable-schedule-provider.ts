@@ -1,5 +1,18 @@
 import type { LolProviderClient, LolProviderScheduleEntry, LolProviderSeries } from './provider.ts';
 
+export interface UsableScheduleProviderOptions {
+  now?: () => Date;
+  scheduledLiveProbeDelayMs?: number;
+  scheduledLiveProbeWindowMs?: number;
+  scheduledLiveProbeLimit?: number;
+}
+
+const DEFAULT_SCHEDULED_LIVE_PROBE_DELAY_MS = 2 * 60 * 1_000;
+const DEFAULT_SCHEDULED_LIVE_PROBE_WINDOW_MS = 6 * 60 * 60 * 1_000;
+const DEFAULT_SCHEDULED_LIVE_PROBE_LIMIT = 6;
+
+type ProviderGame = LolProviderSeries['games'][number];
+
 function hasPlaceholderTeam(series: LolProviderSeries): boolean {
   return series.teams.some((team, index) => team.name === `Team ${index + 1}`);
 }
@@ -8,76 +21,198 @@ function hasUsableTeams(series: LolProviderSeries): boolean {
   return !hasPlaceholderTeam(series);
 }
 
+function hasActiveGame(games: readonly ProviderGame[]): boolean {
+  return games.some(game => (
+    game.state === 'live'
+    || game.state === 'draft'
+    || game.state === 'paused'
+  ));
+}
+
 function isUsableLiveSeries(series: LolProviderSeries): boolean {
   return hasUsableTeams(series) && series.games.length > 0;
 }
 
+function scheduledProbeTime(
+  series: LolProviderSeries,
+  nowMs: number,
+  delayMs: number,
+  windowMs: number
+): number | null {
+  if (series.state !== 'scheduled' || !hasUsableTeams(series)) return null;
+  const scheduledStart = Date.parse(series.scheduledStart);
+  if (!Number.isFinite(scheduledStart)) return null;
+  const elapsed = nowMs - scheduledStart;
+  return elapsed >= delayMs && elapsed <= windowMs ? scheduledStart : null;
+}
+
 async function reconcileLiveGameState(
   provider: LolProviderClient,
-  games: readonly LolProviderSeries['games'][number][]
-): Promise<readonly LolProviderSeries['games'][number][]> {
-  if (games.some(game => game.state === 'live' || game.state === 'draft')) return games;
+  games: readonly ProviderGame[]
+): Promise<readonly ProviderGame[]> {
+  if (hasActiveGame(games)) return games;
 
+  let reconciled = games;
   const candidates = games.filter(game => game.state === 'unstarted' || game.state === 'unknown');
   for (const candidate of candidates) {
     try {
       const snapshot = await provider.getSnapshot(candidate.id);
-      if (snapshot.stats && snapshot.game.state === 'live') {
-        return games.map(game => game.id === candidate.id ? { ...game, state: 'live' } : game);
+      if (snapshot.game.state === 'completed') {
+        reconciled = reconciled.map(game => (
+          game.id === candidate.id ? { ...game, state: 'completed' } : game
+        ));
+        continue;
       }
-      if (snapshot.game.state === 'draft') {
-        return games.map(game => game.id === candidate.id ? { ...game, state: 'draft' } : game);
+      if (
+        snapshot.game.state === 'live'
+        || snapshot.game.state === 'draft'
+        || snapshot.game.state === 'paused'
+        || snapshot.stats
+      ) {
+        const state = snapshot.game.state === 'draft'
+          ? 'draft'
+          : snapshot.game.state === 'paused'
+            ? 'paused'
+            : 'live';
+        return reconciled.map(game => game.id === candidate.id ? { ...game, state } : game);
       }
     } catch {
       // A live-stat miss is expected while Riot is between games; try the next slot.
     }
   }
-  return games;
+  return reconciled;
 }
 
-async function resolveSparseEntry(
+async function resolveFromSeriesHistory(
+  provider: LolProviderClient,
+  series: LolProviderSeries
+): Promise<LolProviderSeries | null> {
+  if (!provider.getSeriesContext) return null;
+
+  const context = await provider.getSeriesContext(series.id);
+  const history = context.history;
+  if (!history || history.score.length < 2 || !history.games.length) return null;
+
+  const historyGames = history.games
+    .map(game => ({ id: game.id, number: game.number, state: game.state }))
+    .sort((left, right) => left.number - right.number);
+  const games = await reconcileLiveGameState(provider, historyGames);
+  return {
+    ...series,
+    teams: [history.score[0]!.team, history.score[1]!.team],
+    bestOf: history.bestOf,
+    games
+  };
+}
+
+async function resolveLiveEntry(
   provider: LolProviderClient,
   entry: LolProviderScheduleEntry
 ): Promise<LolProviderScheduleEntry | null> {
   const { series } = entry;
-  if (series.state !== 'live' && series.state !== 'paused') return entry;
-  if (isUsableLiveSeries(series)) return entry;
+  const pendingEntry = hasUsableTeams(series) ? entry : null;
+
+  if (isUsableLiveSeries(series)) {
+    const games = await reconcileLiveGameState(provider, series.games);
+    return games === series.games ? entry : { ...entry, series: { ...series, games } };
+  }
 
   // Riot can mark a match live before publishing its game IDs. Keep a live
   // listing with real teams visible while the feed catches up, rather than
   // deleting the match from the schedule entirely.
-  const pendingEntry = hasUsableTeams(series) ? entry : null;
-  if (!provider.getSeriesContext) return pendingEntry;
-
   try {
-    const context = await provider.getSeriesContext(series.id);
-    const history = context.history;
-    if (!history || history.score.length < 2 || !history.games.length) return pendingEntry;
-
-    const historyGames = history.games
-      .map(game => ({ id: game.id, number: game.number, state: game.state }))
-      .sort((left, right) => left.number - right.number);
-    const games = await reconcileLiveGameState(provider, historyGames);
-    const resolvedSeries: LolProviderSeries = {
-      ...series,
-      teams: [history.score[0]!.team, history.score[1]!.team],
-      bestOf: history.bestOf,
-      games
-    };
-    return isUsableLiveSeries(resolvedSeries) ? { ...entry, series: resolvedSeries } : pendingEntry;
+    const resolvedSeries = await resolveFromSeriesHistory(provider, series);
+    return resolvedSeries && isUsableLiveSeries(resolvedSeries)
+      ? { ...entry, series: resolvedSeries }
+      : pendingEntry;
   } catch {
     return pendingEntry;
   }
 }
 
-export function createUsableScheduleProvider(provider: LolProviderClient): LolProviderClient {
+function promoteScheduledEntry(
+  entry: LolProviderScheduleEntry,
+  series: LolProviderSeries
+): LolProviderScheduleEntry {
+  const state = series.games.some(game => game.state === 'paused') ? 'paused' : 'live';
+  return { ...entry, series: { ...series, state } };
+}
+
+async function resolveScheduledEntry(
+  provider: LolProviderClient,
+  entry: LolProviderScheduleEntry,
+  probeScheduled: boolean
+): Promise<LolProviderScheduleEntry> {
+  const { series } = entry;
+  if (hasActiveGame(series.games)) return promoteScheduledEntry(entry, series);
+  if (!probeScheduled) return entry;
+
+  if (series.games.length) {
+    const games = await reconcileLiveGameState(provider, series.games);
+    const resolvedSeries = { ...series, games };
+    if (hasActiveGame(games)) return promoteScheduledEntry(entry, resolvedSeries);
+  }
+
+  try {
+    const resolvedSeries = await resolveFromSeriesHistory(provider, series);
+    return resolvedSeries && hasActiveGame(resolvedSeries.games)
+      ? promoteScheduledEntry(entry, resolvedSeries)
+      : entry;
+  } catch {
+    return entry;
+  }
+}
+
+async function resolveEntry(
+  provider: LolProviderClient,
+  entry: LolProviderScheduleEntry,
+  probeScheduled: boolean
+): Promise<LolProviderScheduleEntry | null> {
+  if (entry.series.state === 'live' || entry.series.state === 'paused') {
+    return resolveLiveEntry(provider, entry);
+  }
+  if (entry.series.state === 'scheduled') {
+    return resolveScheduledEntry(provider, entry, probeScheduled);
+  }
+  return entry;
+}
+
+export function createUsableScheduleProvider(
+  provider: LolProviderClient,
+  options: UsableScheduleProviderOptions = {}
+): LolProviderClient {
+  const now = options.now ?? (() => new Date());
+  const scheduledLiveProbeDelayMs = options.scheduledLiveProbeDelayMs
+    ?? DEFAULT_SCHEDULED_LIVE_PROBE_DELAY_MS;
+  const scheduledLiveProbeWindowMs = options.scheduledLiveProbeWindowMs
+    ?? DEFAULT_SCHEDULED_LIVE_PROBE_WINDOW_MS;
+  const scheduledLiveProbeLimit = options.scheduledLiveProbeLimit
+    ?? DEFAULT_SCHEDULED_LIVE_PROBE_LIMIT;
+
   return {
     id: provider.id,
     name: provider.name,
     ...(provider.sourceUrl ? { sourceUrl: provider.sourceUrl } : {}),
     async getSchedule(): Promise<readonly LolProviderScheduleEntry[]> {
       const entries = await provider.getSchedule();
-      const resolved = await Promise.all(entries.map(entry => resolveSparseEntry(provider, entry)));
+      const nowMs = now().getTime();
+      const scheduledProbeIds = new Set(entries
+        .map(entry => ({
+          id: entry.series.id,
+          start: scheduledProbeTime(
+            entry.series,
+            nowMs,
+            scheduledLiveProbeDelayMs,
+            scheduledLiveProbeWindowMs
+          )
+        }))
+        .filter((candidate): candidate is { id: string; start: number } => candidate.start !== null)
+        .sort((left, right) => right.start - left.start)
+        .slice(0, Math.max(0, scheduledLiveProbeLimit))
+        .map(candidate => candidate.id));
+      const resolved = await Promise.all(entries.map(entry => (
+        resolveEntry(provider, entry, scheduledProbeIds.has(entry.series.id))
+      )));
       return resolved.filter((entry): entry is LolProviderScheduleEntry => entry !== null);
     },
     getSnapshot: (gameId, after) => provider.getSnapshot(gameId, after),

@@ -154,7 +154,7 @@ test('mobile demo starts when ResizeObserver is unavailable', async ({ page }) =
   await installFixtures(page);
   await page.goto('/');
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.13');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.14');
   await expect(page.locator('.mobile-app-nav')).toBeVisible();
   await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
   expect(pageErrors).toEqual([]);

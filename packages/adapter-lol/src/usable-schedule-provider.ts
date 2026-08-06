@@ -33,6 +33,23 @@ function isUsableLiveSeries(series: LolProviderSeries): boolean {
   return hasUsableTeams(series) && series.games.length > 0;
 }
 
+function verifiedSeriesState(games: readonly ProviderGame[]): LolProviderSeries['state'] {
+  if (games.some(game => game.state === 'paused')) return 'paused';
+  if (games.some(game => game.state === 'live' || game.state === 'draft')) return 'live';
+  if (games.length > 0 && games.every(game => game.state === 'completed')) return 'completed';
+  return 'scheduled';
+}
+
+function applyVerifiedSeriesState(
+  series: LolProviderSeries,
+  games: readonly ProviderGame[]
+): LolProviderSeries {
+  const state = verifiedSeriesState(games);
+  return games === series.games && state === series.state
+    ? series
+    : { ...series, games, state };
+}
+
 function scheduledProbeTime(
   series: LolProviderSeries,
   nowMs: number,
@@ -110,20 +127,21 @@ async function resolveLiveEntry(
   entry: LolProviderScheduleEntry
 ): Promise<LolProviderScheduleEntry | null> {
   const { series } = entry;
-  const pendingEntry = hasUsableTeams(series) ? entry : null;
+  const pendingEntry = hasUsableTeams(series)
+    ? { ...entry, series: applyVerifiedSeriesState(series, series.games) }
+    : null;
 
   if (isUsableLiveSeries(series)) {
     const games = await reconcileLiveGameState(provider, series.games);
-    return games === series.games ? entry : { ...entry, series: { ...series, games } };
+    return { ...entry, series: applyVerifiedSeriesState(series, games) };
   }
 
-  // Riot can mark a match live before publishing its game IDs. Keep a live
-  // listing with real teams visible while the feed catches up, rather than
-  // deleting the match from the schedule entirely.
+  // Keep a listing with real teams visible while Riot publishes game IDs, but
+  // do not label it live until an active game or gameplay frame is verified.
   try {
     const resolvedSeries = await resolveFromSeriesHistory(provider, series);
     return resolvedSeries && isUsableLiveSeries(resolvedSeries)
-      ? { ...entry, series: resolvedSeries }
+      ? { ...entry, series: applyVerifiedSeriesState(resolvedSeries, resolvedSeries.games) }
       : pendingEntry;
   } catch {
     return pendingEntry;

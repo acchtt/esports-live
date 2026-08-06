@@ -144,7 +144,7 @@ test('suppresses a live placeholder that cannot be resolved', async () => {
   assert.deepEqual(await provider.getSchedule(), []);
 });
 
-test('retains a live event with real teams while Riot game IDs are pending', async () => {
+test('keeps a real-team event scheduled while Riot game IDs are pending', async () => {
   const entry = sparseEntry();
   entry.series.teams = [
     { id: 'team-a', name: 'Anyone’s Legend', code: 'AL' },
@@ -155,7 +155,7 @@ test('retains a live event with real teams while Riot game IDs are pending', asy
   const schedule = await provider.getSchedule();
 
   assert.equal(schedule.length, 1);
-  assert.equal(schedule[0]?.series.state, 'live');
+  assert.equal(schedule[0]?.series.state, 'scheduled');
   assert.equal(schedule[0]?.series.teams[0].name, 'Anyone’s Legend');
   assert.deepEqual(schedule[0]?.series.games, []);
 });
@@ -172,6 +172,35 @@ test('retains scheduled entries before Riot publishes game IDs', async () => {
   const schedule = await createUsableScheduleProvider(base).getSchedule();
   assert.equal(schedule.length, 1);
   assert.equal(contextCalls, 0);
+});
+
+test('demotes stale LPL live metadata when no game has active telemetry', async () => {
+  const base = delayedLiveProvider();
+  const snapshotCalls: string[] = [];
+  base.getSnapshot = async gameId => {
+    snapshotCalls.push(gameId);
+    return {
+      series: sparseEntry().series,
+      game: {
+        id: gameId,
+        number: gameId === 'game-3' ? 3 : 2,
+        state: 'unstarted'
+      },
+      sourceTimestamp: null,
+      observedAt,
+      advancing: false,
+      complete: false,
+      stats: null
+    };
+  };
+
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
+
+  assert.deepEqual(snapshotCalls, ['game-2', 'game-3']);
+  assert.equal(schedule[0]?.series.state, 'scheduled');
+  assert.equal(schedule[0]?.series.games.some(game => (
+    game.state === 'live' || game.state === 'draft' || game.state === 'paused'
+  )), false);
 });
 
 test('promotes an unstarted LPL game when the live-stat feed has gameplay', async () => {
@@ -192,6 +221,7 @@ test('promotes an unstarted LPL game when the live-stat feed has gameplay', asyn
 
   const schedule = await createUsableScheduleProvider(base).getSchedule();
   assert.deepEqual(snapshotCalls, ['game-2']);
+  assert.equal(schedule[0]?.series.state, 'live');
   assert.equal(schedule[0]?.series.games[1]?.state, 'live');
 });
 
@@ -213,5 +243,6 @@ test('tries the next unpublished game slot after a live-stat miss', async () => 
 
   const schedule = await createUsableScheduleProvider(base).getSchedule();
   assert.deepEqual(snapshotCalls, ['game-2', 'game-3']);
+  assert.equal(schedule[0]?.series.state, 'live');
   assert.equal(schedule[0]?.series.games[2]?.state, 'live');
 });

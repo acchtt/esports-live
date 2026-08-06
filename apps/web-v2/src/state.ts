@@ -6,8 +6,9 @@ import type {
 } from '@esports-live/core';
 import type { LolStats } from '@esports-live/adapter-lol';
 
-export type AppView = 'matches' | 'history' | 'standings';
-export type DataView = Exclude<AppView, 'standings'>;
+export type AppView = 'matches' | 'match' | 'platform';
+export type DataView = 'matches' | 'history';
+export type MatchFilter = 'all' | 'live' | 'upcoming' | 'ended';
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -16,8 +17,15 @@ export interface SelectionState {
   gameId: string | null;
 }
 
+export interface CatalogueEntry {
+  event: ScheduleEvent;
+  view: DataView;
+}
+
 export interface AppState {
   activeView: AppView;
+  matchFilter: MatchFilter;
+  detailView: DataView;
   connectionStatus: ConnectionStatus;
   connectionMessage: string;
   events: Record<DataView, readonly ScheduleEvent[]>;
@@ -31,6 +39,7 @@ export interface AppState {
 
 export type AppAction =
   | { type: 'set-view'; view: AppView }
+  | { type: 'set-filter'; filter: MatchFilter }
   | { type: 'set-connection'; status: ConnectionStatus; message: string }
   | { type: 'schedule-loading'; view: DataView }
   | { type: 'schedule-loaded'; view: DataView; events: readonly ScheduleEvent[] }
@@ -54,6 +63,8 @@ const GAME_STATE_RANK: Record<GameState, number> = {
 
 export const initialState: AppState = {
   activeView: 'matches',
+  matchFilter: 'all',
+  detailView: 'matches',
   connectionStatus: 'connecting',
   connectionMessage: 'Connecting to the live data service…',
   events: {
@@ -118,13 +129,13 @@ function mergeSnapshot(
 
 function preferredGame(event: ScheduleEvent, view: DataView): SeriesGameRef | null {
   const games = event.series.games;
-  if (view === 'history') {
-    return games.find(game => game.state === 'completed') ?? games[0] ?? null;
+  if (view === 'history' || event.series.state === 'completed') {
+    return [...games].reverse().find(game => game.state === 'completed') ?? games.at(-1) ?? null;
   }
   return games.find(game => game.state === 'live')
     ?? games.find(game => game.state === 'draft' || game.state === 'paused')
     ?? games.find(game => game.state === 'unstarted' || game.state === 'unknown')
-    ?? games.find(game => game.state === 'completed')
+    ?? [...games].reverse().find(game => game.state === 'completed')
     ?? games[0]
     ?? null;
 }
@@ -144,22 +155,59 @@ function selectionForEvents(
   };
 }
 
-export function eventsForView(state: AppState, view: DataView): readonly ScheduleEvent[] {
-  return state.events[view];
+function catalogueStateRank(event: ScheduleEvent): number {
+  if (event.series.state === 'live' || event.series.state === 'paused') return 0;
+  if (event.series.state === 'completed') return 2;
+  return 1;
+}
+
+function catalogueTime(entry: CatalogueEntry): number {
+  const value = Date.parse(entry.event.series.scheduledStart);
+  return Number.isFinite(value) ? value : 0;
+}
+
+export function catalogueEntries(state: AppState): readonly CatalogueEntry[] {
+  const entries = new Map<string, CatalogueEntry>();
+  (['matches', 'history'] as const).forEach(view => {
+    state.events[view].forEach(event => {
+      const current = entries.get(event.series.id);
+      if (!current || catalogueStateRank(event) >= catalogueStateRank(current.event)) {
+        entries.set(event.series.id, { event, view });
+      }
+    });
+  });
+
+  return [...entries.values()].sort((left, right) => {
+    const stateDifference = catalogueStateRank(left.event) - catalogueStateRank(right.event);
+    if (stateDifference) return stateDifference;
+    if (left.event.series.state === 'completed') return catalogueTime(right) - catalogueTime(left);
+    return catalogueTime(left) - catalogueTime(right);
+  });
+}
+
+export function filteredCatalogueEntries(state: AppState): readonly CatalogueEntry[] {
+  const entries = catalogueEntries(state);
+  if (state.matchFilter === 'all') return entries;
+  return entries.filter(({ event }) => {
+    const seriesState = event.series.state;
+    if (state.matchFilter === 'live') return seriesState === 'live' || seriesState === 'paused';
+    if (state.matchFilter === 'ended') return seriesState === 'completed';
+    return seriesState !== 'live' && seriesState !== 'paused' && seriesState !== 'completed';
+  });
 }
 
 export function selectionForView(state: AppState, view: DataView): SelectionState {
   return state.selections[view];
 }
 
-export function selectedEvent(state: AppState, view: DataView): ScheduleEvent | null {
-  const selection = selectionForView(state, view);
-  return eventsForView(state, view).find(event => event.series.id === selection.seriesId) ?? null;
+export function selectedEvent(state: AppState): ScheduleEvent | null {
+  const selection = selectionForView(state, state.detailView);
+  return state.events[state.detailView].find(event => event.series.id === selection.seriesId) ?? null;
 }
 
-export function selectedGame(state: AppState, view: DataView): SeriesGameRef | null {
-  const event = selectedEvent(state, view);
-  const selection = selectionForView(state, view);
+export function selectedGame(state: AppState): SeriesGameRef | null {
+  const event = selectedEvent(state);
+  const selection = selectionForView(state, state.detailView);
   return event?.series.games.find(game => game.id === selection.gameId) ?? null;
 }
 
@@ -167,6 +215,8 @@ export function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'set-view':
       return { ...state, activeView: action.view };
+    case 'set-filter':
+      return { ...state, matchFilter: action.filter };
     case 'set-connection':
       return {
         ...state,
@@ -204,6 +254,8 @@ export function reducer(state: AppState, action: AppAction): AppState {
       if (!event) return state;
       return {
         ...state,
+        activeView: 'match',
+        detailView: action.view,
         selections: {
           ...state.selections,
           [action.view]: {
@@ -214,14 +266,16 @@ export function reducer(state: AppState, action: AppAction): AppState {
       };
     }
     case 'select-game': {
-      const event = selectedEvent(state, action.view);
+      const selection = state.selections[action.view];
+      const event = state.events[action.view].find(item => item.series.id === selection.seriesId);
       if (!event?.series.games.some(game => game.id === action.gameId)) return state;
       return {
         ...state,
+        detailView: action.view,
         selections: {
           ...state.selections,
           [action.view]: {
-            ...state.selections[action.view],
+            ...selection,
             gameId: action.gameId
           }
         }

@@ -56,6 +56,19 @@ const staleCompletedLiveLplSeries = {
   state: 'completed'
 };
 
+const backgroundRecoveryLplSeries = {
+  id: 'series-v2-lpl-background',
+  esport: 'lol',
+  competition: { id: '98767991314006698', name: 'LPL', stage: 'Regular Season' },
+  teams: [lplBlue, lplRed],
+  bestOf: 3,
+  state: 'completed',
+  scheduledStart: iso(-25 * 60 * 1_000),
+  games: [
+    { id: 'game-v2-lpl-background-1', number: 1, state: 'completed' }
+  ]
+};
+
 const futureLplSeries = {
   id: 'series-v2-lpl-future',
   esport: 'lol',
@@ -96,6 +109,16 @@ const canonicalHistorySeries = {
   ]
 };
 
+const recoveredBackgroundLplSeries = {
+  ...backgroundRecoveryLplSeries,
+  state: 'live',
+  games: [
+    { id: 'game-v2-lpl-background-1', number: 1, state: 'completed' },
+    { id: 'game-v2-lpl-background-2', number: 2, state: 'live' },
+    { id: 'game-v2-lpl-background-3', number: 3, state: 'unstarted' }
+  ]
+};
+
 const historyContext = {
   schemaVersion: '1.0',
   esport: 'lol',
@@ -130,6 +153,56 @@ const historyContext = {
         redTeam: echo,
         winner: delta,
         durationSeconds: 2_217
+      }
+    ]
+  },
+  complete: true,
+  reasons: []
+};
+
+const backgroundRecoveryContext = {
+  schemaVersion: '1.0',
+  esport: 'lol',
+  seriesId: backgroundRecoveryLplSeries.id,
+  provider,
+  observedAt: iso(),
+  rosters: [],
+  standings: [],
+  history: {
+    bestOf: 3,
+    winsRequired: 2,
+    drawPossible: false,
+    score: [
+      { team: lplBlue, wins: 1 },
+      { team: lplRed, wins: 0 }
+    ],
+    games: [
+      {
+        id: 'game-v2-lpl-background-1',
+        number: 1,
+        state: 'completed',
+        blueTeam: lplBlue,
+        redTeam: lplRed,
+        winner: lplBlue,
+        durationSeconds: 2_031
+      },
+      {
+        id: 'game-v2-lpl-background-2',
+        number: 2,
+        state: 'unstarted',
+        blueTeam: lplRed,
+        redTeam: lplBlue,
+        winner: null,
+        durationSeconds: null
+      },
+      {
+        id: 'game-v2-lpl-background-3',
+        number: 3,
+        state: 'unstarted',
+        blueTeam: lplBlue,
+        redTeam: lplRed,
+        winner: null,
+        durationSeconds: null
       }
     ]
   },
@@ -180,12 +253,15 @@ function team(
 
 function snapshot(gameId: string) {
   const historical = gameId.startsWith('game-v2-history');
+  const backgroundLpl = gameId.startsWith('game-v2-lpl-background');
   const lpl = gameId.startsWith('game-v2-lpl-live');
   const series = historical
     ? canonicalHistorySeries
-    : lpl
-      ? { ...unknownLiveLplSeries, state: 'live' }
-      : activeSeries;
+    : backgroundLpl
+      ? recoveredBackgroundLplSeries
+      : lpl
+        ? { ...unknownLiveLplSeries, state: 'live' }
+        : activeSeries;
   const game = series.games.find(item => item.id === gameId) ?? series.games[0]!;
   const left = series.teams[0]!;
   const right = series.teams[1]!;
@@ -258,6 +334,47 @@ async function installFixtures(page: Page): Promise<{ contextRequests: () => num
   return { contextRequests: () => contextRequestCount };
 }
 
+async function installBackgroundRecoveryFixtures(page: Page): Promise<{
+  contextRequests: () => number;
+  releaseContext: () => void;
+}> {
+  let contextRequestCount = 0;
+  let releaseContext = (): void => {};
+  const contextGate = new Promise<void>(resolve => {
+    releaseContext = resolve;
+  });
+
+  await page.route('**/health', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+  await page.route('**/v1/lol/schedule**', route => {
+    const history = route.request().url().includes('states=completed');
+    return json(route, {
+      esport: 'lol',
+      events: history
+        ? [{ series: backgroundRecoveryLplSeries, provider, observedAt: iso() }]
+        : []
+    });
+  });
+  await page.route('**/v1/lol/series/**/context**', async route => {
+    contextRequestCount += 1;
+    await contextGate;
+    return json(route, backgroundRecoveryContext);
+  });
+  await page.route('**/v1/lol/games/**/live**', route => {
+    const match = route.request().url().match(/games\/([^/]+)\/live/);
+    return json(route, snapshot(decodeURIComponent(match?.[1] ?? 'game-v2-lpl-background-2')));
+  });
+
+  return {
+    contextRequests: () => contextRequestCount,
+    releaseContext
+  };
+}
+
 test('web v2 renders ended immediately and recovers unknown LPL live series', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -295,6 +412,31 @@ test('web v2 renders ended immediately and recovers unknown LPL live series', as
   await expect(page.locator('#player-board .player-row')).toHaveCount(5);
   await expect(page.locator('.lane-gold').first()).toHaveText('+906');
   expect(fixture.contextRequests()).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('web v2 renders the catalogue before background LPL recovery completes', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const fixture = await installBackgroundRecoveryFixtures(page);
+  await page.goto('/v2/');
+
+  await expect(page.locator('#catalogue-meta')).toContainText('1 matches');
+  const card = page.locator('[data-series-id="series-v2-lpl-background"]');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('FINAL');
+  await expect.poll(fixture.contextRequests).toBe(1);
+
+  fixture.releaseContext();
+  await page.getByRole('button', { name: 'Live', exact: true }).click();
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('LIVE');
+  await expect(card).toHaveAttribute('data-source-view', 'history');
+
+  await card.click();
+  await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+  await expect(page.locator('#game-clock')).toHaveText('22:02');
+  await expect(page.locator('#player-board .player-row')).toHaveCount(5);
   expect(errors).toEqual([]);
 });
 

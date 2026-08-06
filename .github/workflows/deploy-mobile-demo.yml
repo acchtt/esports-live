@@ -182,27 +182,35 @@ jobs:
           grep -R "DEMO v$MOBILE_DEMO_VERSION" apps/web-mobile/dist/assets
 
       - name: Deploy isolated mobile Pages application
-        run: >-
-          npx wrangler pages deploy apps/web-mobile/dist
-          --project-name esports-live
-          --branch mobile-demo
-          --commit-hash "$MOBILE_DEMO_COMMIT_SHA"
-          --commit-message "Mobile application $MOBILE_DEMO_COMMIT_SHA"
-
-      - name: Verify current and rebuilt mobile applications
+        id: pages-deploy
         shell: bash
         run: |
-          current_url="https://mobile-demo.esports-live.pages.dev/?commit=$MOBILE_DEMO_COMMIT_SHA"
-          v2_url="https://mobile-demo.esports-live.pages.dev/v2/?commit=$MOBILE_DEMO_COMMIT_SHA"
+          output="$(npx wrangler pages deploy apps/web-mobile/dist \
+            --project-name esports-live \
+            --branch mobile-demo \
+            --commit-hash "$MOBILE_DEMO_COMMIT_SHA" \
+            --commit-message "Mobile application $MOBILE_DEMO_COMMIT_SHA" 2>&1)"
+          echo "$output"
+          url="$(grep -Eo 'https://[a-z0-9]+\.esports-live\.pages\.dev' <<<"$output" | head -n 1)"
+          test -n "$url" || { echo "Wrangler did not return an immutable Pages deployment URL."; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify current and rebuilt mobile applications
+        env:
+          PAGES_DEPLOYMENT_URL: ${{ steps.pages-deploy.outputs.url }}
+        shell: bash
+        run: |
+          current_url="$PAGES_DEPLOYMENT_URL/?commit=$MOBILE_DEMO_COMMIT_SHA"
+          v2_url="$PAGES_DEPLOYMENT_URL/v2/?commit=$MOBILE_DEMO_COMMIT_SHA"
           for attempt in {1..12}; do
             html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$current_url" || true)"
             asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$html" | head -n 1 | cut -d'"' -f2)"
-            if [[ "$asset" == /* ]]; then asset="https://mobile-demo.esports-live.pages.dev$asset"; fi
+            if [[ "$asset" == /* ]]; then asset="$PAGES_DEPLOYMENT_URL$asset"; fi
             script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$asset" || true)"
 
             v2_html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$v2_url" || true)"
             v2_asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$v2_html" | head -n 1 | cut -d'"' -f2)"
-            if [[ "$v2_asset" == /* ]]; then v2_asset="https://mobile-demo.esports-live.pages.dev$v2_asset"; fi
+            if [[ "$v2_asset" == /* ]]; then v2_asset="$PAGES_DEPLOYMENT_URL$v2_asset"; fi
             v2_script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$v2_asset" || true)"
 
             if grep -q '<title>Esports Live</title>' <<<"$html" \

@@ -203,6 +203,27 @@ test('demotes stale LPL live metadata when no game has active telemetry', async 
   )), false);
 });
 
+test('removes a stale live listing when the active game is already completed', async () => {
+  const entry = sparseEntry();
+  entry.series.teams = [left, right];
+  entry.series.games = [{ id: 'game-1', number: 1, state: 'live' }];
+  const base = baseProvider(entry, false);
+  base.getSnapshot = async gameId => ({
+    series: entry.series,
+    game: { id: gameId, number: 1, state: 'completed' },
+    sourceTimestamp: observedAt,
+    observedAt,
+    advancing: false,
+    complete: true,
+    stats: {} as never
+  });
+
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
+
+  assert.equal(schedule[0]?.series.state, 'completed');
+  assert.equal(schedule[0]?.series.games[0]?.state, 'completed');
+});
+
 test('promotes an unstarted LPL game when the live-stat feed has gameplay', async () => {
   const base = delayedLiveProvider();
   const snapshotCalls: string[] = [];

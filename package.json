@@ -11,14 +11,17 @@
     "dev:api": "wrangler dev",
     "dev:web": "vite apps/web",
     "dev:web-mobile": "vite apps/web-mobile",
+    "dev:web-v2": "vite apps/web-v2",
     "build:web": "npm run build --workspace @esports-live/web",
     "build:web-mobile": "npm run build --workspace @esports-live/web-mobile",
+    "build:web-v2": "npm run build --workspace @esports-live/web-v2",
     "deploy:api": "wrangler deploy",
     "deploy:web": "npm run build:web && wrangler pages deploy apps/web/dist --project-name esports-live",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test packages/core/src/*.test.ts packages/adapter-lol/src/*.test.ts apps/api/src/*.test.ts",
     "test:web": "npm run build:web && playwright test",
     "test:web-mobile": "npm run build:web-mobile && WEB_APP_ROOT=apps/web-mobile playwright test",
+    "test:web-v2": "npm run build:web-v2 && WEB_APP_ROOT=apps/web-v2 playwright test tests/web/web-v2-shell.spec.ts",
     "check": "npm run typecheck && npm test"
   },
   "devDependencies": {

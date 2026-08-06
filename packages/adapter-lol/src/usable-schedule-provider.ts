@@ -67,10 +67,8 @@ async function reconcileLiveGameState(
   provider: LolProviderClient,
   games: readonly ProviderGame[]
 ): Promise<readonly ProviderGame[]> {
-  if (hasActiveGame(games)) return games;
-
   let reconciled = games;
-  const candidates = games.filter(game => game.state === 'unstarted' || game.state === 'unknown');
+  const candidates = games.filter(game => game.state !== 'completed');
   for (const candidate of candidates) {
     try {
       const snapshot = await provider.getSnapshot(candidate.id);
@@ -92,6 +90,11 @@ async function reconcileLiveGameState(
             ? 'paused'
             : 'live';
         return reconciled.map(game => game.id === candidate.id ? { ...game, state } : game);
+      }
+      if (snapshot.game.state === 'unstarted' || snapshot.game.state === 'unknown') {
+        reconciled = reconciled.map(game => (
+          game.id === candidate.id ? { ...game, state: snapshot.game.state } : game
+        ));
       }
     } catch {
       // A live-stat miss is expected while Riot is between games; try the next slot.

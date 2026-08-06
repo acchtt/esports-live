@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { LolProviderClient, LolProviderScheduleEntry } from './provider.ts';
-import { RIOT_LPL_LEAGUE_ID } from './riot-supplemental-league-provider.ts';
 import { createUsableScheduleProvider } from './usable-schedule-provider.ts';
 
 const observedAt = '2026-08-01T13:00:00.000Z';
@@ -89,41 +88,6 @@ function delayedLiveProvider(): LolProviderClient {
     complete: true
   });
   return provider;
-}
-
-function staleCompletedLplProvider(): {
-  provider: LolProviderClient;
-  entry: LolProviderScheduleEntry;
-} {
-  const entry = sparseEntry('scheduled');
-  entry.series.id = 'series-lpl-stale-completed';
-  entry.series.competition = { id: RIOT_LPL_LEAGUE_ID, name: 'LPL' };
-  entry.series.teams = [left, right];
-  entry.series.bestOf = 3;
-  entry.series.state = 'completed';
-  entry.series.games = [
-    { id: 'game-1', number: 1, state: 'completed' }
-  ];
-  const provider = baseProvider(entry, true);
-  provider.getSeriesContext = async seriesId => ({
-    seriesId,
-    observedAt,
-    rosters: [],
-    standings: [],
-    history: {
-      bestOf: 3,
-      winsRequired: 2,
-      drawPossible: false,
-      score: [{ team: left, wins: 1 }, { team: right, wins: 0 }],
-      games: [
-        { id: 'game-1', number: 1, state: 'completed', blueTeam: left, redTeam: right, winner: left, durationSeconds: 2_100 },
-        { id: 'game-2', number: 2, state: 'unstarted', blueTeam: right, redTeam: left, winner: null, durationSeconds: null },
-        { id: 'game-3', number: 3, state: 'unstarted', blueTeam: left, redTeam: right, winner: null, durationSeconds: null }
-      ]
-    },
-    complete: true
-  });
-  return { provider, entry };
 }
 
 test('enriches a sparse live event from series history', async () => {
@@ -304,58 +268,28 @@ test('tries the next unpublished game slot after a live-stat miss', async () => 
   assert.equal(schedule[0]?.series.games[2]?.state, 'live');
 });
 
-test('rescues a recent LPL series misclassified as completed when the next game is live', async () => {
-  const { provider, entry } = staleCompletedLplProvider();
-  const snapshotCalls: string[] = [];
-  provider.getSnapshot = async gameId => {
-    snapshotCalls.push(gameId);
-    return {
-      series: entry.series,
-      game: { id: gameId, number: gameId === 'game-3' ? 3 : 2, state: 'live' },
-      sourceTimestamp: '2026-08-01T13:45:00.000Z',
-      observedAt: '2026-08-01T13:45:01.000Z',
-      advancing: true,
-      complete: true,
-      stats: {} as never
-    };
+test('returns completed series without loading context or snapshots', async () => {
+  const entry = sparseEntry('scheduled');
+  entry.series.state = 'completed';
+  entry.series.teams = [left, right];
+  entry.series.bestOf = 3;
+  entry.series.games = [{ id: 'game-1', number: 1, state: 'completed' }];
+  const base = baseProvider(entry, true);
+  let contextCalls = 0;
+  let snapshotCalls = 0;
+  base.getSeriesContext = async () => {
+    contextCalls += 1;
+    throw new Error('completed schedule hydration must not run');
+  };
+  base.getSnapshot = async () => {
+    snapshotCalls += 1;
+    throw new Error('completed schedule snapshots must not run');
   };
 
-  const schedule = await createUsableScheduleProvider(provider, {
-    now: () => new Date('2026-08-01T14:00:00.000Z')
-  }).getSchedule();
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
 
-  assert.deepEqual(snapshotCalls, ['game-2']);
-  assert.equal(schedule[0]?.series.state, 'live');
-  assert.equal(schedule[0]?.series.games[0]?.state, 'completed');
-  assert.equal(schedule[0]?.series.games[1]?.id, 'game-2');
-  assert.equal(schedule[0]?.series.games[1]?.state, 'live');
-});
-
-test('keeps a recent completed LPL series ended when no unfinished game has telemetry', async () => {
-  const { provider, entry } = staleCompletedLplProvider();
-  const snapshotCalls: string[] = [];
-  provider.getSnapshot = async gameId => {
-    snapshotCalls.push(gameId);
-    return {
-      series: entry.series,
-      game: {
-        id: gameId,
-        number: gameId === 'game-3' ? 3 : 2,
-        state: 'unstarted'
-      },
-      sourceTimestamp: null,
-      observedAt: '2026-08-01T13:45:01.000Z',
-      advancing: false,
-      complete: false,
-      stats: null
-    };
-  };
-
-  const schedule = await createUsableScheduleProvider(provider, {
-    now: () => new Date('2026-08-01T14:00:00.000Z')
-  }).getSchedule();
-
-  assert.deepEqual(snapshotCalls, ['game-2', 'game-3']);
+  assert.equal(schedule.length, 1);
   assert.equal(schedule[0]?.series.state, 'completed');
-  assert.deepEqual(schedule[0]?.series.games, entry.series.games);
+  assert.equal(contextCalls, 0);
+  assert.equal(snapshotCalls, 0);
 });

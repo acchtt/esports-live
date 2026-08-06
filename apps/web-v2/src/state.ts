@@ -1,0 +1,281 @@
+import type {
+  GameState,
+  LiveSnapshot,
+  ScheduleEvent,
+  SeriesGameRef
+} from '@esports-live/core';
+import type { LolStats } from '@esports-live/adapter-lol';
+
+export type AppView = 'matches' | 'history' | 'standings';
+export type DataView = Exclude<AppView, 'standings'>;
+export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type ConnectionStatus = 'connecting' | 'online' | 'offline';
+
+export interface SelectionState {
+  seriesId: string | null;
+  gameId: string | null;
+}
+
+export interface AppState {
+  activeView: AppView;
+  connectionStatus: ConnectionStatus;
+  connectionMessage: string;
+  events: Record<DataView, readonly ScheduleEvent[]>;
+  scheduleStatus: Record<DataView, LoadStatus>;
+  scheduleError: Record<DataView, string | null>;
+  selections: Record<DataView, SelectionState>;
+  snapshots: Readonly<Record<string, LiveSnapshot<LolStats>>>;
+  snapshotStatus: Readonly<Record<string, LoadStatus>>;
+  snapshotError: Readonly<Record<string, string | null>>;
+}
+
+export type AppAction =
+  | { type: 'set-view'; view: AppView }
+  | { type: 'set-connection'; status: ConnectionStatus; message: string }
+  | { type: 'schedule-loading'; view: DataView }
+  | { type: 'schedule-loaded'; view: DataView; events: readonly ScheduleEvent[] }
+  | { type: 'schedule-failed'; view: DataView; message: string }
+  | { type: 'select-series'; view: DataView; seriesId: string }
+  | { type: 'select-game'; view: DataView; gameId: string }
+  | { type: 'snapshot-loading'; gameId: string }
+  | { type: 'snapshot-received'; snapshot: LiveSnapshot<LolStats> }
+  | { type: 'snapshot-failed'; gameId: string; message: string };
+
+const EMPTY_SELECTION: SelectionState = { seriesId: null, gameId: null };
+
+const GAME_STATE_RANK: Record<GameState, number> = {
+  unknown: 0,
+  unstarted: 1,
+  draft: 2,
+  live: 3,
+  paused: 3,
+  completed: 4
+};
+
+export const initialState: AppState = {
+  activeView: 'matches',
+  connectionStatus: 'connecting',
+  connectionMessage: 'Connecting to the live data service…',
+  events: {
+    matches: [],
+    history: []
+  },
+  scheduleStatus: {
+    matches: 'idle',
+    history: 'idle'
+  },
+  scheduleError: {
+    matches: null,
+    history: null
+  },
+  selections: {
+    matches: EMPTY_SELECTION,
+    history: EMPTY_SELECTION
+  },
+  snapshots: {},
+  snapshotStatus: {},
+  snapshotError: {}
+};
+
+function snapshotTime(snapshot: LiveSnapshot<LolStats>): number {
+  const value = snapshot.quality.sourceTimestamp ?? snapshot.quality.observedAt;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mergeSnapshot(
+  existing: LiveSnapshot<LolStats> | undefined,
+  incoming: LiveSnapshot<LolStats>
+): LiveSnapshot<LolStats> {
+  if (!existing) return incoming;
+
+  const existingRank = GAME_STATE_RANK[existing.game.state];
+  const incomingRank = GAME_STATE_RANK[incoming.game.state];
+  if (existing.game.state === 'completed' && incoming.game.state !== 'completed') {
+    return existing;
+  }
+  if (snapshotTime(incoming) < snapshotTime(existing) && incomingRank <= existingRank) {
+    return existing;
+  }
+  if (incomingRank >= existingRank) return incoming;
+
+  const retainedState = existing.game.state;
+  return {
+    ...incoming,
+    game: {
+      ...incoming.game,
+      state: retainedState
+    },
+    series: {
+      ...incoming.series,
+      state: retainedState === 'completed' ? 'completed' : incoming.series.state,
+      games: incoming.series.games.map(game => game.id === incoming.game.id
+        ? { ...game, state: retainedState }
+        : game)
+    }
+  };
+}
+
+function preferredGame(event: ScheduleEvent, view: DataView): SeriesGameRef | null {
+  const games = event.series.games;
+  if (view === 'history') {
+    return games.find(game => game.state === 'completed') ?? games[0] ?? null;
+  }
+  return games.find(game => game.state === 'live')
+    ?? games.find(game => game.state === 'draft' || game.state === 'paused')
+    ?? games.find(game => game.state === 'unstarted' || game.state === 'unknown')
+    ?? games.find(game => game.state === 'completed')
+    ?? games[0]
+    ?? null;
+}
+
+function selectionForEvents(
+  events: readonly ScheduleEvent[],
+  previous: SelectionState,
+  view: DataView
+): SelectionState {
+  const event = events.find(item => item.series.id === previous.seriesId) ?? events[0] ?? null;
+  if (!event) return EMPTY_SELECTION;
+  const game = event.series.games.find(item => item.id === previous.gameId)
+    ?? preferredGame(event, view);
+  return {
+    seriesId: event.series.id,
+    gameId: game?.id ?? null
+  };
+}
+
+export function eventsForView(state: AppState, view: DataView): readonly ScheduleEvent[] {
+  return state.events[view];
+}
+
+export function selectionForView(state: AppState, view: DataView): SelectionState {
+  return state.selections[view];
+}
+
+export function selectedEvent(state: AppState, view: DataView): ScheduleEvent | null {
+  const selection = selectionForView(state, view);
+  return eventsForView(state, view).find(event => event.series.id === selection.seriesId) ?? null;
+}
+
+export function selectedGame(state: AppState, view: DataView): SeriesGameRef | null {
+  const event = selectedEvent(state, view);
+  const selection = selectionForView(state, view);
+  return event?.series.games.find(game => game.id === selection.gameId) ?? null;
+}
+
+export function reducer(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
+    case 'set-view':
+      return { ...state, activeView: action.view };
+    case 'set-connection':
+      return {
+        ...state,
+        connectionStatus: action.status,
+        connectionMessage: action.message
+      };
+    case 'schedule-loading':
+      return {
+        ...state,
+        scheduleStatus: { ...state.scheduleStatus, [action.view]: 'loading' },
+        scheduleError: { ...state.scheduleError, [action.view]: null }
+      };
+    case 'schedule-loaded': {
+      const nextSelection = selectionForEvents(
+        action.events,
+        state.selections[action.view],
+        action.view
+      );
+      return {
+        ...state,
+        events: { ...state.events, [action.view]: action.events },
+        scheduleStatus: { ...state.scheduleStatus, [action.view]: 'ready' },
+        scheduleError: { ...state.scheduleError, [action.view]: null },
+        selections: { ...state.selections, [action.view]: nextSelection }
+      };
+    }
+    case 'schedule-failed':
+      return {
+        ...state,
+        scheduleStatus: { ...state.scheduleStatus, [action.view]: 'error' },
+        scheduleError: { ...state.scheduleError, [action.view]: action.message }
+      };
+    case 'select-series': {
+      const event = state.events[action.view].find(item => item.series.id === action.seriesId);
+      if (!event) return state;
+      return {
+        ...state,
+        selections: {
+          ...state.selections,
+          [action.view]: {
+            seriesId: action.seriesId,
+            gameId: preferredGame(event, action.view)?.id ?? null
+          }
+        }
+      };
+    }
+    case 'select-game': {
+      const event = selectedEvent(state, action.view);
+      if (!event?.series.games.some(game => game.id === action.gameId)) return state;
+      return {
+        ...state,
+        selections: {
+          ...state.selections,
+          [action.view]: {
+            ...state.selections[action.view],
+            gameId: action.gameId
+          }
+        }
+      };
+    }
+    case 'snapshot-loading':
+      return {
+        ...state,
+        snapshotStatus: { ...state.snapshotStatus, [action.gameId]: 'loading' },
+        snapshotError: { ...state.snapshotError, [action.gameId]: null }
+      };
+    case 'snapshot-received': {
+      const gameId = action.snapshot.game.id;
+      const snapshot = mergeSnapshot(state.snapshots[gameId], action.snapshot);
+      return {
+        ...state,
+        snapshots: { ...state.snapshots, [gameId]: snapshot },
+        snapshotStatus: { ...state.snapshotStatus, [gameId]: 'ready' },
+        snapshotError: { ...state.snapshotError, [gameId]: null }
+      };
+    }
+    case 'snapshot-failed':
+      return {
+        ...state,
+        snapshotStatus: { ...state.snapshotStatus, [action.gameId]: 'error' },
+        snapshotError: { ...state.snapshotError, [action.gameId]: action.message }
+      };
+  }
+}
+
+export type StoreListener = (state: AppState, previous: AppState) => void;
+
+export class AppStore {
+  #state: AppState;
+  #listeners = new Set<StoreListener>();
+
+  constructor(state: AppState = initialState) {
+    this.#state = state;
+  }
+
+  getState(): AppState {
+    return this.#state;
+  }
+
+  dispatch(action: AppAction): void {
+    const previous = this.#state;
+    const next = reducer(previous, action);
+    if (next === previous) return;
+    this.#state = next;
+    this.#listeners.forEach(listener => listener(next, previous));
+  }
+
+  subscribe(listener: StoreListener): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+}

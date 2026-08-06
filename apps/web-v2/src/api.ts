@@ -1,7 +1,8 @@
 import type {
   LiveSnapshot,
   ScheduleEvent,
-  SeriesContext
+  SeriesContext,
+  SeriesGameRef
 } from '@esports-live/core';
 import type { LolStats } from '@esports-live/adapter-lol';
 import type { DataView } from './state.ts';
@@ -18,10 +19,18 @@ interface ScheduleResponse {
   events: readonly ScheduleEvent[];
 }
 
+interface CachedContext {
+  expiresAt: number;
+  value: SeriesContext;
+}
+
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const DEFAULT_TIMEOUT_MS = 10_000;
 const SNAPSHOT_TIMEOUT_MS = 25_000;
 const COMPLETED_SNAPSHOT_ATTEMPTS = 2;
+const CONTEXT_CACHE_MS = 5 * 60 * 1_000;
+const CONTEXT_CONCURRENCY = 4;
+const contextCache = new Map<string, CachedContext>();
 
 async function requestJson<T>(
   path: string,
@@ -69,6 +78,49 @@ function snapshotPath(
   return `/v1/lol/games/${encodeURIComponent(gameId)}/live${suffix}`;
 }
 
+function historyGames(context: SeriesContext): readonly SeriesGameRef[] {
+  return context.history?.games.map(game => ({
+    id: game.id,
+    number: game.number,
+    state: game.state
+  })) ?? [];
+}
+
+async function hydrateCompletedEvents(
+  events: readonly ScheduleEvent[],
+  signal?: AbortSignal
+): Promise<readonly ScheduleEvent[]> {
+  const hydrated = [...events];
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(CONTEXT_CONCURRENCY, events.length) },
+    async () => {
+      while (cursor < events.length) {
+        const index = cursor;
+        cursor += 1;
+        const event = events[index]!;
+        if (event.series.games.length || event.series.state !== 'completed') continue;
+        try {
+          const context = await loadSeriesContext(event.series.id, signal);
+          const games = historyGames(context);
+          if (!games.length) continue;
+          hydrated[index] = {
+            ...event,
+            series: {
+              ...event.series,
+              games
+            }
+          };
+        } catch (error) {
+          if (signal?.aborted) throw error;
+        }
+      }
+    }
+  );
+  await Promise.all(workers);
+  return hydrated;
+}
+
 function aliasCompletedSnapshot(
   snapshot: LiveSnapshot<LolStats>,
   requestedGameId: string,
@@ -105,10 +157,7 @@ async function loadCompletedSnapshot(
 ): Promise<LiveSnapshot<LolStats>> {
   let context: SeriesContext | null = null;
   try {
-    context = await requestJson<SeriesContext>(
-      `/v1/lol/series/${encodeURIComponent(initial.series.id)}/context?final=${Date.now()}`,
-      signal
-    );
+    context = await loadSeriesContext(initial.series.id, signal);
   } catch (error) {
     if (signal?.aborted) throw error;
   }
@@ -157,6 +206,23 @@ export function loadHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return requestJson<HealthResponse>('/health', signal);
 }
 
+export async function loadSeriesContext(
+  seriesId: string,
+  signal?: AbortSignal
+): Promise<SeriesContext> {
+  const cached = contextCache.get(seriesId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const value = await requestJson<SeriesContext>(
+    `/v1/lol/series/${encodeURIComponent(seriesId)}/context?final=${Date.now()}`,
+    signal
+  );
+  contextCache.set(seriesId, {
+    value,
+    expiresAt: Date.now() + CONTEXT_CACHE_MS
+  });
+  return value;
+}
+
 export async function loadSchedule(
   view: DataView,
   signal?: AbortSignal
@@ -166,7 +232,9 @@ export async function loadSchedule(
     `/v1/lol/schedule?states=${states}`,
     signal
   );
-  return payload.events;
+  return view === 'history'
+    ? hydrateCompletedEvents(payload.events, signal)
+    : payload.events;
 }
 
 export async function loadSnapshot(

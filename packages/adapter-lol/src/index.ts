@@ -9,5 +9,6 @@ export * from './riot-delayed-live-recovery-provider.ts';
 export * from './riot-history-provider.ts';
 export * from './riot-provider.ts';
 export * from './riot-resolved-provider.ts';
+export * from './riot-supplemental-league-provider.ts';
 export * from './types.ts';
 export * from './usable-schedule-provider.ts';

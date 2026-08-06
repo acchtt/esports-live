@@ -6,9 +6,11 @@ on:
       - mobile-demo
     paths:
       - apps/web-mobile/**
+      - apps/web-v2/**
       - apps/api/**
       - packages/**
       - tests/web/mobile-*.spec.ts
+      - tests/web/web-v2-*.spec.ts
       - tests/web/completed-board-merge.spec.ts
       - tests/web/history-mode-ownership.spec.ts
       - tests/web/live-poll-recovery.spec.ts
@@ -102,6 +104,14 @@ jobs:
             tests/web/live-poll-recovery.spec.ts \
             tests/web/live-telemetry-pending.spec.ts
 
+      - name: Validate rebuilt web v2 shell
+        env:
+          WEB_APP_ROOT: apps/web-v2
+        shell: bash
+        run: |
+          npm run build:web-v2
+          npx playwright test tests/web/web-v2-shell.spec.ts
+
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy
 
@@ -148,8 +158,14 @@ jobs:
           echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
-      - name: Build isolated mobile application
-        run: npm run build:web-mobile
+      - name: Build current and rebuilt mobile applications
+        shell: bash
+        run: |
+          npm run build:web-mobile
+          npm run build:web-v2
+          rm -rf apps/web-mobile/dist/v2
+          mkdir -p apps/web-mobile/dist/v2
+          cp -R apps/web-v2/dist/. apps/web-mobile/dist/v2/
         env:
           VITE_API_BASE_URL: ${{ steps.api-preview.outputs.url }}
 
@@ -159,7 +175,10 @@ jobs:
         shell: bash
         run: |
           grep -R "$API_BASE_URL" apps/web-mobile/dist/assets
+          grep -R "$API_BASE_URL" apps/web-mobile/dist/v2/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web-mobile/dist/index.html
+          grep -q "$MOBILE_DEMO_COMMIT_SHA" apps/web-mobile/dist/v2/index.html
+          grep -q '<title>Esports Live V2</title>' apps/web-mobile/dist/v2/index.html
           grep -R "DEMO v$MOBILE_DEMO_VERSION" apps/web-mobile/dist/assets
 
       - name: Deploy isolated mobile Pages application
@@ -170,23 +189,34 @@ jobs:
           --commit-hash "$MOBILE_DEMO_COMMIT_SHA"
           --commit-message "Mobile application $MOBILE_DEMO_COMMIT_SHA"
 
-      - name: Verify isolated mobile application
+      - name: Verify current and rebuilt mobile applications
         shell: bash
         run: |
-          url="https://mobile-demo.esports-live.pages.dev/?commit=$MOBILE_DEMO_COMMIT_SHA"
+          current_url="https://mobile-demo.esports-live.pages.dev/?commit=$MOBILE_DEMO_COMMIT_SHA"
+          v2_url="https://mobile-demo.esports-live.pages.dev/v2/?commit=$MOBILE_DEMO_COMMIT_SHA"
           for attempt in {1..12}; do
-            html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$url" || true)"
+            html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$current_url" || true)"
             asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$html" | head -n 1 | cut -d'"' -f2)"
             if [[ "$asset" == /* ]]; then asset="https://mobile-demo.esports-live.pages.dev$asset"; fi
             script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$asset" || true)"
+
+            v2_html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$v2_url" || true)"
+            v2_asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$v2_html" | head -n 1 | cut -d'"' -f2)"
+            if [[ "$v2_asset" == /* ]]; then v2_asset="https://mobile-demo.esports-live.pages.dev$v2_asset"; fi
+            v2_script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$v2_asset" || true)"
+
             if grep -q '<title>Esports Live</title>' <<<"$html" \
               && grep -q 'class="app-frame"' <<<"$html" \
               && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" \
-              && grep -q "DEMO v$MOBILE_DEMO_VERSION" <<<"$script"; then
-              echo "Mobile application $VITE_BUILD_SHA_SHORT is available at $url"
+              && grep -q "DEMO v$MOBILE_DEMO_VERSION" <<<"$script" \
+              && grep -q '<title>Esports Live V2</title>' <<<"$v2_html" \
+              && grep -q "$MOBILE_DEMO_COMMIT_SHA" <<<"$v2_html" \
+              && grep -q 'data-component="scoreboard"' <<<"$v2_script"; then
+              echo "Current mobile application is available at $current_url"
+              echo "Rebuilt mobile application is available at $v2_url"
               exit 0
             fi
-            echo "Mobile application $VITE_BUILD_SHA_SHORT not ready (attempt $attempt/12)."
+            echo "Mobile applications not ready (attempt $attempt/12)."
             sleep 5
           done
           echo "Mobile application verification failed for build $VITE_BUILD_SHA_SHORT."
@@ -201,7 +231,7 @@ jobs:
         run: |
           if [[ "$DEPLOY_JOB_STATUS" == "success" ]]; then
             state="success"
-            description="Mobile application deployed and verified"
+            description="Mobile applications deployed and verified"
           else
             state="failure"
             description="Mobile application deployment failed"

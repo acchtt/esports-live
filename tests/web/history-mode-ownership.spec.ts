@@ -116,7 +116,7 @@ test('shared mobile scoreboard exposes one game label, a larger clock, and reada
 
   const board = page.locator('[data-mobile-scoreboard-readability="v25"]');
   const header = board.locator('.completed-final-game-header');
-  await expect(page.locator('html')).toHaveAttribute('data-mobile-demo-version', '0.17.15');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-demo-version', '0.17.16');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-readability', 'large-clock-single-game-label-v25');
   await expect(header.locator(':scope > *')).toHaveCount(2);
   await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('20:34');
@@ -141,5 +141,92 @@ test('shared mobile scoreboard exposes one game label, a larger clock, and reada
   expect(readability.labelSize).toBeGreaterThanOrEqual(8);
   expect(readability.valueSize).toBeGreaterThanOrEqual(14);
   expect(readability.clockSize).toBeGreaterThanOrEqual(20);
+  expect(pageErrors).toEqual([]);
+});
+
+test('ended games remain final when stale live telemetry arrives and the header shares one baseline', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(page);
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    const gameId = 'game-terminal-1';
+    window.dispatchEvent(new CustomEvent('esports-live:selection', {
+      detail: {
+        provider: { id: 'fixture', name: 'Fixture provider' },
+        observedAt: new Date().toISOString(),
+        series: {
+          id: 'series-terminal',
+          esport: 'lol',
+          competition: { id: 'terminal-league', name: 'Terminal League' },
+          teams: [
+            { id: 'terminal-blue', name: 'Terminal Blue', code: 'TBL' },
+            { id: 'terminal-red', name: 'Terminal Red', code: 'TRD' }
+          ],
+          bestOf: 3,
+          state: 'live',
+          scheduledStart: new Date().toISOString(),
+          games: [
+            { id: gameId, number: 1, state: 'completed' },
+            { id: 'game-terminal-2', number: 2, state: 'live' }
+          ]
+        }
+      }
+    }));
+
+    const root = document.createElement('article');
+    root.className = 'completed-final-game mobile-live-history-board';
+    root.dataset.mobileScoreboardRenderer = 'shared-v1';
+    root.dataset.mobileUnifiedGameId = gameId;
+    root.dataset.liveBoardState = 'verified';
+    root.innerHTML = `
+      <div class="completed-final-game-header">
+        <span class="mobile-scoreboard-game-clock">34:12</span>
+        <strong class="mobile-scoreboard-game-label">Game 1 · Live</strong>
+      </div>`;
+    document.body.append(root);
+
+    window.dispatchEvent(new CustomEvent('esports-live:mobile-scoreboard-rendered', {
+      detail: {
+        root,
+        mode: 'live',
+        snapshot: {
+          game: { id: gameId, number: 1, state: 'live' },
+          stats: { gameClockSeconds: 2_052 }
+        }
+      }
+    }));
+  });
+
+  const board = page.locator('[data-mobile-unified-game-id="game-terminal-1"]');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-ended-game-status', 'terminal-state-v28');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-game-header-alignment', 'baseline-v28');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-game-state', 'completed');
+  await expect(board).toHaveAttribute('data-mobile-ended-state', 'final-v28');
+  await expect(board).toHaveAttribute('data-mobile-game-header-alignment', 'baseline-v28');
+  await expect(board.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Final');
+
+  const alignment = await board.locator('.completed-final-game-header').evaluate(element => {
+    const clock = element.querySelector<HTMLElement>('.mobile-scoreboard-game-clock');
+    const label = element.querySelector<HTMLElement>('.mobile-scoreboard-game-label');
+    if (!clock || !label) throw new Error('Game header is incomplete.');
+    const clockBounds = clock.getBoundingClientRect();
+    const labelBounds = label.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      display: style.display,
+      alignItems: style.alignItems,
+      clockTop: clockBounds.top,
+      labelTop: labelBounds.top,
+      clockSize: Number.parseFloat(getComputedStyle(clock).fontSize),
+      labelSize: Number.parseFloat(getComputedStyle(label).fontSize)
+    };
+  });
+  expect(alignment.display).toBe('grid');
+  expect(alignment.alignItems).toBe('baseline');
+  expect(Math.abs(alignment.clockTop - alignment.labelTop)).toBeLessThanOrEqual(2);
+  expect(alignment.clockSize).toBeCloseTo(alignment.labelSize, 1);
   expect(pageErrors).toEqual([]);
 });

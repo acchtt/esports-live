@@ -91,7 +91,6 @@ function isCompleted(
 ): boolean {
   return root.dataset.mobileScoreboardGameState === 'completed'
     || endedGameIds.has(gameId)
-    || selectionGame(gameId)?.state === 'completed'
     || snapshot?.game.state === 'completed';
 }
 
@@ -156,9 +155,6 @@ function queueApply(): void {
 
 window.addEventListener('esports-live:selection', event => {
   selection = (event as CustomEvent<ScheduleEvent>).detail;
-  selection?.series.games.forEach(game => {
-    if (game.state === 'completed') endedGameIds.add(game.id);
-  });
   queueApply();
 });
 

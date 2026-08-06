@@ -307,7 +307,7 @@ export class WebV2App {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
-    const viewButton = target.closest<HTMLElement>('[data-view]');
+    const viewButton = target.closest<HTMLButtonElement>('button[data-view]');
     if (viewButton && isAppView(viewButton.dataset.view)) {
       this.#store.dispatch({ type: 'set-view', view: viewButton.dataset.view });
       return;

@@ -1,8 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const provider = { id: 'fixture', name: 'Fixture provider' };
-const blue = { id: 'blue-history-copy', name: 'Blue History Copy', code: 'BHC' };
-const red = { id: 'red-history-copy', name: 'Red History Copy', code: 'RHC' };
+const blue = { id: 'blue-history-copy', name: 'KIWOOM DRX Challengers', code: 'KDX' };
+const red = { id: 'red-history-copy', name: 'DN SOOPers Academy', code: 'DNS' };
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
 const champions = ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'] as const;
 
@@ -149,6 +149,7 @@ test('live matches use the shared mobile scoreboard renderer', async ({ page }) 
   await expect(page.locator('#build-version')).toContainText('DEMO v0.17.14');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-details', 'team-kills-no-items');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-width-guard', 'shared-v28');
 
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   const header = board.locator('.completed-final-game-header');
@@ -209,6 +210,7 @@ test('pending live matches keep the same shared scoreboard shell', async ({ page
   const board = page.locator('.mobile-live-history-board[data-mobile-history-copy="true"]');
   const header = board.locator('.completed-final-game-header');
   await expect(board).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-width-guard', 'shared-v28');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-live-board-state', 'pending');
@@ -223,7 +225,28 @@ test('pending live matches keep the same shared scoreboard shell', async ({ page
   await expect(board.locator('.mobile-live-board-notice')).toContainText('Waiting for Riot');
   await expect(page.getByRole('heading', { name: 'Waiting for verified gameplay' })).toHaveCount(0);
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
+  const layout = await board.evaluate(element => {
+    const boardBounds = element.getBoundingClientRect();
+    const sections = [
+      element.querySelector<HTMLElement>('.completed-final-game-header'),
+      element.querySelector<HTMLElement>('.mobile-live-parity-team-strip'),
+      element.querySelector<HTMLElement>('.mobile-scoreboard-objective-grid'),
+      element.querySelector<HTMLElement>('.role-matchup-row')
+    ].filter((section): section is HTMLElement => section instanceof HTMLElement);
+    const bounds = sections.map(section => section.getBoundingClientRect());
+    return {
+      viewportWidth: window.innerWidth,
+      boardLeft: boardBounds.left,
+      boardRight: boardBounds.right,
+      minSectionLeft: Math.min(...bounds.map(value => value.left)),
+      maxSectionRight: Math.max(...bounds.map(value => value.right)),
+      overflow: document.documentElement.scrollWidth - window.innerWidth
+    };
+  });
+  expect(layout.boardLeft).toBeGreaterThanOrEqual(0);
+  expect(layout.boardRight).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.minSectionLeft).toBeGreaterThanOrEqual(layout.boardLeft - 1);
+  expect(layout.maxSectionRight).toBeLessThanOrEqual(layout.boardRight + 1);
+  expect(layout.overflow).toBeLessThanOrEqual(1);
   expect(pageErrors).toEqual([]);
 });

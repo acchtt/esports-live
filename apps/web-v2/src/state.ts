@@ -52,6 +52,7 @@ export type AppAction =
 
 const EMPTY_SELECTION: SelectionState = { seriesId: null, gameId: null };
 const LAZY_HISTORY_GAME_PREFIX = 'series-history:';
+const RECOVERED_SNAPSHOT_EVENT = 'esports-live:v2-recovered-snapshot';
 
 const GAME_STATE_RANK: Record<GameState, number> = {
   unknown: 0,
@@ -403,6 +404,13 @@ export class AppStore {
 
   constructor(state: AppState = initialState) {
     this.#state = state;
+    if (typeof window !== 'undefined') {
+      window.addEventListener(RECOVERED_SNAPSHOT_EVENT, event => {
+        const snapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
+        if (!snapshot?.game?.id) return;
+        this.dispatch({ type: 'snapshot-received', snapshot });
+      });
+    }
   }
 
   getState(): AppState {

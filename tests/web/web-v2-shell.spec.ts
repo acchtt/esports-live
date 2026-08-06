@@ -57,9 +57,9 @@ function team(teamRef: typeof alpha, side: 'blue' | 'red', live: boolean) {
 function snapshot(gameId: string) {
   const historical = gameId !== 'game-v2-2';
   const series = gameId === 'game-v2-history-1' ? historySeries : activeSeries;
-  const game = series.games.find(item => item.id === gameId) ?? series.games[0];
-  const left = series.teams[0];
-  const right = series.teams[1];
+  const game = series.games.find(item => item.id === gameId) ?? series.games[0]!;
+  const left = series.teams[0]!;
+  const right = series.teams[1]!;
   return {
     schemaVersion: '1.0',
     esport: 'lol',

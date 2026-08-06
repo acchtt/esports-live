@@ -30,6 +30,7 @@ const SNAPSHOT_TIMEOUT_MS = 25_000;
 const COMPLETED_SNAPSHOT_ATTEMPTS = 2;
 const CONTEXT_CACHE_MS = 5 * 60 * 1_000;
 const CONTEXT_CONCURRENCY = 4;
+const FUTURE_COMPLETION_TOLERANCE_MS = 5 * 60 * 1_000;
 const contextCache = new Map<string, CachedContext>();
 
 async function requestJson<T>(
@@ -76,6 +77,28 @@ function snapshotPath(
   if (finalToken) query.set('final', finalToken);
   const suffix = query.size ? `?${query.toString()}` : '';
   return `/v1/lol/games/${encodeURIComponent(gameId)}/live${suffix}`;
+}
+
+function normalizeImpossibleFutureCompletion(
+  event: ScheduleEvent,
+  now = Date.now()
+): ScheduleEvent {
+  if (event.series.state !== 'completed') return event;
+  const scheduledStart = Date.parse(event.series.scheduledStart);
+  if (!Number.isFinite(scheduledStart)) return event;
+  if (scheduledStart <= now + FUTURE_COMPLETION_TOLERANCE_MS) return event;
+
+  return {
+    ...event,
+    series: {
+      ...event.series,
+      state: 'scheduled',
+      games: event.series.games.map(game => ({
+        ...game,
+        state: 'unstarted'
+      }))
+    }
+  };
 }
 
 function historyGames(context: SeriesContext): readonly SeriesGameRef[] {
@@ -232,9 +255,10 @@ export async function loadSchedule(
     `/v1/lol/schedule?states=${states}`,
     signal
   );
+  const events = payload.events.map(event => normalizeImpossibleFutureCompletion(event));
   return view === 'history'
-    ? hydrateCompletedEvents(payload.events, signal)
-    : payload.events;
+    ? hydrateCompletedEvents(events, signal)
+    : events;
 }
 
 export async function loadSnapshot(

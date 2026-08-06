@@ -31,10 +31,12 @@ const COMPLETED_SNAPSHOT_ATTEMPTS = 2;
 const CONTEXT_CACHE_MS = 5 * 60 * 1_000;
 const FUTURE_COMPLETION_TOLERANCE_MS = 5 * 60 * 1_000;
 const LAZY_HISTORY_GAME_PREFIX = 'series-history:';
+const LAZY_LIVE_GAME_PREFIX = 'series-live:';
 const RECOVERED_SNAPSHOT_EVENT = 'esports-live:v2-recovered-snapshot';
 const RECENT_LPL_RECOVERY_WINDOW_MS = 12 * 60 * 60 * 1_000;
 const RECENT_LPL_RECOVERY_LIMIT = 1;
 const RECENT_LPL_GAME_PROBE_LIMIT = 2;
+const LAZY_LIVE_GAME_PROBE_LIMIT = 3;
 const contextCache = new Map<string, CachedContext>();
 const lplRecoveryInFlight = new Set<string>();
 
@@ -162,18 +164,18 @@ function recoveredGameState(
   return null;
 }
 
-function recoveredLiveSnapshot(
-  event: ScheduleEvent,
-  context: SeriesContext,
+function contextGameInventory(context: SeriesContext): readonly SeriesGameRef[] {
+  return (context.history?.games ?? [])
+    .map(game => ({ id: game.id, number: game.number, state: game.state }))
+    .sort((left, right) => left.number - right.number);
+}
+
+function snapshotWithContextInventory(
   snapshot: LiveSnapshot<LolStats>,
+  context: SeriesContext,
   gameState: 'live' | 'draft' | 'paused'
 ): LiveSnapshot<LolStats> {
-  const historyGames: readonly SeriesGameRef[] = (context.history?.games ?? []).map(game => ({
-    id: game.id,
-    number: game.number,
-    state: game.state
-  }));
-  const sourceGames = historyGames.length ? historyGames : event.series.games;
+  const sourceGames = contextGameInventory(context);
   const updatedGames = sourceGames.some(game => game.id === snapshot.game.id)
     ? sourceGames.map(game => game.id === snapshot.game.id
         ? { ...game, state: gameState }
@@ -192,13 +194,30 @@ function recoveredLiveSnapshot(
     ...snapshot,
     series: {
       ...snapshot.series,
-      ...event.series,
       state: seriesState,
       games: updatedGames
     },
     game: {
       ...snapshot.game,
       state: gameState
+    }
+  };
+}
+
+function recoveredLiveSnapshot(
+  event: ScheduleEvent,
+  context: SeriesContext,
+  snapshot: LiveSnapshot<LolStats>,
+  gameState: 'live' | 'draft' | 'paused'
+): LiveSnapshot<LolStats> {
+  const recovered = snapshotWithContextInventory(snapshot, context, gameState);
+  return {
+    ...recovered,
+    series: {
+      ...recovered.series,
+      ...event.series,
+      state: recovered.series.state,
+      games: recovered.series.games
     }
   };
 }
@@ -275,6 +294,19 @@ function lazyHistorySeriesId(gameId: string): string | null {
   }
 }
 
+function lazyLiveGameId(seriesId: string): string {
+  return `${LAZY_LIVE_GAME_PREFIX}${encodeURIComponent(seriesId)}`;
+}
+
+function lazyLiveSeriesId(gameId: string): string | null {
+  if (!gameId.startsWith(LAZY_LIVE_GAME_PREFIX)) return null;
+  try {
+    return decodeURIComponent(gameId.slice(LAZY_LIVE_GAME_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
 function ensureSelectableCompletedEvent(event: ScheduleEvent): ScheduleEvent {
   if (event.series.state !== 'completed' || event.series.games.length) return event;
   return {
@@ -285,6 +317,38 @@ function ensureSelectableCompletedEvent(event: ScheduleEvent): ScheduleEvent {
         id: lazyHistoryGameId(event.series.id),
         number: 1,
         state: 'completed'
+      }]
+    }
+  };
+}
+
+function ensureSelectableLiveEvent(
+  event: ScheduleEvent,
+  now = Date.now()
+): ScheduleEvent {
+  if (event.series.games.length || event.series.state === 'completed') return event;
+  const scheduledStart = Date.parse(event.series.scheduledStart);
+  const started = Number.isFinite(scheduledStart)
+    && scheduledStart <= now + FUTURE_COMPLETION_TOLERANCE_MS;
+  const shouldHydrate = event.series.state === 'live'
+    || event.series.state === 'paused'
+    || (isLplEvent(event) && started
+      && (event.series.state === 'scheduled' || event.series.state === 'unknown'));
+  if (!shouldHydrate) return event;
+
+  const state = event.series.state === 'paused'
+    ? 'paused'
+    : event.series.state === 'live'
+      ? 'live'
+      : 'unknown';
+  return {
+    ...event,
+    series: {
+      ...event.series,
+      games: [{
+        id: lazyLiveGameId(event.series.id),
+        number: 1,
+        state
       }]
     }
   };
@@ -394,6 +458,50 @@ async function loadLazyHistorySnapshot(
   return loadCompletedSnapshot(snapshot, canonicalGame.id, signal);
 }
 
+async function loadLazyLiveSnapshot(
+  seriesId: string,
+  signal?: AbortSignal
+): Promise<LiveSnapshot<LolStats>> {
+  const context = await loadSeriesContext(seriesId, signal);
+  const games = [...(context.history?.games ?? [])];
+  const stateRank = (state: SeriesGameRef['state']): number => {
+    if (state === 'live' || state === 'draft' || state === 'paused') return 0;
+    if (state === 'unstarted' || state === 'unknown') return 1;
+    return 2;
+  };
+  const candidates = games
+    .sort((left, right) => {
+      const rankDifference = stateRank(left.state) - stateRank(right.state);
+      if (rankDifference) return rankDifference;
+      return right.number - left.number;
+    })
+    .slice(0, LAZY_LIVE_GAME_PROBE_LIMIT);
+  if (!candidates.length) {
+    throw new Error('The provider has not published a game ID for this live match yet.');
+  }
+
+  let fallback: LiveSnapshot<LolStats> | null = null;
+  for (let index = 0; index < candidates.length; index += 1) {
+    if (signal?.aborted) throw signal.reason;
+    const candidate = candidates[index]!;
+    try {
+      const snapshot = await requestJson<LiveSnapshot<LolStats>>(
+        snapshotPath(candidate.id, null, `live-hydrate-${Date.now()}-${index}`),
+        signal,
+        SNAPSHOT_TIMEOUT_MS
+      );
+      fallback = snapshot;
+      const gameState = recoveredGameState(snapshot);
+      if (gameState) return snapshotWithContextInventory(snapshot, context, gameState);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+  }
+
+  if (fallback) return fallback;
+  throw new Error('Live game telemetry is not available for this match yet.');
+}
+
 export function loadHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return requestJson<HealthResponse>('/health', signal);
 }
@@ -429,7 +537,7 @@ export async function loadSchedule(
   const events = payload.events.map(event => normalizeScheduleEvent(event));
   const normalized = view === 'history'
     ? events.map(event => ensureSelectableCompletedEvent(event))
-    : events;
+    : events.map(event => ensureSelectableLiveEvent(event));
   if (view === 'history') scheduleRecentLplRecovery(normalized, signal);
   return normalized;
 }
@@ -439,8 +547,10 @@ export async function loadSnapshot(
   after: string | null,
   signal?: AbortSignal
 ): Promise<LiveSnapshot<LolStats>> {
-  const lazySeriesId = lazyHistorySeriesId(gameId);
-  if (lazySeriesId) return loadLazyHistorySnapshot(lazySeriesId, signal);
+  const lazyHistoryId = lazyHistorySeriesId(gameId);
+  if (lazyHistoryId) return loadLazyHistorySnapshot(lazyHistoryId, signal);
+  const lazyLiveId = lazyLiveSeriesId(gameId);
+  if (lazyLiveId) return loadLazyLiveSnapshot(lazyLiveId, signal);
 
   const snapshot = await requestJson<LiveSnapshot<LolStats>>(
     snapshotPath(gameId, after, after ? null : String(Date.now())),

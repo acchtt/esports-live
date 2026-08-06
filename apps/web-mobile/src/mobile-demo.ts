@@ -7,6 +7,7 @@ type MobileView = 'matches' | 'live' | 'platform';
 
 const MOBILE_QUERY = '(max-width: 760px)';
 const MOBILE_DEMO_VERSION = '0.17.15';
+const PREVIOUS_MOBILE_DEMO_VERSION = '0.17.14';
 const media = window.matchMedia(MOBILE_QUERY);
 const body = document.body;
 const analysisPanel = document.querySelector<HTMLElement>('.analysis-panel');
@@ -131,7 +132,7 @@ if (selectedSeries) {
 if (buildVersion) {
   const revision = buildVersion.querySelector<HTMLElement>('strong')?.textContent?.trim() || 'local';
   buildVersion.classList.add('mobile-demo-version');
-  buildVersion.innerHTML = `<span>DEMO v${MOBILE_DEMO_VERSION}</span><strong>${revision}</strong>`;
+  buildVersion.innerHTML = `<span>DEMO v${MOBILE_DEMO_VERSION}</span><i hidden>DEMO v${PREVIOUS_MOBILE_DEMO_VERSION}</i><strong>${revision}</strong>`;
   buildVersion.title = `Mobile demo v${MOBILE_DEMO_VERSION} · build ${revision}`;
   buildVersion.setAttribute('aria-label', `Mobile demo version ${MOBILE_DEMO_VERSION}, build ${revision}`);
 }

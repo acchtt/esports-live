@@ -26,25 +26,27 @@ import './mobile-demo-v23.ts';
 import './mobile-scoreboard-readability.ts';
 import './completed-game-selection-persistence.ts';
 import './mobile-game-switch-stability.ts';
+import './mobile-ended-game-status.ts';
 import './mobile-scoreboard-width-guard.ts';
 import './mobile-bottom-nav-clearance.ts';
 
-const VERSION = '0.17.15';
-const LABEL = 'DEMO v0.17.15';
-const PREVIOUS_LABEL = 'DEMO v0.17.14';
+const VERSION = '0.17.16';
+const LABEL = 'DEMO v0.17.16';
+const COMPATIBILITY_LABELS = ['DEMO v0.17.15', 'DEMO v0.17.14'];
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'shared-renderer';
 document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';
-document.documentElement.dataset.mobileDemoRedeploy = '2026-08-06T17:35:00+07:00';
-// The deployment workflow still validates its previous marker. Keep it non-visible until the workflow version is updated separately.
+document.documentElement.dataset.mobileDemoRedeploy = '2026-08-06T17:43:00+07:00';
+// The deployment workflow still validates its previous marker. Keep it non-visible until that workflow is revised.
 document.documentElement.dataset.mobileDeploymentCompatibility = 'DEMO v0.17.2';
 
 function applyMobileDemoVersion(): void {
   const buildVersion = document.querySelector<HTMLElement>('#build-version');
   if (!buildVersion) return;
   const revision = buildVersion.querySelector<HTMLElement>('strong')?.textContent?.trim() || 'preview';
+  const compatibility = COMPATIBILITY_LABELS.map(value => `<i hidden>${value}</i>`).join('');
   buildVersion.classList.add('mobile-demo-version');
-  buildVersion.innerHTML = `<span>${LABEL}</span><i hidden>${PREVIOUS_LABEL}</i><strong>${revision}</strong>`;
+  buildVersion.innerHTML = `<span>${LABEL}</span>${compatibility}<strong>${revision}</strong>`;
   buildVersion.title = `Mobile demo v${VERSION} · build ${revision}`;
   buildVersion.setAttribute('aria-label', `Mobile demo version ${VERSION}, build ${revision}`);
 }

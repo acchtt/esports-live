@@ -146,7 +146,7 @@ test('live matches use the shared mobile scoreboard renderer', async ({ page }) 
   page.on('pageerror', error => pageErrors.push(error.message));
   await openLiveMatch(page, true);
 
-  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.13');
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.14');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
   await expect(page.locator('html')).toHaveAttribute('data-mobile-scoreboard-details', 'team-kills-no-items');
 

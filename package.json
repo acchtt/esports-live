@@ -21,7 +21,7 @@
     "test": "node --import tsx --test packages/core/src/*.test.ts packages/adapter-lol/src/*.test.ts apps/api/src/*.test.ts",
     "test:web": "npm run build:web && playwright test",
     "test:web-mobile": "npm run build:web-mobile && WEB_APP_ROOT=apps/web-mobile playwright test",
-    "test:web-v2": "npm run build:web-v2 && WEB_APP_ROOT=apps/web-v2 playwright test tests/web/web-v2-shell.spec.ts tests/web/web-v2-scoreboard-density.spec.ts",
+    "test:web-v2": "npm run build:web-v2 && WEB_APP_ROOT=apps/web-v2 playwright test tests/web/web-v2-shell.spec.ts tests/web/web-v2-scoreboard-density.spec.ts tests/web/web-v2-sparse-live.spec.ts",
     "check": "npm run typecheck && npm test"
   },
   "devDependencies": {

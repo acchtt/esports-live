@@ -127,9 +127,9 @@ function mergeSnapshot(
   };
 }
 
-function preferredGame(event: ScheduleEvent, view: DataView): SeriesGameRef | null {
+function preferredGame(event: ScheduleEvent, _view: DataView): SeriesGameRef | null {
   const games = event.series.games;
-  if (view === 'history' || event.series.state === 'completed') {
+  if (event.series.state === 'completed') {
     return [...games].reverse().find(game => game.state === 'completed') ?? games.at(-1) ?? null;
   }
   return games.find(game => game.state === 'live')
@@ -161,6 +161,20 @@ function catalogueStateRank(event: ScheduleEvent): number {
   return 1;
 }
 
+function shouldReplaceCatalogueEntry(
+  current: CatalogueEntry,
+  event: ScheduleEvent,
+  view: DataView
+): boolean {
+  const currentRank = catalogueStateRank(current.event);
+  const nextRank = catalogueStateRank(event);
+  if (nextRank !== currentRank) return nextRank > currentRank;
+  if (event.series.state === 'completed') {
+    return view === 'history' && current.view !== 'history';
+  }
+  return view === 'matches' && current.view !== 'matches';
+}
+
 function catalogueTime(entry: CatalogueEntry): number {
   const value = Date.parse(entry.event.series.scheduledStart);
   return Number.isFinite(value) ? value : 0;
@@ -171,7 +185,7 @@ export function catalogueEntries(state: AppState): readonly CatalogueEntry[] {
   (['matches', 'history'] as const).forEach(view => {
     state.events[view].forEach(event => {
       const current = entries.get(event.series.id);
-      if (!current || catalogueStateRank(event) >= catalogueStateRank(current.event)) {
+      if (!current || shouldReplaceCatalogueEntry(current, event, view)) {
         entries.set(event.series.id, { event, view });
       }
     });

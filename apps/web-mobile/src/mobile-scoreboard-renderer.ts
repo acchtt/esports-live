@@ -25,7 +25,37 @@ const OBJECTIVES: readonly [ObjectiveKey, string][] = [
   ['barons', 'Barons'],
   ['inhibitors', 'Inhibitors']
 ];
+const DDRAGON_VERSIONS = 'https://ddragon.leagueoflegends.com/api/versions.json';
 const DDRAGON_CDN = 'https://ddragon.leagueoflegends.com/cdn';
+const CHAMPION_ASSET_VERSION = 'ddragon-version-fallback-v27';
+const CHAMPION_ALIASES: Record<string, string> = {
+  aurelionsol: 'AurelionSol',
+  belveth: 'Belveth',
+  chogath: 'Chogath',
+  drmundo: 'DrMundo',
+  jarvaniv: 'JarvanIV',
+  kaisa: 'Kaisa',
+  ksante: 'KSante',
+  khazix: 'Khazix',
+  leblanc: 'Leblanc',
+  leesin: 'LeeSin',
+  masteryi: 'MasterYi',
+  missfortune: 'MissFortune',
+  monkeyking: 'MonkeyKing',
+  nunu: 'Nunu',
+  nunuandwillump: 'Nunu',
+  nunuwillump: 'Nunu',
+  reksai: 'RekSai',
+  renata: 'Renata',
+  renataglasc: 'Renata',
+  tahmkench: 'TahmKench',
+  twistedfate: 'TwistedFate',
+  velkoz: 'Velkoz',
+  wukong: 'MonkeyKing',
+  xinzhao: 'XinZhao'
+};
+
+let ddragonVersionsPromise: Promise<readonly string[]> | null = null;
 
 function esc(value: unknown): string {
   return String(value ?? '')
@@ -72,29 +102,108 @@ function orderedPlayers(team: LolTeamState | null): readonly (LolPlayerState | n
 function championKey(value: string | null): string | null {
   const key = value?.replace(/[^a-z0-9]/gi, '') ?? '';
   if (!key || /^\d+$/.test(key)) return null;
-  return ({
-    Wukong: 'MonkeyKing',
-    NunuWillump: 'Nunu',
-    RenataGlasc: 'Renata'
-  } as Record<string, string>)[key] ?? key;
+  return CHAMPION_ALIASES[key.toLowerCase()] ?? key;
 }
 
-function championMarkup(player: LolPlayerState | null, patch: string | null): string {
+function availableDdragonVersions(): Promise<readonly string[]> {
+  if (ddragonVersionsPromise) return ddragonVersionsPromise;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 4_000);
+  ddragonVersionsPromise = fetch(DDRAGON_VERSIONS, {
+    cache: 'force-cache',
+    signal: controller.signal
+  })
+    .then(response => response.ok ? response.json() : [])
+    .then(value => Array.isArray(value)
+      ? value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+      : [])
+    .catch(() => [])
+    .finally(() => window.clearTimeout(timeout));
+  return ddragonVersionsPromise;
+}
+
+async function ddragonVersionCandidates(patch: string | null): Promise<readonly string[]> {
+  const versions = await availableDdragonVersions();
+  const prefix = patch?.match(/^(\d+\.\d+)/)?.[1] ?? null;
+  const candidates = [
+    patch && versions.includes(patch) ? patch : null,
+    prefix ? versions.find(version => version === prefix || version.startsWith(`${prefix}.`)) ?? null : null,
+    versions[0] ?? null,
+    patch
+  ].filter((version): version is string => Boolean(version));
+  return [...new Set(candidates)];
+}
+
+function championMarkup(player: LolPlayerState | null): string {
   const champion = player?.championId ?? 'Champion unavailable';
   const key = championKey(player?.championId ?? null);
-  const image = key && patch
-    ? `<img src="${DDRAGON_CDN}/${encodeURIComponent(patch)}/img/champion/${encodeURIComponent(key)}.png" alt="${esc(champion)}">`
+  const image = key
+    ? `<img class="telemetry-champion-image" data-champion-key="${esc(key)}" data-asset-state="pending" alt="" aria-hidden="true" decoding="async" style="display:none">`
     : '';
   const initials = champion.split(/\s+/).filter(Boolean).slice(0, 2)
     .map(word => word[0]?.toUpperCase() ?? '').join('') || '?';
   return `<div class="role-player-portrait"><div class="telemetry-champion">${image}<span class="telemetry-champion-fallback">${esc(initials)}</span></div></div>`;
 }
 
-function playerMarkup(player: LolPlayerState | null, role: Role, side: Side, patch: string | null): string {
+function tryChampionVersion(image: HTMLImageElement, version: string, key: string): Promise<boolean> {
+  return new Promise(resolve => {
+    if (!image.isConnected) {
+      resolve(false);
+      return;
+    }
+    const finish = (loaded: boolean): void => {
+      image.onload = null;
+      image.onerror = null;
+      resolve(loaded);
+    };
+    image.onload = () => finish(image.naturalWidth > 0);
+    image.onerror = () => finish(false);
+    image.src = `${DDRAGON_CDN}/${encodeURIComponent(version)}/img/champion/${encodeURIComponent(key)}.png`;
+  });
+}
+
+async function loadChampionPortrait(image: HTMLImageElement, versions: readonly string[]): Promise<void> {
+  const key = image.dataset.championKey;
+  if (!key) return;
+  const fallback = image.parentElement?.querySelector<HTMLElement>('.telemetry-champion-fallback') ?? null;
+  for (const version of versions) {
+    if (!image.isConnected) return;
+    image.dataset.assetState = 'loading';
+    image.dataset.assetVersion = version;
+    if (await tryChampionVersion(image, version, key)) {
+      image.dataset.assetState = 'loaded';
+      image.style.removeProperty('display');
+      if (fallback) fallback.hidden = true;
+      return;
+    }
+    image.style.setProperty('display', 'none');
+  }
+  image.dataset.assetState = 'fallback';
+  image.removeAttribute('src');
+  image.removeAttribute('data-asset-version');
+  image.style.setProperty('display', 'none');
+  if (fallback) fallback.hidden = false;
+}
+
+async function hydrateChampionPortraits(root: HTMLElement, patch: string | null): Promise<void> {
+  const images = [...root.querySelectorAll<HTMLImageElement>('.telemetry-champion-image[data-champion-key]')]
+    .filter(image => image.dataset.assetState === 'pending');
+  if (!images.length) return;
+  images.forEach(image => { image.dataset.assetState = 'resolving'; });
+  const versions = await ddragonVersionCandidates(patch);
+  if (!versions.length) {
+    images.forEach(image => { image.dataset.assetState = 'fallback'; });
+    return;
+  }
+  await Promise.all(images.map(image => loadChampionPortrait(image, versions)));
+  document.documentElement.dataset.mobileChampionAssets = CHAMPION_ASSET_VERSION;
+}
+
+function playerMarkup(player: LolPlayerState | null, role: Role, side: Side): string {
   const name = player?.handle ?? 'Player unavailable';
   const champion = player?.championId ?? 'Champion unavailable';
   return `<div class="role-player ${side}">
-    ${championMarkup(player, patch)}
+    ${championMarkup(player)}
     <div class="role-player-heading">
       <span class="role-chip">${ROLE_LABELS[role]}</span>
       <div class="role-player-name"><strong title="${esc(name)}">${esc(name)}</strong><small>${esc(champion)}</small></div>
@@ -124,11 +233,10 @@ function deltaMarkup(blue: LolPlayerState | null, red: LolPlayerState | null, ro
 function matchupMarkup(stats: LolStats | null): string {
   const blue = orderedPlayers(stats?.blue ?? null);
   const red = orderedPlayers(stats?.red ?? null);
-  const patch = stats?.patch ?? null;
   return ROLE_ORDER.map((role, index) => `<div class="role-matchup-row" data-role="${role}">
-    ${playerMarkup(blue[index] ?? null, role, 'blue', patch)}
+    ${playerMarkup(blue[index] ?? null, role, 'blue')}
     ${deltaMarkup(blue[index] ?? null, red[index] ?? null, role)}
-    ${playerMarkup(red[index] ?? null, role, 'red', patch)}
+    ${playerMarkup(red[index] ?? null, role, 'red')}
   </div>`).join('');
 }
 
@@ -195,6 +303,7 @@ function renderKey(root: HTMLElement, snapshot: LiveSnapshot<LolStats> | null, m
     mode,
     gameId: snapshot?.game?.id ?? root.dataset.finalGameId ?? root.dataset.mobileUnifiedGameId ?? '',
     state: root.dataset.liveBoardState ?? snapshot?.game?.state ?? '',
+    patch: stats?.patch ?? null,
     teams: [fallbackName(root, snapshot, 'blue'), fallbackName(root, snapshot, 'red')],
     blue: stats ? {
       gold: stats.blue.gold,
@@ -261,6 +370,7 @@ export function applyMobileScoreboard(
   root.dataset.mobileLiveDesign = 'history-current';
   root.dataset.mobileScoreboardRenderer = 'shared-v1';
   root.dataset.mobileScoreboardMode = options.mode;
+  root.dataset.mobileChampionAssets = CHAMPION_ASSET_VERSION;
   root.dataset.mobileSharedRenderKey = key;
   root.dataset.mobileLiveDesignKey = key;
 
@@ -275,9 +385,11 @@ export function applyMobileScoreboard(
   }
 
   removeLegacyLayers(root, comparison, matchups);
+  void hydrateChampionPortraits(matchups, snapshot?.stats?.patch ?? null);
   root.querySelector<HTMLElement>('.player-board-toolbar')?.setAttribute('data-mobile-live-toolbar', 'hidden');
   document.documentElement.dataset.mobileScoreboardRenderer = 'shared-v1';
   document.documentElement.dataset.mobileScoreboardDetails = 'team-kills-no-items';
+  document.documentElement.dataset.mobileChampionAssets = CHAMPION_ASSET_VERSION;
   window.dispatchEvent(new CustomEvent('esports-live:mobile-scoreboard-rendered', {
     detail: { root, snapshot, mode: options.mode }
   }));

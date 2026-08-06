@@ -137,7 +137,12 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 
   await page.route('**/v1/lol/games/**/live**', route => json(route, snapshot()));
-  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['26.15.1']));
+  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['15.15.1']));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**/img/champion/*.png', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#334155"/></svg>'
+  }));
 }
 
 test('mobile demo switches surfaces and uses the shared scoreboard contract for live matches', async ({ page }) => {
@@ -174,6 +179,8 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
   await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v25');
   await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
+  await expect(board).toHaveAttribute('data-mobile-champion-assets', 'ddragon-version-fallback-v27');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-champion-assets', 'ddragon-version-fallback-v27');
   await expect(board).toHaveClass(/completed-final-game/);
   await expect(board).toHaveClass(/mobile-final-recovery/);
   await expect(header.locator(':scope > *')).toHaveCount(2);
@@ -201,6 +208,19 @@ test('mobile demo switches surfaces and uses the shared scoreboard contract for 
   await expect(board.locator('.completed-final-matchups')).toBeVisible();
   await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
   await expect(board.locator('.role-player-portrait')).toHaveCount(10);
+  await expect(board.locator('.telemetry-champion-image[data-asset-state="loaded"]')).toHaveCount(10);
+  const portraitAssets = await board.locator('.telemetry-champion-image').evaluateAll(images => images.map(image => {
+    const portrait = image as HTMLImageElement;
+    return {
+      source: portrait.currentSrc || portrait.src,
+      complete: portrait.complete,
+      width: portrait.naturalWidth,
+      display: getComputedStyle(portrait).display
+    };
+  }));
+  expect(portraitAssets).toHaveLength(10);
+  expect(portraitAssets.every(asset => asset.source.includes('/15.15.1/img/champion/'))).toBe(true);
+  expect(portraitAssets.every(asset => asset.complete && asset.width > 0 && asset.display !== 'none')).toBe(true);
   await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
   await expect(board.locator('.mobile-recovery-row')).toHaveCount(0);
   await expect(page.locator('.v2-matchup-row')).toHaveCount(0);

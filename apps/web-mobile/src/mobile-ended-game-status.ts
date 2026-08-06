@@ -169,10 +169,8 @@ window.addEventListener('esports-live:snapshot', event => {
 window.addEventListener('esports-live:ended-snapshot', event => {
   const detail = (event as CustomEvent<EndedSnapshotDetail>).detail;
   const snapshot = detail?.snapshot ?? null;
-  if (snapshot?.game?.id) {
-    snapshots.set(snapshot.game.id, snapshot);
-    endedGameIds.add(snapshot.game.id);
-  }
+  if (snapshot?.game?.id) snapshots.set(snapshot.game.id, snapshot);
+  if (snapshot?.game.state === 'completed') endedGameIds.add(snapshot.game.id);
   if (detail?.root) queueMicrotask(() => applyBoard(detail.root!, snapshot));
   queueApply();
 });

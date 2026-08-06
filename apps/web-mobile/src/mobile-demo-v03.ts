@@ -27,8 +27,8 @@ import './mobile-scoreboard-readability.ts';
 import './completed-game-selection-persistence.ts';
 import './mobile-game-switch-stability.ts';
 
-const VERSION = '0.17.14';
-const LABEL = 'DEMO v0.17.14';
+const VERSION = '0.17.13';
+const LABEL = 'DEMO v0.17.13';
 document.documentElement.dataset.mobileDemoVersion = VERSION;
 document.documentElement.dataset.mobileScoreboardParity = 'shared-renderer';
 document.documentElement.dataset.mobileNavigationLayout = 'app-frame-live';

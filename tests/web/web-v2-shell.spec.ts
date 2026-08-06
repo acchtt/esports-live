@@ -5,6 +5,14 @@ const alpha = { id: 'alpha', name: 'Alpha Five', code: 'ALP' };
 const bravo = { id: 'bravo', name: 'Bravo Core', code: 'BRV' };
 const delta = { id: 'delta', name: 'Delta Club', code: 'DLC' };
 const echo = { id: 'echo', name: 'Echo Squad', code: 'ECH' };
+const future = { id: 'future', name: 'Future Gaming', code: 'FTR' };
+const nova = { id: 'nova', name: 'Nova Prime', code: 'NVP' };
+
+const blueHandles = ['Doran', 'Oner', 'Faker', 'Peyz', 'Keria'];
+const redHandles = ['Siwoo', 'Lucid', 'ShowMaker', 'Smash', 'Career'];
+const roles = ['top', 'jungle', 'mid', 'bottom', 'support'];
+const blueChampions = ['Jayce', 'Nocturne', 'Ryze', 'Lucian', 'Milio'];
+const redChampions = ['Olaf', 'JarvanIV', 'Syndra', 'Caitlyn', 'Lux'];
 
 function iso(offsetMs = 0): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -24,39 +32,76 @@ const activeSeries = {
   ]
 };
 
+const upcomingSeries = {
+  id: 'series-v2-upcoming',
+  esport: 'lol',
+  competition: { id: 'competition-upcoming', name: 'V2 League', stage: 'Week 1' },
+  teams: [future, nova],
+  bestOf: 3,
+  state: 'scheduled',
+  scheduledStart: iso(2 * 60 * 60 * 1_000),
+  games: [
+    { id: 'game-v2-upcoming-1', number: 1, state: 'unstarted' },
+    { id: 'game-v2-upcoming-2', number: 2, state: 'unstarted' }
+  ]
+};
+
 const historySeries = {
   id: 'series-v2-history',
   esport: 'lol',
   competition: { id: 'competition-history', name: 'V2 History League', stage: 'Final' },
   teams: [delta, echo],
-  bestOf: 1,
+  bestOf: 3,
   state: 'completed',
   scheduledStart: iso(-2 * 60 * 60 * 1_000),
-  games: [{ id: 'game-v2-history-1', number: 1, state: 'completed' }]
+  games: [
+    { id: 'game-v2-history-1', number: 1, state: 'completed' },
+    { id: 'game-v2-history-2', number: 2, state: 'completed' }
+  ]
 };
+
+function players(side: 'blue' | 'red', live: boolean) {
+  const handles = side === 'blue' ? blueHandles : redHandles;
+  const champions = side === 'blue' ? blueChampions : redChampions;
+  return handles.map((handle, index) => ({
+    id: `${side}-${index}`,
+    handle,
+    championId: champions[index]!,
+    role: roles[index]!,
+    level: live ? 13 + (index % 3) : 18,
+    kills: side === 'blue' ? [4, 1, 1, 11, 0][index]! : [4, 0, 2, 1, 0][index]!,
+    deaths: side === 'blue' ? [4, 0, 0, 2, 1][index]! : [3, 5, 2, 3, 4][index]!,
+    assists: side === 'blue' ? [1, 8, 3, 3, 14][index]! : [0, 2, 0, 1, 3][index]!,
+    creepScore: 190 + index * 11,
+    totalGold: side === 'blue'
+      ? [8_906, 8_517, 8_091, 13_168, 7_580][index]!
+      : [8_000, 7_000, 8_000, 7_000, 6_000][index]!,
+    items: ['1001', '2003']
+  }));
+}
 
 function team(teamRef: typeof alpha, side: 'blue' | 'red', live: boolean) {
   return {
     id: teamRef.id,
     name: teamRef.name,
     side,
-    gold: side === 'blue' ? (live ? 31_400 : 38_500) : (live ? 29_100 : 31_200),
-    kills: side === 'blue' ? (live ? 10 : 16) : (live ? 7 : 9),
+    gold: side === 'blue' ? (live ? 41_400 : 55_000) : (live ? 38_100 : 45_000),
+    kills: side === 'blue' ? (live ? 12 : 17) : (live ? 8 : 7),
     objectives: {
-      towers: side === 'blue' ? 6 : 3,
+      towers: side === 'blue' ? 10 : 3,
       inhibitors: side === 'blue' ? 1 : 0,
-      dragons: side === 'blue' ? ['infernal', 'cloud'] : ['mountain'],
-      barons: side === 'blue' ? 1 : 0,
+      dragons: side === 'blue' ? ['infernal', 'cloud'] : ['mountain', 'ocean', 'hextech'],
+      barons: side === 'blue' ? 2 : 0,
       heralds: 1,
       grubs: 3
     },
-    players: []
+    players: players(side, live)
   };
 }
 
 function snapshot(gameId: string) {
   const historical = gameId !== 'game-v2-2';
-  const series = gameId === 'game-v2-history-1' ? historySeries : activeSeries;
+  const series = gameId.startsWith('game-v2-history') ? historySeries : activeSeries;
   const game = series.games.find(item => item.id === gameId) ?? series.games[0]!;
   const left = series.teams[0]!;
   const right = series.teams[1]!;
@@ -67,7 +112,7 @@ function snapshot(gameId: string) {
     series,
     game,
     stats: {
-      gameClockSeconds: historical ? 1_945 : 1_322,
+      gameClockSeconds: historical ? 2_217 : 1_322,
       patch: '26.15.1',
       blue: team(left, 'blue', !historical),
       red: team(right, 'red', !historical)
@@ -104,11 +149,12 @@ async function installFixtures(page: Page): Promise<void> {
     const history = route.request().url().includes('states=completed');
     return json(route, {
       esport: 'lol',
-      events: [{
-        series: history ? historySeries : activeSeries,
-        provider,
-        observedAt: iso()
-      }]
+      events: history
+        ? [{ series: historySeries, provider, observedAt: iso() }]
+        : [
+            { series: activeSeries, provider, observedAt: iso() },
+            { series: upcomingSeries, provider, observedAt: iso() }
+          ]
     });
   });
   await page.route('**/v1/lol/games/**/live**', route => {
@@ -117,7 +163,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('web v2 keeps one scoreboard mounted while views and games change', async ({ page }) => {
+test('web v2 index includes live, upcoming and ended matches and opens the full stats board', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -126,40 +172,68 @@ test('web v2 keeps one scoreboard mounted while views and games change', async (
   await expect(page).toHaveTitle('Esports Live V2');
   await expect(page.getByRole('link', { name: 'Current site' })).toHaveAttribute('href', '../');
   await expect(page.locator('[data-series-id="series-v2-live"]')).toBeVisible();
-  await expect(page.locator('#stage-title')).toHaveText('Alpha Five vs Bravo Core');
-  await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
-  await expect(page.locator('#game-clock')).toHaveText('22:02');
+  await expect(page.locator('[data-series-id="series-v2-upcoming"]')).toBeVisible();
+  await expect(page.locator('[data-series-id="series-v2-history"]')).toBeVisible();
+  await expect(page.locator('#catalogue-meta')).toContainText('3 matches');
+
+  await page.getByRole('button', { name: 'Ended', exact: true }).click();
+  await expect(page.locator('[data-series-id="series-v2-history"]')).toBeVisible();
+  await expect(page.locator('[data-series-id="series-v2-live"]')).toBeHidden();
+  await expect(page.locator('[data-series-id="series-v2-upcoming"]')).toBeHidden();
+
+  await page.locator('[data-series-id="series-v2-history"]').click();
+  await expect(page.locator('#match-panel')).toBeVisible();
+  await expect(page.locator('#detail-title')).toHaveText('Delta Club vs Echo Squad');
+  await expect(page.locator('#game-label')).toHaveText('Game 2 · Final');
+  await expect(page.locator('#game-clock')).toHaveText('36:57');
+  await expect(page.locator('.objective-grid article')).toHaveCount(4);
+  await expect(page.locator('#player-board .player-row')).toHaveCount(5);
+  await expect(page.locator('.blue-player .player-copy').first()).toContainText('DLC Doran');
+  await expect(page.locator('.red-player .player-copy').first()).toContainText('ECH Siwoo');
+  await expect(page.locator('.lane-gold').first()).toHaveText('+906');
 
   const scoreboard = page.locator('#scoreboard');
   await scoreboard.evaluate(element => { element.dataset.identity = 'persistent'; });
+  await page.getByRole('button', { name: /Matches/ }).last().click();
+  await expect(page.locator('#catalogue-panel')).toBeVisible();
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+  await page.locator('[data-series-id="series-v2-live"]').click();
+  await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+  await expect(page.locator('#game-clock')).toHaveText('22:02');
+  await expect(scoreboard).toHaveAttribute('data-identity', 'persistent');
 
   await page.getByRole('button', { name: /Game 1 Final/i }).click();
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
-  await expect(page.locator('#game-clock')).toHaveText('32:25');
   await expect(scoreboard).toHaveAttribute('data-identity', 'persistent');
 
-  await page.getByRole('button', { name: 'History', exact: true }).first().click();
-  await expect(page.locator('[data-series-id="series-v2-history"]')).toBeVisible();
-  await expect(page.locator('#stage-title')).toHaveText('Delta Club vs Echo Squad');
-  await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
-  await expect(scoreboard).toHaveAttribute('data-identity', 'persistent');
-
-  await page.getByRole('button', { name: 'Standings', exact: true }).first().click();
-  await expect(page.locator('#standings-panel')).toBeVisible();
-  await expect(scoreboard).toBeHidden();
+  await page.getByRole('button', { name: /Platform/ }).click();
+  await expect(page.locator('#platform-panel')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test('web v2 mobile navigation changes mounted panels without layout replacement', async ({ page }) => {
+test('web v2 mobile match detail follows the reference board without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await page.goto('/v2/');
 
-  const mobileNav = page.locator('.mobile-nav');
-  await expect(mobileNav).toBeVisible();
-  await expect(page.locator('#scoreboard')).toBeVisible();
-  await mobileNav.getByRole('button', { name: /History/ }).click();
+  const navigation = page.locator('.mobile-nav');
+  await expect(navigation).toBeVisible();
   await expect(page.locator('[data-series-id="series-v2-history"]')).toBeVisible();
-  await mobileNav.getByRole('button', { name: /Standings/ }).click();
-  await expect(page.locator('#standings-panel')).toBeVisible();
+  await page.locator('[data-series-id="series-v2-live"]').click();
+
+  await expect(page.locator('#scoreboard')).toBeVisible();
+  await expect(page.locator('.scoreboard-header')).toContainText('Game 2 · Live');
+  await expect(page.locator('.team-banner')).toBeVisible();
+  await expect(page.locator('.objective-grid article')).toHaveCount(4);
+  await expect(page.locator('.player-row')).toHaveCount(5);
+  await expect(navigation.getByRole('button', { name: /Match/ })).toHaveClass(/active/);
+
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth
+  }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
+
+  await navigation.getByRole('button', { name: /Matches/ }).click();
+  await expect(page.locator('#catalogue-panel')).toBeVisible();
 });

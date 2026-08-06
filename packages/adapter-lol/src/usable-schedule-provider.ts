@@ -1,15 +1,20 @@
 import type { LolProviderClient, LolProviderScheduleEntry, LolProviderSeries } from './provider.ts';
+import { RIOT_LPL_LEAGUE_ID } from './riot-supplemental-league-provider.ts';
 
 export interface UsableScheduleProviderOptions {
   now?: () => Date;
   scheduledLiveProbeDelayMs?: number;
   scheduledLiveProbeWindowMs?: number;
   scheduledLiveProbeLimit?: number;
+  completedLiveProbeWindowMs?: number;
+  completedLiveProbeLimit?: number;
 }
 
 const DEFAULT_SCHEDULED_LIVE_PROBE_DELAY_MS = 2 * 60 * 1_000;
 const DEFAULT_SCHEDULED_LIVE_PROBE_WINDOW_MS = 6 * 60 * 60 * 1_000;
 const DEFAULT_SCHEDULED_LIVE_PROBE_LIMIT = 6;
+const DEFAULT_COMPLETED_LIVE_PROBE_WINDOW_MS = 12 * 60 * 60 * 1_000;
+const DEFAULT_COMPLETED_LIVE_PROBE_LIMIT = 4;
 
 type ProviderGame = LolProviderSeries['games'][number];
 
@@ -61,6 +66,34 @@ function scheduledProbeTime(
   if (!Number.isFinite(scheduledStart)) return null;
   const elapsed = nowMs - scheduledStart;
   return elapsed >= delayMs && elapsed <= windowMs ? scheduledStart : null;
+}
+
+function isLplSeries(series: LolProviderSeries): boolean {
+  const competitionId = series.competition.id.trim().toLowerCase();
+  const competitionName = series.competition.name.trim().toLowerCase();
+  return competitionId === RIOT_LPL_LEAGUE_ID
+    || competitionName === 'lpl'
+    || competitionName.includes('league of legends pro league');
+}
+
+function completedProbeTime(
+  series: LolProviderSeries,
+  nowMs: number,
+  windowMs: number
+): number | null {
+  if (series.state !== 'completed' || !hasUsableTeams(series)) return null;
+  const scheduledStart = Date.parse(series.scheduledStart);
+  if (!Number.isFinite(scheduledStart)) return null;
+  const elapsed = nowMs - scheduledStart;
+  if (elapsed < 0 || elapsed > windowMs) return null;
+
+  const winsRequired = Math.floor(Math.max(1, series.bestOf) / 2) + 1;
+  const completedGames = series.games.filter(game => game.state === 'completed').length;
+  const incompleteGameInventory = series.games.length < winsRequired
+    || completedGames < winsRequired
+    || series.games.some(game => game.state !== 'completed');
+
+  return isLplSeries(series) || incompleteGameInventory ? scheduledStart : null;
 }
 
 async function reconcileLiveGameState(
@@ -184,16 +217,44 @@ async function resolveScheduledEntry(
   }
 }
 
+async function resolveCompletedEntry(
+  provider: LolProviderClient,
+  entry: LolProviderScheduleEntry,
+  probeCompleted: boolean
+): Promise<LolProviderScheduleEntry> {
+  if (!probeCompleted) return entry;
+  const { series } = entry;
+
+  if (series.games.some(game => game.state !== 'completed')) {
+    const games = await reconcileLiveGameState(provider, series.games);
+    const resolvedSeries = { ...series, games };
+    if (hasActiveGame(games)) return promoteScheduledEntry(entry, resolvedSeries);
+  }
+
+  try {
+    const resolvedSeries = await resolveFromSeriesHistory(provider, series);
+    return resolvedSeries && hasActiveGame(resolvedSeries.games)
+      ? promoteScheduledEntry(entry, resolvedSeries)
+      : entry;
+  } catch {
+    return entry;
+  }
+}
+
 async function resolveEntry(
   provider: LolProviderClient,
   entry: LolProviderScheduleEntry,
-  probeScheduled: boolean
+  probeScheduled: boolean,
+  probeCompleted: boolean
 ): Promise<LolProviderScheduleEntry | null> {
   if (entry.series.state === 'live' || entry.series.state === 'paused') {
     return resolveLiveEntry(provider, entry);
   }
   if (entry.series.state === 'scheduled') {
     return resolveScheduledEntry(provider, entry, probeScheduled);
+  }
+  if (entry.series.state === 'completed') {
+    return resolveCompletedEntry(provider, entry, probeCompleted);
   }
   return entry;
 }
@@ -209,6 +270,10 @@ export function createUsableScheduleProvider(
     ?? DEFAULT_SCHEDULED_LIVE_PROBE_WINDOW_MS;
   const scheduledLiveProbeLimit = options.scheduledLiveProbeLimit
     ?? DEFAULT_SCHEDULED_LIVE_PROBE_LIMIT;
+  const completedLiveProbeWindowMs = options.completedLiveProbeWindowMs
+    ?? DEFAULT_COMPLETED_LIVE_PROBE_WINDOW_MS;
+  const completedLiveProbeLimit = options.completedLiveProbeLimit
+    ?? DEFAULT_COMPLETED_LIVE_PROBE_LIMIT;
 
   return {
     id: provider.id,
@@ -231,8 +296,26 @@ export function createUsableScheduleProvider(
         .sort((left, right) => right.start - left.start)
         .slice(0, Math.max(0, scheduledLiveProbeLimit))
         .map(candidate => candidate.id));
+      const completedProbeIds = new Set(entries
+        .map(entry => ({
+          id: entry.series.id,
+          start: completedProbeTime(
+            entry.series,
+            nowMs,
+            completedLiveProbeWindowMs
+          )
+        }))
+        .filter((candidate): candidate is { id: string; start: number } => candidate.start !== null)
+        .sort((left, right) => right.start - left.start)
+        .slice(0, Math.max(0, completedLiveProbeLimit))
+        .map(candidate => candidate.id));
       const resolved = await Promise.all(entries.map(entry => (
-        resolveEntry(provider, entry, scheduledProbeIds.has(entry.series.id))
+        resolveEntry(
+          provider,
+          entry,
+          scheduledProbeIds.has(entry.series.id),
+          completedProbeIds.has(entry.series.id)
+        )
       )));
       return resolved.filter((entry): entry is LolProviderScheduleEntry => entry !== null);
     },

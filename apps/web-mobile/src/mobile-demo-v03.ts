@@ -26,6 +26,7 @@ import './mobile-demo-v23.ts';
 import './mobile-scoreboard-readability.ts';
 import './completed-game-selection-persistence.ts';
 import './mobile-game-switch-stability.ts';
+import './mobile-scoreboard-width-guard.ts';
 
 const VERSION = '0.17.14';
 const LABEL = 'DEMO v0.17.14';

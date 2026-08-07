@@ -10,6 +10,7 @@ import './lane-gold-polish.css';
 import { startWebV2 } from './app.ts';
 import { installArenaBrand } from './arena-brand.ts';
 import { installCatalogueFinality } from './catalogue-finality.ts';
+import { installCatalogueTeamLogos } from './catalogue-team-logos.ts';
 import { installChampionPortraitAssets } from './champion-portrait-assets.ts';
 import { installCompactHeader } from './compact-header.ts';
 import { installLiveLifecycle } from './live-lifecycle.ts';
@@ -22,6 +23,7 @@ if (!root) throw new Error('Missing #app root.');
 
 installCatalogueFinality();
 installLiveLifecycle(root);
+installCatalogueTeamLogos(root);
 installPlayerBoardCopy(root);
 startWebV2(root);
 installArenaBrand(root);

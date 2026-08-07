@@ -209,6 +209,28 @@ html {
   background: rgba(9, 19, 28, 0.9);
 }
 
+.gold-card::before,
+.gold-card::after,
+.objective-grid article::before,
+.objective-grid article::after {
+  display: none;
+}
+
+.scoreboard[data-game-state="completed"]:not([data-winner-side]) .gold-card {
+  border-color: rgba(245, 247, 250, 0.16);
+  background: rgba(8, 14, 21, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(245, 247, 250, 0.025);
+}
+
+.scoreboard[data-game-state="completed"]:not([data-winner-side]) .gold-card span {
+  color: #7f8b9c;
+}
+
+.scoreboard[data-game-state="completed"]:not([data-winner-side]) .gold-card strong[data-side="neutral"] {
+  color: #d9e0e8;
+  text-shadow: none;
+}
+
 .mobile-nav {
   border-color: rgba(123, 149, 176, 0.22);
   background: rgba(5, 9, 14, 0.96);

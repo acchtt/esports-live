@@ -135,11 +135,15 @@ function parseFinality(value: unknown): FinalitySignal {
     && wins.every(value => value < winsRequired);
   const hasFinalOutcome = teamResults.some(result => finalOutcome(result.outcome));
   const reportedCompleted = reportedState === 'completed' || reportedState === 'finished';
+  const allReportedGamesCompleted = games.length > 0
+    && games.every(game => game.state === 'completed');
 
   // Riot can briefly mark the whole series completed between games. A
-  // non-clinching score without a match outcome is not series finality.
+  // non-clinching score without a match outcome is not series finality. A
+  // fully completed game list is authoritative even if the event flag lags.
   const seriesCompleted = hasClinchedScore
     || hasFinalOutcome
+    || allReportedGamesCompleted
     || (reportedCompleted && !hasPartialScore);
 
   return { games, seriesCompleted };
@@ -280,21 +284,57 @@ function scheduleFinalityCandidates(
     });
 }
 
-function circularTake<T>(
+function rotatingBatch<T>(
   entries: readonly T[],
-  offset: number,
-  limit: number
+  currentTime: number,
+  limit: number,
+  phase = 0
 ): readonly T[] {
   if (!entries.length || limit <= 0) return [];
-  const count = Math.min(entries.length, Math.max(0, limit));
-  const start = ((offset % entries.length) + entries.length) % entries.length;
-  return Array.from({ length: count }, (_, index) => entries[(start + index) % entries.length]!);
+  const batchSize = Math.min(entries.length, Math.max(1, limit));
+  const batchCount = Math.ceil(entries.length / batchSize);
+  const slot = Math.floor(currentTime / SCHEDULE_FINALITY_ROTATION_MS) + phase;
+  const batchIndex = ((slot % batchCount) + batchCount) % batchCount;
+  const start = batchIndex * batchSize;
+  return entries.slice(start, start + batchSize);
 }
 
-function rotationOffset(currentTime: number, width: number): number {
-  if (width <= 0) return 0;
-  const slot = Math.floor(currentTime / SCHEDULE_FINALITY_ROTATION_MS);
-  return slot * width;
+function splitScheduleProbeBudget(
+  activeCount: number,
+  overdueCount: number,
+  otherCount: number,
+  limit: number
+): { active: number; overdue: number; other: number } {
+  const total = Math.max(0, limit);
+  if (!total) return { active: 0, overdue: 0, other: 0 };
+
+  let active = 0;
+  let overdue = 0;
+  let other = 0;
+
+  if (activeCount && overdueCount) {
+    active = Math.min(activeCount, Math.max(1, Math.ceil(total / 2)));
+    overdue = Math.min(overdueCount, total - active);
+  } else if (activeCount) {
+    active = Math.min(activeCount, total);
+  } else if (overdueCount) {
+    overdue = Math.min(overdueCount, total);
+  }
+
+  let remaining = total - active - overdue;
+  if (remaining > 0 && active < activeCount) {
+    const extra = Math.min(remaining, activeCount - active);
+    active += extra;
+    remaining -= extra;
+  }
+  if (remaining > 0 && overdue < overdueCount) {
+    const extra = Math.min(remaining, overdueCount - overdue);
+    overdue += extra;
+    remaining -= extra;
+  }
+  if (remaining > 0) other = Math.min(remaining, otherCount);
+
+  return { active, overdue, other };
 }
 
 async function requestFinality(
@@ -380,19 +420,14 @@ export function createRiotFinalityProvider(
       );
       const limit = Math.max(0, scheduleFinalityLimit);
       const overdue = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 0);
-      const general = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) !== 0);
-      const overdueSelection = circularTake(
-        overdue,
-        rotationOffset(currentTime, Math.max(1, limit)),
-        limit
-      );
-      const generalBudget = limit - overdueSelection.length;
-      const generalSelection = circularTake(
-        general,
-        rotationOffset(currentTime, Math.max(1, generalBudget)),
-        generalBudget
-      );
-      const candidates = [...overdueSelection, ...generalSelection];
+      const active = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 1);
+      const other = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 2);
+      const budget = splitScheduleProbeBudget(active.length, overdue.length, other.length, limit);
+      const candidates = [
+        ...rotatingBatch(active, currentTime, budget.active),
+        ...rotatingBatch(overdue, currentTime, budget.overdue, 1),
+        ...rotatingBatch(other, currentTime, budget.other, 2)
+      ];
 
       const signals = new Map<string, FinalitySignal>();
       await Promise.all(candidates.map(async entry => {

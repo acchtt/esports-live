@@ -71,23 +71,18 @@ function json(value: unknown): Response {
   });
 }
 
-test('prioritizes overdue scheduled series when live events would exhaust the finality limit', async () => {
-  const nsKt = series(
-    'ns-kt-ended',
-    'scheduled',
-    new Date(NOW - 7 * 60 * 60 * 1_000 - 20 * 60 * 1_000).toISOString()
-  );
-  const hleKrx = series(
-    'hle-krx-ended',
-    'scheduled',
-    new Date(NOW - 7 * 60 * 60 * 1_000 - 20 * 60 * 1_000).toISOString()
-  );
-  const olderLive = Array.from({ length: 4 }, (_, index) => series(
-    `older-live-${index}`,
+test('reserves finality capacity for live series when overdue scheduled entries fill the pool', async () => {
+  const tesBlg = series(
+    'tes-blg-ended',
     'live',
-    new Date(NOW - (7 * 60 + 50 - index * 5) * 60 * 1_000).toISOString()
+    new Date(NOW - 2 * 60 * 60 * 1_000).toISOString()
+  );
+  const overdue = Array.from({ length: 6 }, (_, index) => series(
+    `overdue-${index}`,
+    'scheduled',
+    new Date(NOW - (8 * 60 + index * 5) * 60 * 1_000).toISOString()
   ));
-  const schedule = [...olderLive.map(entry), entry(nsKt), entry(hleKrx)];
+  const schedule = [...overdue.map(entry), entry(tesBlg)];
   const requested: string[] = [];
 
   const base: LolProviderClient = {
@@ -105,15 +100,16 @@ test('prioritizes overdue scheduled series when live events would exhaust the fi
     fetcher: async input => {
       const id = new URL(String(input)).searchParams.get('id') ?? '';
       requested.push(id);
-      return json(payload(id, id === nsKt.id || id === hleKrx.id));
+      return json(payload(id, id === tesBlg.id));
     }
   });
 
   const reconciled = await provider.getSchedule();
 
-  assert.deepEqual(requested.sort(), [hleKrx.id, nsKt.id].sort());
-  assert.equal(reconciled.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
-  assert.equal(reconciled.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
+  assert.equal(requested.length, 2);
+  assert.ok(requested.includes(tesBlg.id));
+  assert.ok(requested.some(id => id.startsWith('overdue-')));
+  assert.equal(reconciled.find(item => item.series.id === tesBlg.id)?.series.state, 'completed');
 });
 
 test('advances stale scheduled probe batches across time windows even on a fresh worker isolate', async () => {

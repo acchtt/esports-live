@@ -116,7 +116,8 @@ test('prioritizes overdue scheduled series when live events would exhaust the fi
   assert.equal(reconciled.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
 });
 
-test('rotates overdue scheduled probes so stalled entries cannot permanently starve later finals', async () => {
+test('advances stale scheduled probe batches across time windows even on a fresh worker isolate', async () => {
+  let currentTime = NOW;
   const stalledOne = series(
     'stalled-one',
     'scheduled',
@@ -148,9 +149,9 @@ test('rotates overdue scheduled probes so stalled entries cannot permanently sta
       throw new Error('Snapshot should not be requested by this regression.');
     }
   };
-  const provider = createRiotFinalityProvider(base, {
+  const makeProvider = () => createRiotFinalityProvider(base, {
     apiKey: 'test-key',
-    now: () => new Date(NOW),
+    now: () => new Date(currentTime),
     scheduleFinalityLimit: 2,
     fetcher: async input => {
       const id = new URL(String(input)).searchParams.get('id') ?? '';
@@ -159,13 +160,16 @@ test('rotates overdue scheduled probes so stalled entries cannot permanently sta
     }
   });
 
-  const first = await provider.getSchedule();
-  assert.deepEqual(requested, [stalledOne.id, stalledTwo.id]);
-  assert.equal(first.find(item => item.series.id === nsKt.id)?.series.state, 'scheduled');
-  assert.equal(first.find(item => item.series.id === hleKrx.id)?.series.state, 'scheduled');
+  await makeProvider().getSchedule();
+  assert.equal(requested.length, 2);
 
-  const second = await provider.getSchedule();
-  assert.deepEqual(requested.slice(2), [nsKt.id, hleKrx.id]);
+  currentTime += 15_000;
+  const second = await makeProvider().getSchedule();
+  assert.equal(new Set(requested).size, 4);
+  assert.deepEqual(
+    [...new Set(requested)].sort(),
+    [stalledOne.id, stalledTwo.id, nsKt.id, hleKrx.id].sort()
+  );
   assert.equal(second.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
   assert.equal(second.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
 });

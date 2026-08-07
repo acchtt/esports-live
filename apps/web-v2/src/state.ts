@@ -161,43 +161,13 @@ function selectionForEvents(
   };
 }
 
-function authoritativeHistoryEvent(event: ScheduleEvent): ScheduleEvent {
-  if (event.series.state === 'completed'
-    && !event.series.games.some(game => (
-      game.state === 'live' || game.state === 'draft' || game.state === 'paused'
-    ))) {
-    return event;
-  }
-  return {
-    ...event,
-    series: {
-      ...event.series,
-      state: 'completed',
-      games: event.series.games.map(game => (
-        game.state === 'live' || game.state === 'draft' || game.state === 'paused'
-          ? { ...game, state: 'completed' as const }
-          : game
-      ))
-    }
-  };
-}
-
 function mergeScheduleEvents(
   previous: readonly ScheduleEvent[],
-  incoming: readonly ScheduleEvent[],
-  view: DataView
+  incoming: readonly ScheduleEvent[]
 ): readonly ScheduleEvent[] {
-  return incoming.map(rawEvent => {
-    const event = view === 'history' ? authoritativeHistoryEvent(rawEvent) : rawEvent;
+  return incoming.map(event => {
     const existing = previous.find(item => item.series.id === event.series.id);
     if (!existing) return event;
-
-    // Completion is monotonic in the client. Once a result or snapshot has
-    // established Final, a later stale schedule response cannot resurrect it.
-    if (existing.series.state === 'completed' && event.series.state !== 'completed') {
-      return existing;
-    }
-
     const incomingOnlyHasLazyGame = event.series.games.length > 0
       && event.series.games.every(game => isLazyHistoryGameId(game.id));
     const existingHasCanonicalGames = existing.series.games.some(game => (
@@ -229,13 +199,13 @@ function shouldReplaceCatalogueEntry(
   event: ScheduleEvent,
   view: DataView
 ): boolean {
-  const currentCompleted = current.event.series.state === 'completed';
-  const nextCompleted = event.series.state === 'completed';
-  if (currentCompleted !== nextCompleted) return nextCompleted;
-
   const currentActive = isActiveEvent(current.event);
   const nextActive = isActiveEvent(event);
   if (currentActive !== nextActive) return nextActive;
+
+  const currentCompleted = current.event.series.state === 'completed';
+  const nextCompleted = event.series.state === 'completed';
+  if (currentCompleted !== nextCompleted) return nextCompleted;
 
   if (nextCompleted) return view === 'history' && current.view !== 'history';
   return view === 'matches' && current.view !== 'matches';
@@ -295,18 +265,16 @@ function eventsWithSnapshotSeries(
   events: readonly ScheduleEvent[],
   snapshot: LiveSnapshot<LolStats>
 ): readonly ScheduleEvent[] {
-  return events.map(event => {
-    if (event.series.id !== snapshot.series.id) return event;
-    if (event.series.state === 'completed' && snapshot.series.state !== 'completed') return event;
-    return {
-      ...event,
-      series: {
-        ...event.series,
-        state: snapshot.series.state,
-        games: snapshot.series.games
-      }
-    };
-  });
+  return events.map(event => event.series.id !== snapshot.series.id
+    ? event
+    : {
+        ...event,
+        series: {
+          ...event.series,
+          state: snapshot.series.state,
+          games: snapshot.series.games
+        }
+      });
 }
 
 function selectionWithSnapshotGame(
@@ -341,11 +309,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
         scheduleError: { ...state.scheduleError, [action.view]: null }
       };
     case 'schedule-loaded': {
-      const nextEvents = mergeScheduleEvents(
-        state.events[action.view],
-        action.events,
-        action.view
-      );
+      const nextEvents = mergeScheduleEvents(state.events[action.view], action.events);
       const nextSelection = selectionForEvents(
         nextEvents,
         state.selections[action.view],

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Baron objective">
+  <path d="M9 14c5 1 10 5 13 11l4-10 6 7 6-7 4 10c3-6 8-10 13-11-1 10-5 16-11 20l4 4-6 3-2 9-8 6-8-6-2-9-6-3 4-4C14 30 10 24 9 14Z" fill="#86EAFF"/>
+  <path d="M21 31 29 27l3 5 3-5 8 4-4 5-7-2-7 2-4-5Z" fill="#071421"/>
+  <path d="m32 23 5 7-5 8-5-8 5-7Z" fill="#FF5368" stroke="#F8FBFF" stroke-width="1.5"/>
+  <path d="m20 39 7 2-4 4-3-6Zm24 0-7 2 4 4 3-6Z" fill="#FF5368"/>
+  <path d="m27 47 5 3 5-3" fill="none" stroke="#071421" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

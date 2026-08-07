@@ -1,8 +1,18 @@
-import { expect, test, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 const provider = { id: 'fixture', name: 'Fixture provider' };
-const hle = { id: 'hle-challengers', name: 'HLE Challengers', code: 'HLE' };
-const krx = { id: 'krx-challengers', name: 'KRX Challengers', code: 'KRX' };
+const hle = {
+  id: 'hle-challengers',
+  name: 'HLE Challengers',
+  code: 'HLE',
+  imageUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%23f97316%22/%3E%3C/svg%3E'
+};
+const krx = {
+  id: 'krx-challengers',
+  name: 'KRX Challengers',
+  code: 'KRX',
+  imageUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230ea5e9%22/%3E%3C/svg%3E'
+};
 
 const series = {
   id: 'series-challengers-side-swap',
@@ -45,14 +55,15 @@ function players(side: 'blue' | 'red') {
 function statsTeam(
   ref: typeof hle,
   side: 'blue' | 'red',
-  telemetryName: string
+  telemetryName: string,
+  kills: number
 ) {
   return {
     id: ref.id,
     name: telemetryName,
     side,
     gold: side === 'blue' ? 49_000 : 53_500,
-    kills: side === 'blue' ? 19 : 27,
+    kills,
     objectives: {
       towers: side === 'blue' ? 5 : 9,
       inhibitors: side === 'blue' ? 0 : 1,
@@ -65,29 +76,75 @@ function statsTeam(
   };
 }
 
-const snapshot = {
-  schemaVersion: '1.0',
-  esport: 'lol',
-  provider,
-  series,
-  game: series.games[1],
-  stats: {
-    gameClockSeconds: 2_252,
-    patch: '26.15.1',
-    blue: statsTeam(krx, 'blue', 'KRX'),
-    red: statsTeam(hle, 'red', 'HLE')
-  },
-  quality: {
-    freshness: 'fresh',
-    sourceTimestamp: new Date().toISOString(),
+function snapshotAt(blueKills = 19, sourceTimestamp = new Date().toISOString()) {
+  return {
+    schemaVersion: '1.0',
+    esport: 'lol',
+    provider,
+    series,
+    game: series.games[1],
+    stats: {
+      gameClockSeconds: 2_252,
+      patch: '26.15.1',
+      blue: statsTeam(krx, 'blue', 'KRX', blueKills),
+      red: statsTeam(hle, 'red', 'HLE', 27)
+    },
+    quality: {
+      freshness: 'fresh',
+      sourceTimestamp,
+      observedAt: sourceTimestamp,
+      ageSeconds: 1,
+      complete: true,
+      advancing: true,
+      safeForLiveAnalysis: true,
+      reasons: []
+    }
+  };
+}
+
+function context(gameTwoState: 'live' | 'completed') {
+  const gameTwoWinner = gameTwoState === 'completed' ? krx : null;
+  return {
+    schemaVersion: '1.0',
+    esport: 'lol',
+    seriesId: series.id,
+    provider,
     observedAt: new Date().toISOString(),
-    ageSeconds: 1,
+    rosters: [],
+    standings: [],
+    history: {
+      bestOf: 3,
+      winsRequired: 2,
+      drawPossible: false,
+      score: [
+        { team: hle, wins: 1 },
+        { team: krx, wins: gameTwoWinner ? 1 : 0 }
+      ],
+      games: [
+        {
+          id: 'challengers-game-1',
+          number: 1,
+          state: 'completed',
+          blueTeam: hle,
+          redTeam: krx,
+          winner: hle,
+          durationSeconds: 2_101
+        },
+        {
+          id: 'challengers-game-2',
+          number: 2,
+          state: gameTwoState,
+          blueTeam: krx,
+          redTeam: hle,
+          winner: gameTwoWinner,
+          durationSeconds: gameTwoWinner ? 2_252 : null
+        }
+      ]
+    },
     complete: true,
-    advancing: true,
-    safeForLiveAnalysis: true,
     reasons: []
-  }
-};
+  };
+}
 
 async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({
@@ -97,8 +154,7 @@ async function json(route: Route, value: unknown): Promise<void> {
   });
 }
 
-test('web v2 resolves side identity and enriches champion-board copy', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+async function installCommon(page: Page, gameContext = context('live')): Promise<void> {
   await page.route('https://ddragon.leagueoflegends.com/**', route => route.abort());
   await page.route('**/health', route => json(route, {
     ok: true,
@@ -113,7 +169,13 @@ test('web v2 resolves side identity and enriches champion-board copy', async ({ 
       events: history ? [] : [{ series, provider, observedAt: new Date().toISOString() }]
     });
   });
-  await page.route('**/v1/lol/games/challengers-game-2/live**', route => json(route, snapshot));
+  await page.route('**/v1/lol/series/**/context**', route => json(route, gameContext));
+}
+
+test('web v2 resolves side identity, team logos and champion-board copy', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installCommon(page);
+  await page.route('**/v1/lol/games/challengers-game-2/live**', route => json(route, snapshotAt()));
 
   await page.goto('/v2/');
   const card = page.locator('[data-series-id="series-challengers-side-swap"]');
@@ -123,6 +185,12 @@ test('web v2 resolves side identity and enriches champion-board copy', async ({ 
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
   await expect(page.locator('#blue-name')).toHaveText('KRX Challengers');
   await expect(page.locator('#red-name')).toHaveText('HLE Challengers');
+  await expect(page.locator('.team-side.blue')).not.toContainText('BLUE SIDE');
+  await expect(page.locator('.team-side.red')).not.toContainText('RED SIDE');
+  await expect(page.locator('#blue-logo')).toBeVisible();
+  await expect(page.locator('#red-logo')).toBeVisible();
+  await expect(page.locator('#blue-logo')).toHaveAttribute('src', krx.imageUrl);
+  await expect(page.locator('#red-logo')).toHaveAttribute('src', hle.imageUrl);
 
   const blueNames = page.locator('.blue-player .player-copy strong');
   const redNames = page.locator('.red-player .player-copy strong');
@@ -148,4 +216,46 @@ test('web v2 resolves side identity and enriches champion-board copy', async ({ 
   const labels = await page.locator('.player-copy strong').allTextContents();
   expect(labels.some(label => label.includes('HLE KRX'))).toBe(false);
   expect(labels.some(label => label.includes('KRX HLE'))).toBe(false);
+});
+
+test('web v2 forces a cursorless game refresh after refocus', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installCommon(page);
+
+  const staleTimestamp = new Date(Date.now() - 10_000).toISOString();
+  const freshTimestamp = new Date().toISOString();
+  const requestUrls: string[] = [];
+  await page.route('**/v1/lol/games/challengers-game-2/live**', route => {
+    const url = route.request().url();
+    requestUrls.push(url);
+    const cursorless = !new URL(url).searchParams.has('after');
+    const refreshed = cursorless && requestUrls.length > 1;
+    return json(route, snapshotAt(refreshed ? 23 : 19, refreshed ? freshTimestamp : staleTimestamp));
+  });
+
+  await page.goto('/v2/');
+  await page.locator('[data-series-id="series-challengers-side-swap"]').click();
+  await expect(page.locator('#blue-kills')).toHaveText('19');
+
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+
+  await expect(page.locator('#blue-kills')).toHaveText('23');
+  await expect.poll(() => requestUrls.filter(url => !new URL(url).searchParams.has('after')).length)
+    .toBeGreaterThanOrEqual(2);
+});
+
+test('web v2 reconciles a stale live frame to final and declares the winner', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installCommon(page, context('completed'));
+  await page.route('**/v1/lol/games/challengers-game-2/live**', route => json(route, snapshotAt()));
+
+  await page.goto('/v2/');
+  await page.locator('[data-series-id="series-challengers-side-swap"]').click();
+
+  await expect(page.locator('#game-label')).toHaveText('Game 2 · Final');
+  await expect(page.locator('#scoreboard')).toHaveAttribute('data-game-state', 'completed');
+  await expect(page.locator('#gold-lead-label')).toHaveText('WINNER');
+  await expect(page.locator('#gold-lead')).toHaveText('KRX');
+  await expect(page.locator('#scoreboard')).toHaveAttribute('data-winner-side', 'blue');
+  await expect(page.locator('#scoreboard-notice')).toHaveText('KRX Challengers won Game 2.');
 });

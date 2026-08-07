@@ -1,0 +1,27 @@
+.team-side > .team-logo {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 56px;
+  max-height: 36px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.team-side.blue > .team-logo { justify-self: start; }
+.team-side.red > .team-logo { justify-self: end; }
+.team-side > .team-logo[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  .team-side > .team-logo {
+    max-width: 34px;
+    max-height: 22px;
+  }
+}
+
+@media (max-width: 400px) {
+  .team-side > .team-logo {
+    max-width: 30px;
+    max-height: 20px;
+  }
+}

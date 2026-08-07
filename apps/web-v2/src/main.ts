@@ -3,6 +3,7 @@ import './compact-scoreboard.css';
 import './compact-header.css';
 import './player-board-copy.css';
 import './team-logos.css';
+import './signal-palette.css';
 import { startWebV2 } from './app.ts';
 import { installCatalogueFinality } from './catalogue-finality.ts';
 import { installChampionPortraitAssets } from './champion-portrait-assets.ts';

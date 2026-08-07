@@ -150,6 +150,28 @@ test('reconciles stale live match-list entries against Riot finality', async () 
   assert.equal(schedule[0]?.series.games.some(game => game.state === 'live'), false);
 });
 
+test('reconciles ended matches even when Riot regresses the schedule back to upcoming', async () => {
+  const stale = scheduleEntry();
+  const regressed: LolProviderScheduleEntry = {
+    ...stale,
+    series: {
+      ...stale.series,
+      state: 'scheduled',
+      games: stale.series.games.map(game => ({ ...game, state: 'unstarted' as const }))
+    }
+  };
+  const provider = createRiotFinalityProvider(base(snapshot(false), [regressed]), {
+    apiKey: 'test-key',
+    now: () => new Date('2026-08-07T09:50:00.000Z'),
+    fetcher: async () => json(eventPayload('completed'))
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule[0]?.series.state, 'completed');
+  assert.equal(schedule[0]?.series.games[0]?.state, 'completed');
+  assert.equal(schedule[0]?.series.games[1]?.state, 'completed');
+});
+
 test('does not treat Riot between-game completed flags as series finality', async () => {
   const betweenGames = eventPayload('completed');
   betweenGames.data.event.match.teams[0]!.result.gameWins = 1;

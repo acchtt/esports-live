@@ -6,6 +6,7 @@ export * from './riot-consistent-provider.ts';
 export * from './riot-context-provider.ts';
 export * from './riot-current-player-provider.ts';
 export * from './riot-delayed-live-recovery-provider.ts';
+export * from './riot-finality-provider.ts';
 export * from './riot-history-provider.ts';
 export * from './riot-provider.ts';
 export * from './riot-resolved-provider.ts';

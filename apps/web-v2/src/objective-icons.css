@@ -1,60 +1,53 @@
 .objective-grid article > span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
+  display: grid;
+  place-items: center;
+  gap: 5px;
   white-space: nowrap;
 }
 
 .objective-grid article > span::before {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
+  width: 28px;
+  height: 28px;
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
   content: '';
-  filter: drop-shadow(0 0 7px rgba(134, 234, 255, 0.18));
 }
 
 .objective-grid article[data-objective="towers"] > span::before {
   background-image: url('./objective-icons/towers.svg');
+  filter: drop-shadow(0 0 7px rgba(88, 184, 255, 0.2));
 }
 
 .objective-grid article[data-objective="dragons"] > span::before {
   background-image: url('./objective-icons/dragons.svg');
-  filter: drop-shadow(0 0 7px rgba(199, 255, 67, 0.16));
+  filter: drop-shadow(0 0 7px rgba(183, 255, 0, 0.2));
 }
 
 .objective-grid article[data-objective="barons"] > span::before {
   background-image: url('./objective-icons/barons.svg');
-  filter: drop-shadow(0 0 7px rgba(255, 83, 104, 0.16));
+  filter: drop-shadow(0 0 7px rgba(163, 107, 255, 0.22));
 }
 
 .objective-grid article[data-objective="inhibitors"] > span::before {
   background-image: url('./objective-icons/inhibitors.svg');
+  filter: drop-shadow(0 0 7px rgba(255, 59, 59, 0.2));
 }
 
 @media (max-width: 760px) {
-  .objective-grid article > span {
-    gap: 4px;
-  }
-
-  .objective-grid article > span::before {
-    width: 17px;
-    height: 17px;
-    flex-basis: 17px;
-  }
-}
-
-@media (max-width: 400px) {
   .objective-grid article > span {
     gap: 3px;
   }
 
   .objective-grid article > span::before {
-    width: 15px;
-    height: 15px;
-    flex-basis: 15px;
+    width: 22px;
+    height: 22px;
+  }
+}
+
+@media (max-width: 400px) {
+  .objective-grid article > span::before {
+    width: 20px;
+    height: 20px;
   }
 }

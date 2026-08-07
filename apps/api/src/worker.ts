@@ -107,7 +107,7 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
       )
     );
     registry.register(new CachedAdapter(new LolAdapter(provider), {
-      scheduleTtlMs: 45_000,
+      scheduleTtlMs: 15_000,
       liveSnapshotTtlMs: 400,
       seriesContextTtlMs: 10_000
     }));

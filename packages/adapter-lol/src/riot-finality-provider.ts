@@ -249,7 +249,7 @@ function scheduleFinalityCandidates(
   limit: number
 ): readonly LolProviderScheduleEntry[] {
   return entries
-    .filter(entry => entry.series.state === 'live' || entry.series.state === 'paused')
+    .filter(entry => entry.series.state !== 'completed' && entry.series.state !== 'cancelled')
     .filter(entry => {
       const scheduled = Date.parse(entry.series.scheduledStart);
       return Number.isFinite(scheduled)

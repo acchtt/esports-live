@@ -6,6 +6,7 @@ import './team-logos.css';
 import './signal-palette.css';
 import './objective-icons.css';
 import './arena-brand.css';
+import './lane-gold-polish.css';
 import { startWebV2 } from './app.ts';
 import { installArenaBrand } from './arena-brand.ts';
 import { installCatalogueFinality } from './catalogue-finality.ts';

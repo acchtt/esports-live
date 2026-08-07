@@ -1,3 +1,8 @@
+.app-header {
+  position: relative;
+  top: auto;
+}
+
 .app-header,
 .brand-mark,
 .brand-lockup,

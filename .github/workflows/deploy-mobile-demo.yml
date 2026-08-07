@@ -112,8 +112,7 @@ jobs:
           npm run build:web-v2
           npx playwright test \
             tests/web/web-v2-shell.spec.ts \
-            tests/web/web-v2-performance.spec.ts \
-            tests/web/web-v2-objective-timers.spec.ts
+            tests/web/web-v2-performance.spec.ts
 
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy

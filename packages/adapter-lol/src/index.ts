@@ -10,6 +10,7 @@ export * from './riot-finality-provider.ts';
 export * from './riot-history-provider.ts';
 export * from './riot-provider.ts';
 export * from './riot-resolved-provider.ts';
+export * from './riot-schedule-reconciliation-provider.ts';
 export * from './riot-supplemental-league-provider.ts';
 export * from './types.ts';
 export * from './usable-schedule-provider.ts';

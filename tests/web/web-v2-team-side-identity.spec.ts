@@ -259,3 +259,127 @@ test('web v2 reconciles a stale live frame to final and declares the winner', as
   await expect(page.locator('#scoreboard')).toHaveAttribute('data-winner-side', 'blue');
   await expect(page.locator('#scoreboard-notice')).toHaveText('KRX Challengers won Game 2.');
 });
+
+test('web v2 resolves stale catalogue states from fresh series context without ending a partial series', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const now = Date.now();
+  const staleLive = {
+    id: 'tes-blg-stale-live',
+    esport: 'lol',
+    competition: { id: 'lpl', name: 'LPL' },
+    teams: [hle, krx],
+    bestOf: 3,
+    state: 'live',
+    scheduledStart: new Date(now - 4 * 60 * 60 * 1_000).toISOString(),
+    games: [
+      { id: 'tes-game-1', number: 1, state: 'completed' },
+      { id: 'tes-game-2', number: 2, state: 'completed' },
+      { id: 'tes-game-3', number: 3, state: 'live' }
+    ]
+  };
+  const staleUpcoming = {
+    id: 'ns-kt-stale-upcoming',
+    esport: 'lol',
+    competition: { id: 'lck-cl', name: 'LCK Challengers' },
+    teams: [hle, krx],
+    bestOf: 3,
+    state: 'scheduled',
+    scheduledStart: new Date(now - 10 * 60 * 60 * 1_000).toISOString(),
+    games: [
+      { id: 'ns-game-1', number: 1, state: 'unstarted' },
+      { id: 'ns-game-2', number: 2, state: 'unstarted' },
+      { id: 'ns-game-3', number: 3, state: 'unstarted' }
+    ]
+  };
+  const partialLive = {
+    id: 'partial-live',
+    esport: 'lol',
+    competition: { id: 'lck', name: 'LCK' },
+    teams: [hle, krx],
+    bestOf: 3,
+    state: 'live',
+    scheduledStart: new Date(now - 3 * 60 * 60 * 1_000).toISOString(),
+    games: [
+      { id: 'partial-game-1', number: 1, state: 'completed' },
+      { id: 'partial-game-2', number: 2, state: 'completed' },
+      { id: 'partial-game-3', number: 3, state: 'live' }
+    ]
+  };
+  const future = {
+    id: 'future-series',
+    esport: 'lol',
+    competition: { id: 'future', name: 'Future League' },
+    teams: [hle, krx],
+    bestOf: 3,
+    state: 'scheduled',
+    scheduledStart: new Date(now + 60 * 60 * 1_000).toISOString(),
+    games: [{ id: 'future-game-1', number: 1, state: 'unstarted' }]
+  };
+  const contextFor = (value: typeof staleLive, leftWins: number, rightWins: number) => ({
+    schemaVersion: '1.0',
+    esport: 'lol',
+    seriesId: value.id,
+    provider,
+    observedAt: new Date().toISOString(),
+    rosters: [],
+    standings: [],
+    history: {
+      bestOf: 3,
+      winsRequired: 2,
+      drawPossible: false,
+      score: [
+        { team: hle, wins: leftWins },
+        { team: krx, wins: rightWins }
+      ],
+      games: value.games.map((game, index) => ({
+        ...game,
+        state: index < 2 ? 'completed' : game.state,
+        blueTeam: hle,
+        redTeam: krx,
+        winner: index === 0 ? hle : index === 1 ? krx : null,
+        durationSeconds: index < 2 ? 2_000 + index * 100 : null
+      }))
+    },
+    complete: true,
+    reasons: []
+  });
+  const requested: string[] = [];
+
+  await page.route('**/health', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+  await page.route('**/v1/lol/schedule**', route => {
+    const history = route.request().url().includes('states=completed');
+    return json(route, {
+      esport: 'lol',
+      events: history ? [] : [staleLive, partialLive, staleUpcoming, future].map(value => ({
+        series: value,
+        provider,
+        observedAt: new Date().toISOString()
+      }))
+    });
+  });
+  await page.route('**/v1/lol/series/**/context**', route => {
+    const match = route.request().url().match(/series\/([^/]+)\/context/);
+    const id = decodeURIComponent(match?.[1] ?? '');
+    requested.push(id);
+    if (id === staleLive.id) return json(route, contextFor(staleLive, 2, 1));
+    if (id === staleUpcoming.id) return json(route, contextFor(staleUpcoming as typeof staleLive, 0, 2));
+    if (id === partialLive.id) return json(route, contextFor(partialLive, 1, 1));
+    return json(route, contextFor(future as typeof staleLive, 0, 0));
+  });
+
+  await page.goto('/v2/');
+
+  await expect(page.locator(`[data-series-id="${staleLive.id}"] .match-status`)).toHaveText('FINAL');
+  await expect(page.locator(`[data-series-id="${staleUpcoming.id}"] .match-status`)).toHaveText('FINAL');
+  await expect(page.locator(`[data-series-id="${partialLive.id}"] .match-status`)).toHaveText('LIVE');
+  await expect(page.locator(`[data-series-id="${future.id}"] .match-status`)).toHaveText('UPCOMING');
+  expect(requested).toContain(staleLive.id);
+  expect(requested).toContain(staleUpcoming.id);
+  expect(requested).toContain(partialLive.id);
+  expect(requested).not.toContain(future.id);
+});

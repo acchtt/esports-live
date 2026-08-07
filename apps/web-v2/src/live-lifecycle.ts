@@ -107,6 +107,7 @@ function applyContextFinality(
   snapshot: LiveSnapshot<LolStats>,
   context: SeriesContext
 ): LiveSnapshot<LolStats> {
+  if (context.seriesId !== snapshot.series.id) return snapshot;
   if (snapshot.game.state === 'completed') return snapshot;
   const game = contextGame(context, snapshot);
   if (!game || game.state !== 'completed') return snapshot;
@@ -265,6 +266,9 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
 
     try {
       const context = await requestContext(nativeFetch, seriesId, signal);
+      if (context.seriesId !== seriesId) {
+        return cached ? applyContextFinality(snapshot, cached.value) : snapshot;
+      }
       contexts.set(seriesId, { checkedAt: now, value: context });
       return applyContextFinality(snapshot, context);
     } catch {
@@ -321,11 +325,13 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
 
   const markForeground = (dispatchVisibility: boolean): void => {
     if (document.hidden) return;
+    const gameId = activeGameId();
+    if (!gameId) return;
     const now = Date.now();
     if (now - lastForegroundSignalAt < FOREGROUND_DEBOUNCE_MS) return;
     lastForegroundSignalAt = now;
-    forceFreshGameId = activeGameId();
-    if (dispatchVisibility && forceFreshGameId) {
+    forceFreshGameId = gameId;
+    if (dispatchVisibility) {
       document.dispatchEvent(new Event('visibilitychange'));
     }
   };

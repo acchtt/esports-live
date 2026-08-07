@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Inhibitor objective">
+  <path d="m32 8 10 14-4 26H26l-4-26L32 8Z" fill="#FF5368" stroke="#F8FBFF" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M32 8v40M22 22l10 8 10-8" fill="none" stroke="#7D1220" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M16 48h32l6 6-8 4H18l-8-4 6-6Z" fill="none" stroke="#86EAFF" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M19 54h26" stroke="#C7FF43" stroke-width="2" stroke-linecap="round"/>
+</svg>

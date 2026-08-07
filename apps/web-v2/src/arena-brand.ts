@@ -1,6 +1,4 @@
 export function installArenaBrand(root: ParentNode): void {
-  document.title = 'ARENA';
-
   const brandLink = root.querySelector<HTMLAnchorElement>('.brand-lockup');
   if (brandLink) brandLink.setAttribute('aria-label', 'ARENA matches');
 

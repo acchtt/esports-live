@@ -167,7 +167,7 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
   const nativeFetch = window.fetch.bind(window);
   const contexts = new Map<string, CachedContext>();
   const teamLogos = new Map<string, { name: string; imageUrl: string }>();
-  let forceFreshGameId = '';
+  let forceFreshSnapshot = false;
   let lastForegroundSignalAt = 0;
   let logoSyncQueued = false;
 
@@ -282,12 +282,12 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
     let forceFinalityProbe = false;
     let nextInput = input;
 
-    if (gameId && forceFreshGameId && gameId === forceFreshGameId) {
+    if (gameId && forceFreshSnapshot) {
       url = new URL(url.toString());
       url.searchParams.delete('after');
       url.searchParams.set('final', `foreground-${Date.now()}`);
       nextInput = rewrittenInput(input, url);
-      forceFreshGameId = '';
+      forceFreshSnapshot = false;
       forceFinalityProbe = true;
     } else if (gameId && !url.searchParams.has('after')) {
       forceFinalityProbe = true;
@@ -319,19 +319,17 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
 
   window.fetch = wrappedFetch;
 
-  const activeGameId = (): string => (
-    root.querySelector<HTMLElement>('#scoreboard')?.dataset.gameId?.trim() ?? ''
-  );
-
-  const markForeground = (dispatchVisibility: boolean): void => {
-    if (document.hidden) return;
-    const gameId = activeGameId();
-    if (!gameId) return;
+  const markForeground = (
+    dispatchVisibility: boolean,
+    allowHidden = false,
+    bypassDebounce = false
+  ): void => {
+    if (document.hidden && !allowHidden) return;
     const now = Date.now();
-    if (now - lastForegroundSignalAt < FOREGROUND_DEBOUNCE_MS) return;
+    if (!bypassDebounce && now - lastForegroundSignalAt < FOREGROUND_DEBOUNCE_MS) return;
     lastForegroundSignalAt = now;
-    forceFreshGameId = gameId;
-    if (dispatchVisibility) {
+    forceFreshSnapshot = true;
+    if (dispatchVisibility && !document.hidden) {
       document.dispatchEvent(new Event('visibilitychange'));
     }
   };
@@ -341,8 +339,10 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
   };
   const focused = (): void => markForeground(true);
   const pageShown = (): void => markForeground(true);
+  const resumed = (): void => markForeground(true, true, true);
 
   document.addEventListener('visibilitychange', visibilityChanged);
+  document.addEventListener('resume', resumed);
   window.addEventListener('focus', focused);
   window.addEventListener('pageshow', pageShown);
 
@@ -357,6 +357,7 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
   return () => {
     observer.disconnect();
     document.removeEventListener('visibilitychange', visibilityChanged);
+    document.removeEventListener('resume', resumed);
     window.removeEventListener('focus', focused);
     window.removeEventListener('pageshow', pageShown);
     if (window.fetch === wrappedFetch) window.fetch = nativeFetch;

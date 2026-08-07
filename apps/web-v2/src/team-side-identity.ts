@@ -127,16 +127,14 @@ export class TeamSideIdentityController {
     const candidates = titleTeams(detailTitle.textContent);
     if (candidates.length !== 2) return;
 
-    const blueTelemetry = blueName.dataset.telemetryName || blueName.textContent?.trim() || '';
-    const redTelemetry = redName.dataset.telemetryName || redName.textContent?.trim() || '';
+    const blueTelemetry = blueName.textContent?.trim() || '';
+    const redTelemetry = redName.textContent?.trim() || '';
     if (!blueTelemetry || !redTelemetry) return;
 
     const blueFull = resolvedFullName(candidates, blueTelemetry);
     const redFull = resolvedFullName(candidates, redTelemetry);
     if (!blueFull || !redFull || blueFull === redFull) return;
 
-    blueName.dataset.telemetryName = blueTelemetry;
-    redName.dataset.telemetryName = redTelemetry;
     if (blueName.textContent !== blueFull) blueName.textContent = blueFull;
     if (redName.textContent !== redFull) redName.textContent = redFull;
 

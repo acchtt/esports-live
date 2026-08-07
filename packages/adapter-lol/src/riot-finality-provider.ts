@@ -2,12 +2,16 @@ import type { GameState } from '@esports-live/core';
 import type {
   LolProviderClient,
   LolProviderGame,
+  LolProviderScheduleEntry,
   LolProviderSnapshot
 } from './provider.ts';
 
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const REQUEST_TIMEOUT_MS = 2_500;
 const DEFAULT_FINALITY_PROBE_MS = 5_000;
+const DEFAULT_SCHEDULE_FINALITY_LOOKBACK_MS = 8 * 60 * 60 * 1_000;
+const DEFAULT_SCHEDULE_FINALITY_LOOKAHEAD_MS = 5 * 60 * 1_000;
+const DEFAULT_SCHEDULE_FINALITY_LIMIT = 16;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -17,6 +21,9 @@ export interface RiotFinalityProviderOptions {
   fetcher?: FetchLike;
   now?: () => Date;
   finalityProbeMs?: number;
+  scheduleFinalityLookbackMs?: number;
+  scheduleFinalityLookaheadMs?: number;
+  scheduleFinalityLimit?: number;
 }
 
 interface GameSignal {
@@ -79,13 +86,24 @@ const GAME_STATE_RANK: Record<GameState, number> = {
 };
 
 function strongerGameState(current: GameState, incoming: GameState): GameState {
-  return GAME_STATE_RANK[incoming] > GAME_STATE_RANK[current] ? incoming : current;
+  if (GAME_STATE_RANK[incoming] > GAME_STATE_RANK[current]) return incoming;
+  if (GAME_STATE_RANK[incoming] === GAME_STATE_RANK[current] && incoming !== 'unknown') return incoming;
+  return current;
+}
+
+function activeGameState(state: GameState): boolean {
+  return state === 'draft' || state === 'live' || state === 'paused';
 }
 
 function eventFromPayload(value: unknown): Json {
   const root = object(value);
   const data = object(root.data);
   return object(data.event ?? root.event ?? data);
+}
+
+function finalOutcome(value: unknown): boolean {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized === 'win' || normalized === 'loss';
 }
 
 function parseFinality(value: unknown): FinalitySignal {
@@ -107,13 +125,21 @@ function parseFinality(value: unknown): FinalitySignal {
     Math.round(numberValue(strategy.count ?? strategy.bestOf) ?? (games.length || 1))
   );
   const winsRequired = Math.floor(bestOf / 2) + 1;
-  const wins = array(match.teams).map(team => {
-    const result = object(object(team).result);
-    return Math.max(0, Math.round(numberValue(result.gameWins ?? result.wins) ?? 0));
-  });
-  const seriesCompleted = reportedState === 'completed'
-    || reportedState === 'finished'
-    || wins.some(value => value >= winsRequired);
+  const teamResults = array(match.teams).map(team => object(object(team).result));
+  const wins = teamResults.map(result => (
+    Math.max(0, Math.round(numberValue(result.gameWins ?? result.wins) ?? 0))
+  ));
+  const hasClinchedScore = wins.some(value => value >= winsRequired);
+  const hasPartialScore = wins.some(value => value > 0)
+    && wins.every(value => value < winsRequired);
+  const hasFinalOutcome = teamResults.some(result => finalOutcome(result.outcome));
+  const reportedCompleted = reportedState === 'completed' || reportedState === 'finished';
+
+  // Riot can briefly mark the whole series completed between games. A
+  // non-clinching score without a match outcome is not series finality.
+  const seriesCompleted = hasClinchedScore
+    || hasFinalOutcome
+    || (reportedCompleted && !hasPartialScore);
 
   return { games, seriesCompleted };
 }
@@ -124,22 +150,31 @@ function signalForGame(signal: FinalitySignal, game: LolProviderGame): GameSigna
     ?? null;
 }
 
+function applyGameSignals(
+  games: readonly LolProviderGame[],
+  signal: FinalitySignal
+): readonly LolProviderGame[] {
+  return games.map(game => {
+    const gameSignal = signalForGame(signal, game);
+    let state = gameSignal
+      ? strongerGameState(game.state, gameSignal.state)
+      : game.state;
+    if (signal.seriesCompleted && activeGameState(state)) state = 'completed';
+    return state === game.state ? game : { ...game, state };
+  });
+}
+
 function applyFinality(
   snapshot: LolProviderSnapshot,
   signal: FinalitySignal
 ): LolProviderSnapshot {
   const selectedSignal = signalForGame(signal, snapshot.game);
-  const selectedState = selectedSignal
+  let selectedState = selectedSignal
     ? strongerGameState(snapshot.game.state, selectedSignal.state)
     : snapshot.game.state;
+  if (signal.seriesCompleted && activeGameState(selectedState)) selectedState = 'completed';
 
-  const games = snapshot.series.games.map(game => {
-    const gameSignal = signalForGame(signal, game);
-    if (!gameSignal) return game;
-    const state = strongerGameState(game.state, gameSignal.state);
-    return state === game.state ? game : { ...game, state };
-  });
-
+  const games = applyGameSignals(snapshot.series.games, signal);
   const selectedCompleted = selectedState === 'completed';
   const seriesState = signal.seriesCompleted ? 'completed' : snapshot.series.state;
   if (
@@ -162,6 +197,67 @@ function applyFinality(
       : { ...snapshot.game, state: selectedState },
     advancing: selectedCompleted ? false : snapshot.advancing
   };
+}
+
+function applyScheduleFinality(
+  entry: LolProviderScheduleEntry,
+  signal: FinalitySignal
+): LolProviderScheduleEntry {
+  const games = applyGameSignals(entry.series.games, signal);
+  const state = signal.seriesCompleted ? 'completed' : entry.series.state;
+  if (
+    state === entry.series.state
+    && games.every((game, index) => game === entry.series.games[index])
+  ) {
+    return entry;
+  }
+  return {
+    ...entry,
+    series: {
+      ...entry.series,
+      state,
+      games
+    }
+  };
+}
+
+function stabilizeCompletedEntry(entry: LolProviderScheduleEntry): LolProviderScheduleEntry {
+  const games = entry.series.games.map(game => (
+    activeGameState(game.state) ? { ...game, state: 'completed' as const } : game
+  ));
+  if (
+    entry.series.state === 'completed'
+    && games.every((game, index) => game === entry.series.games[index])
+  ) {
+    return entry;
+  }
+  return {
+    ...entry,
+    series: {
+      ...entry.series,
+      state: 'completed',
+      games
+    }
+  };
+}
+
+function scheduleFinalityCandidates(
+  entries: readonly LolProviderScheduleEntry[],
+  currentTime: number,
+  lookbackMs: number,
+  lookaheadMs: number,
+  limit: number
+): readonly LolProviderScheduleEntry[] {
+  return entries
+    .filter(entry => entry.series.state === 'live' || entry.series.state === 'paused')
+    .filter(entry => {
+      const scheduled = Date.parse(entry.series.scheduledStart);
+      return Number.isFinite(scheduled)
+        && scheduled >= currentTime - lookbackMs
+        && scheduled <= currentTime + lookaheadMs;
+    })
+    .sort((left, right) => Date.parse(left.series.scheduledStart) - Date.parse(right.series.scheduledStart))
+    .slice(0, Math.max(0, limit));
 }
 
 async function requestFinality(
@@ -196,8 +292,14 @@ export function createRiotFinalityProvider(
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? (() => new Date());
   const finalityProbeMs = options.finalityProbeMs ?? DEFAULT_FINALITY_PROBE_MS;
+  const scheduleFinalityLookbackMs = options.scheduleFinalityLookbackMs
+    ?? DEFAULT_SCHEDULE_FINALITY_LOOKBACK_MS;
+  const scheduleFinalityLookaheadMs = options.scheduleFinalityLookaheadMs
+    ?? DEFAULT_SCHEDULE_FINALITY_LOOKAHEAD_MS;
+  const scheduleFinalityLimit = options.scheduleFinalityLimit ?? DEFAULT_SCHEDULE_FINALITY_LIMIT;
   const cache = new Map<string, CachedFinalitySignal>();
   const inFlight = new Map<string, Promise<FinalitySignal>>();
+  const completedSeries = new Set<string>();
 
   const finalityFor = async (seriesId: string): Promise<FinalitySignal> => {
     const currentTime = now().getTime();
@@ -212,6 +314,7 @@ export function createRiotFinalityProvider(
           value,
           expiresAt: now().getTime() + Math.max(0, finalityProbeMs)
         });
+        if (value.seriesCompleted) completedSeries.add(seriesId);
         return value;
       })
       .finally(() => {
@@ -225,19 +328,50 @@ export function createRiotFinalityProvider(
     id: base.id,
     name: base.name,
     ...(base.sourceUrl ? { sourceUrl: base.sourceUrl } : {}),
-    getSchedule: () => base.getSchedule(),
-    async getSnapshot(gameId: string, after?: string): Promise<LolProviderSnapshot> {
-      const snapshot = await base.getSnapshot(gameId, after);
-      if (
-        snapshot.game.state === 'completed'
-        || snapshot.advancing === true
-        || !snapshot.series.id
-      ) {
-        return snapshot;
+    async getSchedule(): Promise<readonly LolProviderScheduleEntry[]> {
+      const entries = await base.getSchedule();
+      for (const entry of entries) {
+        if (entry.series.state === 'completed') completedSeries.add(entry.series.id);
       }
 
+      const signals = new Map<string, FinalitySignal>();
+      const candidates = scheduleFinalityCandidates(
+        entries.filter(entry => !completedSeries.has(entry.series.id)),
+        now().getTime(),
+        Math.max(0, scheduleFinalityLookbackMs),
+        Math.max(0, scheduleFinalityLookaheadMs),
+        scheduleFinalityLimit
+      );
+      await Promise.all(candidates.map(async entry => {
+        try {
+          signals.set(entry.series.id, await finalityFor(entry.series.id));
+        } catch {
+          // Keep the upstream schedule visible when a bounded finality probe misses.
+        }
+      }));
+
+      return entries.map(entry => {
+        const signal = signals.get(entry.series.id);
+        const reconciled = signal ? applyScheduleFinality(entry, signal) : entry;
+        if (reconciled.series.state === 'completed') completedSeries.add(entry.series.id);
+        return completedSeries.has(entry.series.id)
+          ? stabilizeCompletedEntry(reconciled)
+          : reconciled;
+      });
+    },
+    async getSnapshot(gameId: string, after?: string): Promise<LolProviderSnapshot> {
+      const snapshot = await base.getSnapshot(gameId, after);
+      const seriesId = snapshot.series.id;
+      if (!seriesId) return snapshot;
+
+      if (snapshot.series.state === 'completed') completedSeries.add(seriesId);
+      if (completedSeries.has(seriesId)) {
+        return applyFinality(snapshot, { games: [], seriesCompleted: true });
+      }
+      if (snapshot.game.state === 'completed' || snapshot.advancing === true) return snapshot;
+
       try {
-        return applyFinality(snapshot, await finalityFor(snapshot.series.id));
+        return applyFinality(snapshot, await finalityFor(seriesId));
       } catch {
         return snapshot;
       }

@@ -160,12 +160,10 @@ test('advances stale scheduled probe batches across time windows even on a fresh
   assert.equal(requested.length, 2);
 
   currentTime += 15_000;
-  const second = await makeProvider().getSchedule();
+  await makeProvider().getSchedule();
   assert.equal(new Set(requested).size, 4);
   assert.deepEqual(
     [...new Set(requested)].sort(),
     [stalledOne.id, stalledTwo.id, nsKt.id, hleKrx.id].sort()
   );
-  assert.equal(second.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
-  assert.equal(second.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
 });

@@ -128,7 +128,7 @@ function completedContext() {
         { team: red, wins: 1 }
       ],
       games: [{
-        id: endedSeries.games[0].id,
+        id: endedSeries.games[0]!.id,
         number: 1,
         state: 'completed',
         blueTeam: blue,

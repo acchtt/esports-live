@@ -4,6 +4,7 @@ import './compact-header.css';
 import './player-board-copy.css';
 import './team-logos.css';
 import { startWebV2 } from './app.ts';
+import { installCatalogueFinality } from './catalogue-finality.ts';
 import { installChampionPortraitAssets } from './champion-portrait-assets.ts';
 import { installCompactHeader } from './compact-header.ts';
 import { installLiveLifecycle } from './live-lifecycle.ts';
@@ -14,6 +15,7 @@ import { installWinnerDeclaration } from './winner-declaration.ts';
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Missing #app root.');
 
+installCatalogueFinality();
 installLiveLifecycle(root);
 installPlayerBoardCopy(root);
 startWebV2(root);

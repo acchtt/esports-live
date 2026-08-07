@@ -218,7 +218,7 @@ test('web v2 resolves side identity, team logos and champion-board copy', async 
   expect(labels.some(label => label.includes('KRX HLE'))).toBe(false);
 });
 
-test('web v2 forces a cursorless game refresh after refocus', async ({ page }) => {
+test('web v2 forces a cursorless game refresh after page lifecycle resume', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installCommon(page);
 
@@ -237,7 +237,7 @@ test('web v2 forces a cursorless game refresh after refocus', async ({ page }) =
   await page.locator('[data-series-id="series-challengers-side-swap"]').click();
   await expect(page.locator('#blue-kills')).toHaveText('19');
 
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await page.evaluate(() => document.dispatchEvent(new Event('resume')));
 
   await expect(page.locator('#blue-kills')).toHaveText('23');
   await expect.poll(() => requestUrls.filter(url => !new URL(url).searchParams.has('after')).length)

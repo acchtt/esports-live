@@ -112,7 +112,8 @@ jobs:
           npm run build:web-v2
           npx playwright test \
             tests/web/web-v2-shell.spec.ts \
-            tests/web/web-v2-performance.spec.ts
+            tests/web/web-v2-performance.spec.ts \
+            tests/web/web-v2-objective-timers.spec.ts
 
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy
@@ -251,7 +252,7 @@ jobs:
             fs.writeFileSync("/tmp/mobile-preview-status.json", JSON.stringify({
               state: process.env.STATE,
               context: "esports-live/mobile-preview",
-              description: process.env.DESCRIPTION,
+              description: "$description",
               target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
             }));
           '

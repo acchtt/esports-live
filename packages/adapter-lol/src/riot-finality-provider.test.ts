@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { LolProviderClient, LolProviderSnapshot } from './provider.ts';
+import type {
+  LolProviderClient,
+  LolProviderScheduleEntry,
+  LolProviderSnapshot
+} from './provider.ts';
 import { createRiotFinalityProvider } from './riot-finality-provider.ts';
 
 const SERIES = {
@@ -32,11 +36,21 @@ function snapshot(advancing: boolean | null = false): LolProviderSnapshot {
   };
 }
 
-function base(snapshotValue: LolProviderSnapshot): LolProviderClient {
+function scheduleEntry(): LolProviderScheduleEntry {
+  return {
+    series: SERIES,
+    observedAt: '2026-08-07T09:50:00.000Z'
+  };
+}
+
+function base(
+  snapshotValue: LolProviderSnapshot,
+  scheduleValue: readonly LolProviderScheduleEntry[] = []
+): LolProviderClient {
   return {
     id: 'fixture',
     name: 'Fixture',
-    getSchedule: async () => [],
+    getSchedule: async () => scheduleValue,
     getSnapshot: async () => snapshotValue
   };
 }
@@ -121,4 +135,55 @@ test('does not spend a finality request while live telemetry is still advancing'
   const live = await provider.getSnapshot('game-2');
   assert.equal(live.game.state, 'live');
   assert.equal(detailRequests, 0);
+});
+
+test('reconciles stale live match-list entries against Riot finality', async () => {
+  const provider = createRiotFinalityProvider(base(snapshot(false), [scheduleEntry()]), {
+    apiKey: 'test-key',
+    now: () => new Date('2026-08-07T09:50:00.000Z'),
+    fetcher: async () => json(eventPayload('completed'))
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule[0]?.series.state, 'completed');
+  assert.equal(schedule[0]?.series.games[1]?.state, 'completed');
+  assert.equal(schedule[0]?.series.games.some(game => game.state === 'live'), false);
+});
+
+test('does not treat Riot between-game completed flags as series finality', async () => {
+  const betweenGames = eventPayload('completed');
+  betweenGames.data.event.match.teams[0]!.result.gameWins = 1;
+  betweenGames.data.event.match.games[1]!.state = 'unstarted';
+
+  const provider = createRiotFinalityProvider(base(snapshot(false), [scheduleEntry()]), {
+    apiKey: 'test-key',
+    now: () => new Date('2026-08-07T09:50:00.000Z'),
+    fetcher: async () => json(betweenGames)
+  });
+
+  const schedule = await provider.getSchedule();
+  assert.equal(schedule[0]?.series.state, 'live');
+});
+
+test('keeps an observed completed series ended when Riot later reports it live again', async () => {
+  let currentTime = Date.parse('2026-08-07T09:50:00.000Z');
+  let detailRequests = 0;
+  const provider = createRiotFinalityProvider(base(snapshot(false), [scheduleEntry()]), {
+    apiKey: 'test-key',
+    now: () => new Date(currentTime),
+    fetcher: async () => {
+      detailRequests += 1;
+      return json(eventPayload(detailRequests === 1 ? 'completed' : 'inProgress'));
+    }
+  });
+
+  const first = await provider.getSchedule();
+  assert.equal(first[0]?.series.state, 'completed');
+  assert.equal(detailRequests, 1);
+
+  currentTime += 10_000;
+  const second = await provider.getSchedule();
+  assert.equal(second[0]?.series.state, 'completed');
+  assert.equal(second[0]?.series.games[1]?.state, 'completed');
+  assert.equal(detailRequests, 1);
 });

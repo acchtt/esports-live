@@ -115,3 +115,57 @@ test('prioritizes overdue scheduled series when live events would exhaust the fi
   assert.equal(reconciled.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
   assert.equal(reconciled.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
 });
+
+test('rotates overdue scheduled probes so stalled entries cannot permanently starve later finals', async () => {
+  const stalledOne = series(
+    'stalled-one',
+    'scheduled',
+    new Date(NOW - 9 * 60 * 60 * 1_000).toISOString()
+  );
+  const stalledTwo = series(
+    'stalled-two',
+    'scheduled',
+    new Date(NOW - 8 * 60 * 60 * 1_000 - 30 * 60 * 1_000).toISOString()
+  );
+  const nsKt = series(
+    'ns-kt-ended',
+    'scheduled',
+    new Date(NOW - 7 * 60 * 60 * 1_000 - 20 * 60 * 1_000).toISOString()
+  );
+  const hleKrx = series(
+    'hle-krx-ended',
+    'scheduled',
+    new Date(NOW - 7 * 60 * 60 * 1_000 - 15 * 60 * 1_000).toISOString()
+  );
+  const schedule = [stalledOne, stalledTwo, nsKt, hleKrx].map(entry);
+  const requested: string[] = [];
+
+  const base: LolProviderClient = {
+    id: 'fixture',
+    name: 'Fixture',
+    getSchedule: async () => schedule,
+    getSnapshot: async (): Promise<LolProviderSnapshot> => {
+      throw new Error('Snapshot should not be requested by this regression.');
+    }
+  };
+  const provider = createRiotFinalityProvider(base, {
+    apiKey: 'test-key',
+    now: () => new Date(NOW),
+    scheduleFinalityLimit: 2,
+    fetcher: async input => {
+      const id = new URL(String(input)).searchParams.get('id') ?? '';
+      requested.push(id);
+      return json(payload(id, id === nsKt.id || id === hleKrx.id));
+    }
+  });
+
+  const first = await provider.getSchedule();
+  assert.deepEqual(requested, [stalledOne.id, stalledTwo.id]);
+  assert.equal(first.find(item => item.series.id === nsKt.id)?.series.state, 'scheduled');
+  assert.equal(first.find(item => item.series.id === hleKrx.id)?.series.state, 'scheduled');
+
+  const second = await provider.getSchedule();
+  assert.deepEqual(requested.slice(2), [nsKt.id, hleKrx.id]);
+  assert.equal(second.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
+  assert.equal(second.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
+});

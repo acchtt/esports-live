@@ -26,6 +26,7 @@ const ROLE_ORDER = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
 
 type ObjectiveKey = typeof OBJECTIVES[number];
 type RoleKey = typeof ROLE_ORDER[number];
+type SeriesTeamRef = ScheduleEvent['series']['teams'][number];
 
 interface PlayerPair {
   role: RoleKey | 'player';
@@ -193,9 +194,71 @@ function initials(value: string): string {
 function teamTag(name: string, code: string | null | undefined): string {
   if (code?.trim()) return code.trim();
   const words = name.split(/\s+/).filter(Boolean);
+  const leadingCode = words[0]?.trim() ?? '';
+  if (/^[A-Z0-9]{2,5}$/.test(leadingCode)) return leadingCode;
   return words.length > 1
     ? words.map(word => word[0]?.toUpperCase() ?? '').join('').slice(0, 4)
     : name.slice(0, 4).toUpperCase();
+}
+
+function normalizedTeamIdentity(value: string | null | undefined): string {
+  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function seriesTeamForSide(
+  event: ScheduleEvent | null,
+  statsTeam: LolTeamState | null,
+  fallbackIndex: 0 | 1
+): SeriesTeamRef | null {
+  if (!event) return null;
+  if (!statsTeam) return event.series.teams[fallbackIndex] ?? null;
+
+  const statsId = normalizedTeamIdentity(statsTeam.id);
+  if (statsId) {
+    const byId = event.series.teams.find(team => normalizedTeamIdentity(team.id) === statsId);
+    if (byId) return byId;
+  }
+
+  const statsName = normalizedTeamIdentity(statsTeam.name);
+  if (statsName) {
+    const byName = event.series.teams.find(team => normalizedTeamIdentity(team.name) === statsName);
+    if (byName) return byName;
+
+    const byCode = event.series.teams.find(team => {
+      const code = normalizedTeamIdentity(team.code);
+      return Boolean(code) && (
+        statsName === code
+        || statsName.startsWith(code)
+        || statsName.endsWith(code)
+      );
+    });
+    if (byCode) return byCode;
+  }
+
+  return null;
+}
+
+function sideTeamName(
+  event: ScheduleEvent | null,
+  statsTeam: LolTeamState | null,
+  fallbackIndex: 0 | 1,
+  fallback: string
+): string {
+  return seriesTeamForSide(event, statsTeam, fallbackIndex)?.name
+    ?? statsTeam?.name
+    ?? event?.series.teams[fallbackIndex]?.name
+    ?? fallback;
+}
+
+function sideTeamTag(
+  event: ScheduleEvent | null,
+  statsTeam: LolTeamState | null,
+  fallbackIndex: 0 | 1,
+  fallback: string
+): string {
+  const seriesTeam = seriesTeamForSide(event, statsTeam, fallbackIndex);
+  const name = seriesTeam?.name ?? statsTeam?.name ?? event?.series.teams[fallbackIndex]?.name ?? fallback;
+  return teamTag(name, seriesTeam?.code);
 }
 
 function playerDisplayName(player: LolPlayerState | null, tag: string): string {
@@ -742,8 +805,8 @@ export class WebV2App {
       ? `Game ${game.number} · ${stateLabel(effectiveState)}`
       : 'No game selected';
 
-    const blueName = stats?.blue.name ?? event?.series.teams[0].name ?? 'Blue team';
-    const redName = stats?.red.name ?? event?.series.teams[1].name ?? 'Red team';
+    const blueName = sideTeamName(event, stats?.blue ?? null, 0, 'Blue team');
+    const redName = sideTeamName(event, stats?.red ?? null, 1, 'Red team');
     this.#blueName.textContent = blueName;
     this.#redName.textContent = redName;
     this.#blueKills.textContent = formatNumber(stats?.blue.kills);
@@ -825,6 +888,8 @@ export class WebV2App {
     const pairs = playerPairs(bluePlayers, redPlayers);
     const signature = JSON.stringify({
       series: event?.series.id ?? null,
+      blueTeam: stats?.blue.id ?? null,
+      redTeam: stats?.red.id ?? null,
       blue: bluePlayers,
       red: redPlayers
     });
@@ -841,14 +906,8 @@ export class WebV2App {
       return;
     }
 
-    const blueTag = teamTag(
-      stats?.blue.name ?? event?.series.teams[0].name ?? 'Blue',
-      event?.series.teams[0].code
-    );
-    const redTag = teamTag(
-      stats?.red.name ?? event?.series.teams[1].name ?? 'Red',
-      event?.series.teams[1].code
-    );
+    const blueTag = sideTeamTag(event, stats?.blue ?? null, 0, 'Blue');
+    const redTag = sideTeamTag(event, stats?.red ?? null, 1, 'Red');
     const fragment = document.createDocumentFragment();
     pairs.forEach(pair => fragment.append(this.#playerRow(pair, blueTag, redTag)));
     this.#playerBoard.replaceChildren(fragment);

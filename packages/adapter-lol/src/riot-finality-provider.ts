@@ -12,6 +12,7 @@ const DEFAULT_FINALITY_PROBE_MS = 5_000;
 const DEFAULT_SCHEDULE_FINALITY_LOOKBACK_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_SCHEDULE_FINALITY_LOOKAHEAD_MS = 5 * 60 * 1_000;
 const DEFAULT_SCHEDULE_FINALITY_LIMIT = 16;
+const SCHEDULE_FINALITY_ROTATION_MS = 15_000;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -283,15 +284,17 @@ function circularTake<T>(
   entries: readonly T[],
   offset: number,
   limit: number
-): { values: readonly T[]; nextOffset: number } {
-  if (!entries.length || limit <= 0) return { values: [], nextOffset: 0 };
+): readonly T[] {
+  if (!entries.length || limit <= 0) return [];
   const count = Math.min(entries.length, Math.max(0, limit));
   const start = ((offset % entries.length) + entries.length) % entries.length;
-  const values = Array.from({ length: count }, (_, index) => entries[(start + index) % entries.length]!);
-  return {
-    values,
-    nextOffset: (start + count) % entries.length
-  };
+  return Array.from({ length: count }, (_, index) => entries[(start + index) % entries.length]!);
+}
+
+function rotationOffset(currentTime: number, width: number): number {
+  if (width <= 0) return 0;
+  const slot = Math.floor(currentTime / SCHEDULE_FINALITY_ROTATION_MS);
+  return slot * width;
 }
 
 async function requestFinality(
@@ -334,8 +337,6 @@ export function createRiotFinalityProvider(
   const cache = new Map<string, CachedFinalitySignal>();
   const inFlight = new Map<string, Promise<FinalitySignal>>();
   const completedSeries = new Set<string>();
-  let overdueScheduleProbeOffset = 0;
-  let generalScheduleProbeOffset = 0;
 
   const finalityFor = async (seriesId: string): Promise<FinalitySignal> => {
     const currentTime = now().getTime();
@@ -380,15 +381,18 @@ export function createRiotFinalityProvider(
       const limit = Math.max(0, scheduleFinalityLimit);
       const overdue = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 0);
       const general = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) !== 0);
-      const overdueSelection = circularTake(overdue, overdueScheduleProbeOffset, limit);
-      overdueScheduleProbeOffset = overdueSelection.nextOffset;
+      const overdueSelection = circularTake(
+        overdue,
+        rotationOffset(currentTime, Math.max(1, limit)),
+        limit
+      );
+      const generalBudget = limit - overdueSelection.length;
       const generalSelection = circularTake(
         general,
-        generalScheduleProbeOffset,
-        limit - overdueSelection.values.length
+        rotationOffset(currentTime, Math.max(1, generalBudget)),
+        generalBudget
       );
-      generalScheduleProbeOffset = generalSelection.nextOffset;
-      const candidates = [...overdueSelection.values, ...generalSelection.values];
+      const candidates = [...overdueSelection, ...generalSelection];
 
       const signals = new Map<string, FinalitySignal>();
       await Promise.all(candidates.map(async entry => {

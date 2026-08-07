@@ -1,6 +1,8 @@
 import type { GameState, ScheduleEvent, SeriesGameRef } from '@esports-live/core';
 import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapter-lol';
 import { loadHealth, loadSchedule, loadSnapshot } from './api.ts';
+import { readScheduleCache, writeScheduleCache } from './schedule-cache.ts';
+import { readSnapshotCache, writeSnapshotCache } from './snapshot-cache.ts';
 import {
   AppStore,
   catalogueEntries,
@@ -399,6 +401,7 @@ export class WebV2App {
   }
 
   start(): void {
+    this.#hydrateCachedSchedules();
     void this.#connect();
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
@@ -469,7 +472,15 @@ export class WebV2App {
     }
   }
 
+  #hydrateCachedSchedules(): void {
+    DATA_VIEWS.forEach(view => {
+      const events = readScheduleCache(view);
+      if (events) this.#store.dispatch({ type: 'schedule-loaded', view, events });
+    });
+  }
+
   async #connect(): Promise<void> {
+    const schedules = this.#refreshSchedules();
     try {
       const health = await loadHealth();
       if (!health.ok || !health.adapters.includes('lol')) {
@@ -478,14 +489,13 @@ export class WebV2App {
           status: 'offline',
           message: 'LoL data adapter unavailable'
         });
-        return;
+      } else {
+        this.#store.dispatch({
+          type: 'set-connection',
+          status: 'online',
+          message: `API online · schema ${health.schemaVersion}`
+        });
       }
-      this.#store.dispatch({
-        type: 'set-connection',
-        status: 'online',
-        message: `API online · schema ${health.schemaVersion}`
-      });
-      await this.#refreshSchedules();
     } catch (error) {
       this.#store.dispatch({
         type: 'set-connection',
@@ -493,17 +503,24 @@ export class WebV2App {
         message: errorMessage(error)
       });
     }
+    await schedules;
   }
 
   async #refreshSchedules(): Promise<void> {
     this.#scheduleController?.abort();
     this.#scheduleController = new AbortController();
     const signal = this.#scheduleController.signal;
-    DATA_VIEWS.forEach(view => this.#store.dispatch({ type: 'schedule-loading', view }));
+    const current = this.#store.getState();
+    DATA_VIEWS.forEach(view => {
+      if (!current.events[view].length) {
+        this.#store.dispatch({ type: 'schedule-loading', view });
+      }
+    });
 
     await Promise.all(DATA_VIEWS.map(async view => {
       try {
         const events = await loadSchedule(view, signal);
+        writeScheduleCache(view, events);
         this.#store.dispatch({ type: 'schedule-loaded', view, events });
       } catch (error) {
         if (signal.aborted) return;
@@ -542,13 +559,21 @@ export class WebV2App {
     this.#snapshotController?.abort();
     this.#snapshotController = new AbortController();
     const signal = this.#snapshotController.signal;
-    const state = this.#store.getState();
+    let state = this.#store.getState();
+    if (!state.snapshots[game.id]) {
+      const persisted = readSnapshotCache(game.id);
+      if (persisted) {
+        this.#store.dispatch({ type: 'snapshot-received', snapshot: persisted });
+        state = this.#store.getState();
+      }
+    }
     const cached = state.snapshots[game.id];
     const after = game.state === 'completed' ? null : cached?.quality.sourceTimestamp ?? null;
     this.#store.dispatch({ type: 'snapshot-loading', gameId: game.id });
 
     try {
       const snapshot = await loadSnapshot(game.id, after, signal);
+      writeSnapshotCache(snapshot);
       this.#store.dispatch({ type: 'snapshot-received', snapshot });
     } catch (error) {
       if (!signal.aborted) {
@@ -561,12 +586,12 @@ export class WebV2App {
     }
 
     if (signal.aborted || document.hidden) return;
-    const current = this.#store.getState();
-    const currentGame = selectedGame(current);
-    const snapshot = current.snapshots[game.id];
+    const currentState = this.#store.getState();
+    const currentGame = selectedGame(currentState);
+    const snapshot = currentState.snapshots[game.id];
     if (
-      current.activeView === 'match'
-      && current.detailView === view
+      currentState.activeView === 'match'
+      && currentState.detailView === view
       && currentGame?.id === game.id
       && snapshot?.game.state !== 'completed'
     ) {

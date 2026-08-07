@@ -381,7 +381,7 @@ test('web v2 renders ended immediately and recovers unknown LPL live series', as
   const fixture = await installFixtures(page);
   await page.goto('/v2/');
 
-  await expect(page).toHaveTitle('Esports Live V2');
+  await expect(page).toHaveTitle('ARENA');
   await expect(page.locator('#catalogue-meta')).toContainText('4 matches');
 
   await page.getByRole('button', { name: 'Live', exact: true }).click();

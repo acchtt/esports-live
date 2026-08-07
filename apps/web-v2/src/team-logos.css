@@ -12,10 +12,65 @@
 .team-side.red > .team-logo { justify-self: end; }
 .team-side > .team-logo[hidden] { display: none; }
 
+.match-card-teams > strong.has-team-logo {
+  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: center;
+}
+
+.match-card-teams > strong.has-team-logo > .match-team-logo {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  object-position: center;
+  justify-self: start;
+}
+
+.match-card-teams > strong.has-team-logo > i,
+.match-card-teams > strong.has-team-logo > span {
+  grid-column: 2;
+}
+
+.match-card-teams > strong:last-child.has-team-logo {
+  grid-template-columns: minmax(0, 1fr) 30px;
+}
+
+.match-card-teams > strong:last-child.has-team-logo > .match-team-logo {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.match-card-teams > strong:last-child.has-team-logo > i,
+.match-card-teams > strong:last-child.has-team-logo > span {
+  grid-column: 1;
+}
+
+.match-card-teams > strong > .match-team-logo[hidden] {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .team-side > .team-logo {
     max-width: 34px;
     max-height: 22px;
+  }
+
+  .match-card-teams > strong.has-team-logo {
+    grid-template-columns: 26px minmax(0, 1fr);
+    column-gap: 7px;
+  }
+
+  .match-card-teams > strong:last-child.has-team-logo {
+    grid-template-columns: minmax(0, 1fr) 26px;
+  }
+
+  .match-card-teams > strong.has-team-logo > .match-team-logo {
+    width: 24px;
+    height: 24px;
   }
 }
 
@@ -23,5 +78,19 @@
   .team-side > .team-logo {
     max-width: 30px;
     max-height: 20px;
+  }
+
+  .match-card-teams > strong.has-team-logo {
+    grid-template-columns: 23px minmax(0, 1fr);
+    column-gap: 6px;
+  }
+
+  .match-card-teams > strong:last-child.has-team-logo {
+    grid-template-columns: minmax(0, 1fr) 23px;
+  }
+
+  .match-card-teams > strong.has-team-logo > .match-team-logo {
+    width: 21px;
+    height: 21px;
   }
 }

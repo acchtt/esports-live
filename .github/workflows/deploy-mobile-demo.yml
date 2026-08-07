@@ -181,7 +181,7 @@ jobs:
           grep -R "$API_BASE_URL" apps/web-mobile/dist/v2/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web-mobile/dist/index.html
           grep -q "$MOBILE_DEMO_COMMIT_SHA" apps/web-mobile/dist/v2/index.html
-          grep -q '<title>Esports Live V2</title>' apps/web-mobile/dist/v2/index.html
+          grep -q '<title>ARENA</title>' apps/web-mobile/dist/v2/index.html
           grep -R "DEMO v$MOBILE_DEMO_VERSION" apps/web-mobile/dist/assets
 
       - name: Deploy isolated mobile Pages application
@@ -220,7 +220,7 @@ jobs:
               && grep -q 'class="app-frame"' <<<"$html" \
               && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" \
               && grep -q "DEMO v$MOBILE_DEMO_VERSION" <<<"$script" \
-              && grep -q '<title>Esports Live V2</title>' <<<"$v2_html" \
+              && grep -q '<title>ARENA</title>' <<<"$v2_html" \
               && grep -q "$MOBILE_DEMO_COMMIT_SHA" <<<"$v2_html" \
               && grep -q 'data-component="scoreboard"' <<<"$v2_script"; then
               echo "Current mobile application is available at $current_url"

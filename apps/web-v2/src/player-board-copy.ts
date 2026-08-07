@@ -10,6 +10,7 @@ interface PlayerTelemetry {
   deaths?: number | null;
   assists?: number | null;
   creepScore?: number | null;
+  totalGold?: number | null;
 }
 
 interface TeamTelemetry {
@@ -118,6 +119,30 @@ function formatKda(player: PlayerTelemetry | null): string {
   return `${formatNumber(player.kills)}/${formatNumber(player.deaths)}/${formatNumber(player.assists)}`;
 }
 
+function compactLead(value: number): string {
+  const absolute = Math.abs(value);
+  if (absolute >= 10_000) return `${Math.round(absolute / 1_000)}K`;
+  if (absolute >= 1_000) return `${(absolute / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(absolute);
+}
+
+function laneGoldDifference(blue: PlayerTelemetry | null, red: PlayerTelemetry | null): number | null {
+  if (blue?.totalGold === null || blue?.totalGold === undefined) return null;
+  if (red?.totalGold === null || red?.totalGold === undefined) return null;
+  return blue.totalGold - red.totalGold;
+}
+
+function decorateLaneGold(row: HTMLElement, blue: PlayerTelemetry | null, red: PlayerTelemetry | null): void {
+  const lead = row.querySelector<HTMLElement>('.lane-gold');
+  if (!lead) return;
+  const difference = laneGoldDifference(blue, red);
+  const text = difference === null ? '—' : difference === 0 ? 'EVEN' : `+${compactLead(difference)}`;
+  if (lead.textContent !== text) lead.textContent = text;
+  lead.dataset.side = difference === null || difference === 0
+    ? 'neutral'
+    : difference > 0 ? 'blue' : 'red';
+}
+
 function championDisplayName(value: string | null | undefined): string {
   const raw = String(value ?? '').trim();
   if (!raw) return 'Champion pending';
@@ -187,6 +212,7 @@ export function installPlayerBoardCopy(root: HTMLElement): () => void {
       if (!pair) return;
       decorateSide(row, 'blue', pair.blue);
       decorateSide(row, 'red', pair.red);
+      decorateLaneGold(row, pair.blue, pair.red);
     });
   };
 

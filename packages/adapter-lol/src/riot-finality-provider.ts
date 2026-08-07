@@ -241,6 +241,22 @@ function stabilizeCompletedEntry(entry: LolProviderScheduleEntry): LolProviderSc
   };
 }
 
+function scheduleCandidatePriority(
+  entry: LolProviderScheduleEntry,
+  currentTime: number
+): number {
+  const scheduled = Date.parse(entry.series.scheduledStart);
+  const overdue = Number.isFinite(scheduled) && scheduled <= currentTime;
+  if (
+    overdue
+    && (entry.series.state === 'scheduled' || entry.series.state === 'unknown')
+  ) {
+    return 0;
+  }
+  if (entry.series.state === 'live' || entry.series.state === 'paused') return 1;
+  return 2;
+}
+
 function scheduleFinalityCandidates(
   entries: readonly LolProviderScheduleEntry[],
   currentTime: number,
@@ -256,7 +272,12 @@ function scheduleFinalityCandidates(
         && scheduled >= currentTime - lookbackMs
         && scheduled <= currentTime + lookaheadMs;
     })
-    .sort((left, right) => Date.parse(left.series.scheduledStart) - Date.parse(right.series.scheduledStart))
+    .sort((left, right) => {
+      const priority = scheduleCandidatePriority(left, currentTime)
+        - scheduleCandidatePriority(right, currentTime);
+      if (priority) return priority;
+      return Date.parse(left.series.scheduledStart) - Date.parse(right.series.scheduledStart);
+    })
     .slice(0, Math.max(0, limit));
 }
 

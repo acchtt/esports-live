@@ -12,6 +12,7 @@ const DEFAULT_FINALITY_PROBE_MS = 5_000;
 const DEFAULT_SCHEDULE_FINALITY_LOOKBACK_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_SCHEDULE_FINALITY_LOOKAHEAD_MS = 5 * 60 * 1_000;
 const DEFAULT_SCHEDULE_FINALITY_LIMIT = 16;
+const GUARANTEED_OVERDUE_FINALITY_MS = 2 * 60 * 60 * 1_000;
 const SCHEDULE_FINALITY_ROTATION_MS = 15_000;
 
 type Json = Record<string, unknown>;
@@ -284,6 +285,16 @@ function scheduleFinalityCandidates(
     });
 }
 
+function isGuaranteedOverdue(
+  entry: LolProviderScheduleEntry,
+  currentTime: number
+): boolean {
+  const scheduled = Date.parse(entry.series.scheduledStart);
+  return Number.isFinite(scheduled)
+    && scheduled <= currentTime - GUARANTEED_OVERDUE_FINALITY_MS
+    && (entry.series.state === 'scheduled' || entry.series.state === 'unknown');
+}
+
 function rotatingBatch<T>(
   entries: readonly T[],
   currentTime: number,
@@ -297,44 +308,6 @@ function rotatingBatch<T>(
   const batchIndex = ((slot % batchCount) + batchCount) % batchCount;
   const start = batchIndex * batchSize;
   return entries.slice(start, start + batchSize);
-}
-
-function splitScheduleProbeBudget(
-  activeCount: number,
-  overdueCount: number,
-  otherCount: number,
-  limit: number
-): { active: number; overdue: number; other: number } {
-  const total = Math.max(0, limit);
-  if (!total) return { active: 0, overdue: 0, other: 0 };
-
-  let active = 0;
-  let overdue = 0;
-  let other = 0;
-
-  if (activeCount && overdueCount) {
-    active = Math.min(activeCount, Math.max(1, Math.ceil(total / 2)));
-    overdue = Math.min(overdueCount, total - active);
-  } else if (activeCount) {
-    active = Math.min(activeCount, total);
-  } else if (overdueCount) {
-    overdue = Math.min(overdueCount, total);
-  }
-
-  let remaining = total - active - overdue;
-  if (remaining > 0 && active < activeCount) {
-    const extra = Math.min(remaining, activeCount - active);
-    active += extra;
-    remaining -= extra;
-  }
-  if (remaining > 0 && overdue < overdueCount) {
-    const extra = Math.min(remaining, overdueCount - overdue);
-    overdue += extra;
-    remaining -= extra;
-  }
-  if (remaining > 0) other = Math.min(remaining, otherCount);
-
-  return { active, overdue, other };
 }
 
 async function requestFinality(
@@ -419,14 +392,24 @@ export function createRiotFinalityProvider(
         Math.max(0, scheduleFinalityLookaheadMs)
       );
       const limit = Math.max(0, scheduleFinalityLimit);
-      const overdue = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 0);
       const active = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 1);
+      const overdue = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 0);
+      const guaranteedOverdue = overdue.filter(entry => isGuaranteedOverdue(entry, currentTime));
+      const recentOverdue = overdue.filter(entry => !isGuaranteedOverdue(entry, currentTime));
       const other = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 2);
-      const budget = splitScheduleProbeBudget(active.length, overdue.length, other.length, limit);
+
+      // Live series and hours-old scheduled series are the exact cases where a
+      // stale Riot schedule flag is most damaging. Probe them on every refresh
+      // instead of placing them behind a rotating budget. The configured limit
+      // only controls newer ambiguous entries after those deterministic probes.
+      const guaranteed = [...active, ...guaranteedOverdue];
+      const remainingBudget = Math.max(0, limit - Math.min(limit, guaranteed.length));
+      const recentBudget = Math.min(recentOverdue.length, remainingBudget);
+      const otherBudget = Math.max(0, remainingBudget - recentBudget);
       const candidates = [
-        ...rotatingBatch(active, currentTime, budget.active),
-        ...rotatingBatch(overdue, currentTime, budget.overdue, 1),
-        ...rotatingBatch(other, currentTime, budget.other, 2)
+        ...guaranteed,
+        ...rotatingBatch(recentOverdue, currentTime, recentBudget, 1),
+        ...rotatingBatch(other, currentTime, otherBudget, 2)
       ];
 
       const signals = new Map<string, FinalitySignal>();

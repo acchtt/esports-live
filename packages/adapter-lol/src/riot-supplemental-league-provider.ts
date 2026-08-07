@@ -22,10 +22,19 @@ const object = (value: unknown): Json => (
 );
 const array = (value: unknown): readonly unknown[] => Array.isArray(value) ? value : [];
 
-function scheduleEvents(payload: unknown): readonly Json[] {
+function schedulePayload(payload: unknown): Json {
   const root = object(payload);
   const data = object(root.data);
-  return array(object(data.schedule ?? root.schedule).events).map(object);
+  return object(data.schedule ?? root.schedule);
+}
+
+function scheduleEvents(payload: unknown): readonly Json[] {
+  return array(schedulePayload(payload).events).map(object);
+}
+
+function olderScheduleToken(payload: unknown): string | null {
+  const value = object(schedulePayload(payload).pages).older;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function hasPlaceholderTeams(series: LolProviderSeries): boolean {
@@ -90,11 +99,20 @@ export function createRiotSupplementalLeagueProvider(
   const now = options.now ?? (() => new Date());
   const leagueIds = [...new Set(options.leagueIds ?? DEFAULT_LEAGUE_IDS)];
 
-  const loadLeagueSchedule = async (leagueId: string): Promise<unknown> => {
+  const loadLeagueSchedule = async (leagueId: string, pageToken?: string): Promise<unknown> => {
     const url = new URL(`${PERSISTED_BASE}/getSchedule`);
     url.searchParams.set('hl', locale);
     url.searchParams.set('leagueId', leagueId);
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
     return requestJson(fetcher, url, apiKey);
+  };
+
+  const loadLeagueSchedulePages = async (leagueId: string): Promise<readonly unknown[]> => {
+    const current = await loadLeagueSchedule(leagueId);
+    const olderToken = olderScheduleToken(current);
+    if (!olderToken) return [current];
+    const older = await loadLeagueSchedule(leagueId, olderToken).catch(() => null);
+    return older ? [current, older] : [current];
   };
 
   return {
@@ -104,12 +122,12 @@ export function createRiotSupplementalLeagueProvider(
     async getSchedule(): Promise<readonly LolProviderScheduleEntry[]> {
       const entries = await base.getSchedule();
       const observedAt = now().toISOString();
-      const payloads = await Promise.all(leagueIds.map(leagueId => (
-        loadLeagueSchedule(leagueId).catch(() => null)
+      const payloadGroups = await Promise.all(leagueIds.map(leagueId => (
+        loadLeagueSchedulePages(leagueId).catch(() => [])
       )));
       const merged = new Map(entries.map(entry => [entry.series.id, entry] as const));
 
-      for (const event of payloads.flatMap(scheduleEvents)) {
+      for (const event of payloadGroups.flat().flatMap(scheduleEvents)) {
         const series = normalizeRiotSeries(event, observedAt);
         const existing = merged.get(series.id);
         merged.set(series.id, existing

@@ -71,11 +71,11 @@ function json(value: unknown): Response {
   });
 }
 
-test('reserves finality capacity for live series when overdue scheduled entries fill the pool', async () => {
+test('probes live and hours-overdue series even when they exceed the rotating finality budget', async () => {
   const tesBlg = series(
     'tes-blg-ended',
     'live',
-    new Date(NOW - 2 * 60 * 60 * 1_000).toISOString()
+    new Date(NOW - 3 * 60 * 60 * 1_000).toISOString()
   );
   const overdue = Array.from({ length: 6 }, (_, index) => series(
     `overdue-${index}`,
@@ -106,24 +106,14 @@ test('reserves finality capacity for live series when overdue scheduled entries 
 
   const reconciled = await provider.getSchedule();
 
-  assert.equal(requested.length, 2);
+  assert.equal(requested.length, 7);
   assert.ok(requested.includes(tesBlg.id));
-  assert.ok(requested.some(id => id.startsWith('overdue-')));
+  for (const stale of overdue) assert.ok(requested.includes(stale.id));
   assert.equal(reconciled.find(item => item.series.id === tesBlg.id)?.series.state, 'completed');
 });
 
-test('advances stale scheduled probe batches across time windows even on a fresh worker isolate', async () => {
+test('hours-overdue challengers remain deterministic across fresh workers at the real 30 second poll cadence', async () => {
   let currentTime = NOW;
-  const stalledOne = series(
-    'stalled-one',
-    'scheduled',
-    new Date(NOW - 9 * 60 * 60 * 1_000).toISOString()
-  );
-  const stalledTwo = series(
-    'stalled-two',
-    'scheduled',
-    new Date(NOW - 8 * 60 * 60 * 1_000 - 30 * 60 * 1_000).toISOString()
-  );
   const nsKt = series(
     'ns-kt-ended',
     'scheduled',
@@ -134,7 +124,7 @@ test('advances stale scheduled probe batches across time windows even on a fresh
     'scheduled',
     new Date(NOW - 7 * 60 * 60 * 1_000 - 15 * 60 * 1_000).toISOString()
   );
-  const schedule = [stalledOne, stalledTwo, nsKt, hleKrx].map(entry);
+  const schedule = [entry(nsKt), entry(hleKrx)];
   const requested: string[] = [];
 
   const base: LolProviderClient = {
@@ -148,22 +138,25 @@ test('advances stale scheduled probe batches across time windows even on a fresh
   const makeProvider = () => createRiotFinalityProvider(base, {
     apiKey: 'test-key',
     now: () => new Date(currentTime),
-    scheduleFinalityLimit: 2,
+    scheduleFinalityLimit: 1,
     fetcher: async input => {
       const id = new URL(String(input)).searchParams.get('id') ?? '';
       requested.push(id);
-      return json(payload(id, id === nsKt.id || id === hleKrx.id));
+      return json(payload(id, true));
     }
   });
 
-  await makeProvider().getSchedule();
-  assert.equal(requested.length, 2);
+  const first = await makeProvider().getSchedule();
+  assert.deepEqual(requested.slice().sort(), [hleKrx.id, nsKt.id].sort());
+  assert.equal(first.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
+  assert.equal(first.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
 
-  currentTime += 15_000;
-  await makeProvider().getSchedule();
-  assert.equal(new Set(requested).size, 4);
+  currentTime += 30_000;
+  const second = await makeProvider().getSchedule();
   assert.deepEqual(
-    [...new Set(requested)].sort(),
-    [stalledOne.id, stalledTwo.id, nsKt.id, hleKrx.id].sort()
+    requested.slice(2).sort(),
+    [hleKrx.id, nsKt.id].sort()
   );
+  assert.equal(second.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
+  assert.equal(second.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
 });

@@ -169,8 +169,8 @@ export class WinnerDeclarationController {
     const label = this.#root.querySelector<HTMLElement>('#gold-lead-label');
     const value = this.#root.querySelector<HTMLElement>('#gold-lead');
     if (!label || !value) return;
-    if (label.textContent !== 'FINAL RESULT') label.textContent = 'FINAL RESULT';
-    if (value.textContent !== 'PENDING') value.textContent = 'PENDING';
+    if (label.textContent !== 'GAME STATUS') label.textContent = 'GAME STATUS';
+    if (value.textContent !== 'FINAL') value.textContent = 'FINAL';
     if (value.dataset.side !== 'neutral') value.dataset.side = 'neutral';
     value.removeAttribute('title');
     delete scoreboard.dataset.winnerTeamId;

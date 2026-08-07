@@ -21,13 +21,16 @@ const series = {
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'];
 const blueHandles = ['KRX Rich', 'KRX Willer', 'KRX AK', 'KRX LazyFeel', 'KRX Moham'];
 const redHandles = ['HLE Pades', 'HLE Juhan', 'HLE Crimson', 'HLE Pyosik', 'HLE Bull'];
+const blueChampions = ['Aurora', 'Wukong', 'Ahri', 'Ezreal', 'Nautilus'];
+const redChampions = ['KSante', 'Vi', 'Azir', 'Kaisa', 'Rakan'];
 
 function players(side: 'blue' | 'red') {
   const handles = side === 'blue' ? blueHandles : redHandles;
+  const champions = side === 'blue' ? blueChampions : redChampions;
   return handles.map((handle, index) => ({
     id: `${side}-${index + 1}`,
     handle,
-    championId: null,
+    championId: champions[index]!,
     role: roles[index]!,
     level: 16,
     kills: index,
@@ -94,8 +97,9 @@ async function json(route: Route, value: unknown): Promise<void> {
   });
 }
 
-test('web v2 resolves live team names and player prefixes by side identity', async ({ page }) => {
+test('web v2 resolves side identity and enriches champion-board copy', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('https://ddragon.leagueoflegends.com/**', route => route.abort());
   await page.route('**/health', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -126,6 +130,20 @@ test('web v2 resolves live team names and player prefixes by side identity', asy
   await expect(redNames).toHaveCount(5);
   await expect(blueNames.first()).toHaveText('KRX Rich');
   await expect(redNames.first()).toHaveText('HLE Pades');
+
+  const blueStats = page.locator('.blue-player .player-statline');
+  const redStats = page.locator('.red-player .player-statline');
+  await expect(blueStats).toHaveCount(5);
+  await expect(redStats).toHaveCount(5);
+  await expect(blueStats.first()).toHaveText('0/2/5 · 180 CS');
+  await expect(redStats.first()).toHaveText('0/2/5 · 180 CS');
+
+  const blueChampionNames = page.locator('.blue-player .player-champion');
+  const redChampionNames = page.locator('.red-player .player-champion');
+  await expect(blueChampionNames).toHaveCount(5);
+  await expect(redChampionNames).toHaveCount(5);
+  await expect(blueChampionNames.first()).toHaveText('Aurora');
+  await expect(redChampionNames.first()).toHaveText("K'Sante");
 
   const labels = await page.locator('.player-copy strong').allTextContents();
   expect(labels.some(label => label.includes('HLE KRX'))).toBe(false);

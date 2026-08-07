@@ -67,6 +67,81 @@ function liveSnapshot() {
   };
 }
 
+function completedSnapshot() {
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: '1.0',
+    esport: 'lol',
+    provider,
+    series: endedSeries,
+    game: endedSeries.games[0],
+    stats: {
+      gameClockSeconds: 2_145,
+      patch: '26.15.1',
+      blue: {
+        id: blue.id,
+        name: blue.name,
+        side: 'blue',
+        gold: 58_000,
+        kills: 19,
+        objectives: { towers: 9, inhibitors: 1, dragons: ['cloud', 'infernal'], barons: 1, heralds: 1, grubs: 3 },
+        players: []
+      },
+      red: {
+        id: red.id,
+        name: red.name,
+        side: 'red',
+        gold: 51_000,
+        kills: 10,
+        objectives: { towers: 7, inhibitors: 0, dragons: ['mountain', 'ocean'], barons: 0, heralds: 0, grubs: 3 },
+        players: []
+      }
+    },
+    quality: {
+      freshness: 'stale',
+      sourceTimestamp: now,
+      observedAt: now,
+      ageSeconds: 2,
+      complete: true,
+      advancing: false,
+      safeForLiveAnalysis: false,
+      reasons: []
+    }
+  };
+}
+
+function completedContext() {
+  return {
+    schemaVersion: '1.0',
+    esport: 'lol',
+    seriesId: endedSeries.id,
+    provider,
+    observedAt: new Date().toISOString(),
+    rosters: [],
+    standings: [],
+    history: {
+      bestOf: 3,
+      winsRequired: 2,
+      drawPossible: false,
+      score: [
+        { team: blue, wins: 0 },
+        { team: red, wins: 1 }
+      ],
+      games: [{
+        id: endedSeries.games[0].id,
+        number: 1,
+        state: 'completed',
+        blueTeam: blue,
+        redTeam: red,
+        winner: red,
+        durationSeconds: 2_145
+      }]
+    },
+    complete: true,
+    reasons: []
+  };
+}
+
 async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({
     status: 200,
@@ -144,4 +219,41 @@ test('V2 renders data without waiting for health and reuses recent caches during
 
   releaseSchedules();
   releaseSnapshot();
+});
+
+test('V2 declares the authoritative winner for a completed game', async ({ page }) => {
+  let contextRequests = 0;
+
+  await page.route('**/health', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+  await page.route('**/v1/lol/schedule**', route => {
+    const history = route.request().url().includes('states=completed');
+    return json(route, {
+      esport: 'lol',
+      events: history ? [{ series: endedSeries, provider, observedAt: new Date().toISOString() }] : []
+    });
+  });
+  await page.route('**/v1/lol/games/**/live**', route => json(route, completedSnapshot()));
+  await page.route('**/v1/lol/series/**/context**', route => {
+    contextRequests += 1;
+    return json(route, completedContext());
+  });
+
+  await page.goto('/v2/');
+  await expect(page.locator('[data-series-id="series-fast-ended"]')).toBeVisible();
+  await page.locator('[data-series-id="series-fast-ended"]').click();
+
+  await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
+  await expect(page.locator('#blue-kills')).toHaveText('19');
+  await expect(page.locator('#red-kills')).toHaveText('10');
+  await expect(page.locator('#gold-lead-label')).toHaveText('WINNER');
+  await expect(page.locator('#gold-lead')).toHaveText('FR');
+  await expect(page.locator('#gold-lead')).toHaveAttribute('data-side', 'red');
+  await expect(page.locator('#scoreboard')).toHaveAttribute('data-winner-team-id', red.id);
+  await expect(page.locator('#scoreboard-notice')).toHaveText('Fast Red won Game 1.');
+  expect(contextRequests).toBeGreaterThan(0);
 });

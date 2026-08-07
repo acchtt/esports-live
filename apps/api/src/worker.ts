@@ -6,6 +6,7 @@ import {
   createRiotDelayedLiveRecoveryProvider,
   createRiotFinalityProvider,
   createRiotLolConsistentProvider,
+  createRiotScheduleReconciliationProvider,
   createRiotSupplementalLeagueProvider,
   createUsableScheduleProvider,
   type LolProviderClient,
@@ -87,15 +88,18 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const registry = new AdapterRegistry();
   if (apiKey) {
     const riotProvider = createRiotFinalityProvider(
-      createRiotDelayedLiveRecoveryProvider(
-        createRiotSupplementalLeagueProvider(
-          createRiotLolConsistentProvider({
-            apiKey,
-            includeDetails: false,
-            useDetailItemFallback: false
-          }),
-          { apiKey }
-        )
+      createRiotScheduleReconciliationProvider(
+        createRiotDelayedLiveRecoveryProvider(
+          createRiotSupplementalLeagueProvider(
+            createRiotLolConsistentProvider({
+              apiKey,
+              includeDetails: false,
+              useDetailItemFallback: false
+            }),
+            { apiKey }
+          )
+        ),
+        { apiKey }
       ),
       { apiKey }
     );

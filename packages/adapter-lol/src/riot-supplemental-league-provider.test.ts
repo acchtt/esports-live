@@ -23,7 +23,7 @@ function entry(): LolProviderScheduleEntry {
   };
 }
 
-function lplEvent(id: string, state: 'inProgress' | 'unstarted') {
+function lplEvent(id: string, state: 'inProgress' | 'unstarted' | 'completed') {
   return {
     id: `${id}-event`,
     state,
@@ -40,7 +40,9 @@ function lplEvent(id: string, state: 'inProgress' | 'unstarted') {
       ],
       games: state === 'inProgress'
         ? [{ id: `${id}-game-1`, number: 1, state: 'inProgress' }]
-        : []
+        : state === 'completed'
+          ? [{ id: `${id}-game-1`, number: 1, state: 'completed' }]
+          : []
     }
   };
 }
@@ -85,6 +87,35 @@ test('adds live and scheduled LPL matches omitted by the global schedule', async
   assert.equal(schedule.length, 3);
   assert.equal(schedule.find(item => item.series.id === 'lpl-live-match')?.series.state, 'live');
   assert.equal(schedule.find(item => item.series.id === 'lpl-scheduled-match')?.series.state, 'scheduled');
+});
+
+test('reads the first older LPL page so a just-ended match does not disappear', async () => {
+  const requestedPageTokens: Array<string | null> = [];
+  const provider = createRiotSupplementalLeagueProvider(baseProvider(), {
+    apiKey: 'test-key',
+    now: () => new Date(observedAt),
+    fetcher: async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const pageToken = url.searchParams.get('pageToken');
+      requestedPageTokens.push(pageToken);
+      const events = pageToken === 'older-page'
+        ? [lplEvent('we-finished-match', 'completed')]
+        : [lplEvent('lpl-scheduled-match', 'unstarted')];
+      return new Response(JSON.stringify({
+        data: {
+          schedule: {
+            events,
+            pages: pageToken ? {} : { older: 'older-page' }
+          }
+        }
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+  });
+
+  const schedule = await provider.getSchedule();
+
+  assert.deepEqual(requestedPageTokens, [null, 'older-page']);
+  assert.equal(schedule.find(item => item.series.id === 'we-finished-match')?.series.state, 'completed');
 });
 
 test('keeps the base schedule when the supplemental league request fails', async () => {

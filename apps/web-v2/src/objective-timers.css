@@ -1,0 +1,44 @@
+.objective-grid article.has-objective-timer {
+  gap: 6px;
+}
+
+.objective-timer {
+  display: block;
+  min-height: 0.9em;
+  color: #78899f;
+  font-size: 0.52rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+}
+
+.objective-timer[data-status="spawn"],
+.objective-timer[data-status="respawn"] {
+  color: #f7c74a;
+}
+
+.objective-timer[data-status="up"] {
+  color: #72e7bd;
+}
+
+.objective-timer[data-status="tracking"] {
+  color: #718197;
+}
+
+@media (max-width: 760px) {
+  .objective-grid article.has-objective-timer {
+    gap: 3px;
+  }
+
+  .objective-timer {
+    font-size: clamp(0.39rem, 1.85vw, 0.47rem);
+    letter-spacing: 0.015em;
+  }
+}
+
+@media (max-width: 400px) {
+  .objective-timer {
+    font-size: clamp(0.37rem, 1.8vw, 0.44rem);
+  }
+}

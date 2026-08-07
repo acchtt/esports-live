@@ -9,7 +9,7 @@ import type {
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
 const REQUEST_TIMEOUT_MS = 2_500;
 const DEFAULT_FINALITY_PROBE_MS = 5_000;
-const DEFAULT_SCHEDULE_FINALITY_LOOKBACK_MS = 8 * 60 * 60 * 1_000;
+const DEFAULT_SCHEDULE_FINALITY_LOOKBACK_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_SCHEDULE_FINALITY_LOOKAHEAD_MS = 5 * 60 * 1_000;
 const DEFAULT_SCHEDULE_FINALITY_LIMIT = 16;
 
@@ -261,8 +261,7 @@ function scheduleFinalityCandidates(
   entries: readonly LolProviderScheduleEntry[],
   currentTime: number,
   lookbackMs: number,
-  lookaheadMs: number,
-  limit: number
+  lookaheadMs: number
 ): readonly LolProviderScheduleEntry[] {
   return entries
     .filter(entry => entry.series.state !== 'completed' && entry.series.state !== 'cancelled')
@@ -277,8 +276,22 @@ function scheduleFinalityCandidates(
         - scheduleCandidatePriority(right, currentTime);
       if (priority) return priority;
       return Date.parse(left.series.scheduledStart) - Date.parse(right.series.scheduledStart);
-    })
-    .slice(0, Math.max(0, limit));
+    });
+}
+
+function circularTake<T>(
+  entries: readonly T[],
+  offset: number,
+  limit: number
+): { values: readonly T[]; nextOffset: number } {
+  if (!entries.length || limit <= 0) return { values: [], nextOffset: 0 };
+  const count = Math.min(entries.length, Math.max(0, limit));
+  const start = ((offset % entries.length) + entries.length) % entries.length;
+  const values = Array.from({ length: count }, (_, index) => entries[(start + index) % entries.length]!);
+  return {
+    values,
+    nextOffset: (start + count) % entries.length
+  };
 }
 
 async function requestFinality(
@@ -321,6 +334,8 @@ export function createRiotFinalityProvider(
   const cache = new Map<string, CachedFinalitySignal>();
   const inFlight = new Map<string, Promise<FinalitySignal>>();
   const completedSeries = new Set<string>();
+  let overdueScheduleProbeOffset = 0;
+  let generalScheduleProbeOffset = 0;
 
   const finalityFor = async (seriesId: string): Promise<FinalitySignal> => {
     const currentTime = now().getTime();
@@ -355,14 +370,27 @@ export function createRiotFinalityProvider(
         if (entry.series.state === 'completed') completedSeries.add(entry.series.id);
       }
 
-      const signals = new Map<string, FinalitySignal>();
-      const candidates = scheduleFinalityCandidates(
+      const currentTime = now().getTime();
+      const pool = scheduleFinalityCandidates(
         entries.filter(entry => !completedSeries.has(entry.series.id)),
-        now().getTime(),
+        currentTime,
         Math.max(0, scheduleFinalityLookbackMs),
-        Math.max(0, scheduleFinalityLookaheadMs),
-        scheduleFinalityLimit
+        Math.max(0, scheduleFinalityLookaheadMs)
       );
+      const limit = Math.max(0, scheduleFinalityLimit);
+      const overdue = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) === 0);
+      const general = pool.filter(entry => scheduleCandidatePriority(entry, currentTime) !== 0);
+      const overdueSelection = circularTake(overdue, overdueScheduleProbeOffset, limit);
+      overdueScheduleProbeOffset = overdueSelection.nextOffset;
+      const generalSelection = circularTake(
+        general,
+        generalScheduleProbeOffset,
+        limit - overdueSelection.values.length
+      );
+      generalScheduleProbeOffset = generalSelection.nextOffset;
+      const candidates = [...overdueSelection.values, ...generalSelection.values];
+
+      const signals = new Map<string, FinalitySignal>();
       await Promise.all(candidates.map(async entry => {
         try {
           signals.set(entry.series.id, await finalityFor(entry.series.id));

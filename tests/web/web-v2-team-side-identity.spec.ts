@@ -180,6 +180,12 @@ test('web v2 resolves side identity, team logos and champion-board copy', async 
   await page.goto('/v2/');
   const card = page.locator('[data-series-id="series-challengers-side-swap"]');
   await expect(card).toBeVisible();
+  const catalogueLogos = card.locator('.match-team-logo');
+  await expect(catalogueLogos).toHaveCount(2);
+  await expect(catalogueLogos.nth(0)).toHaveAttribute('src', hle.imageUrl);
+  await expect(catalogueLogos.nth(1)).toHaveAttribute('src', krx.imageUrl);
+  await expect(catalogueLogos.nth(0)).toHaveAttribute('loading', 'eager');
+  await expect(catalogueLogos.nth(0)).toHaveAttribute('fetchpriority', 'high');
   await card.click();
 
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');

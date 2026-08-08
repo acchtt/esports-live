@@ -31,7 +31,7 @@ jobs:
         run: npm run check
 
       - name: Desktop browser stability suite
-        if: github.ref_name == 'main' || github.ref_name == 'demo' || github.base_ref == 'main'
+        if: github.ref_name == 'main' || github.ref_name == 'demo' || github.base_ref == 'main' || github.base_ref == 'demo'
         run: npm run test:web
 
       - name: Mobile application browser suite

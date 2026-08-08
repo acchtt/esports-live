@@ -9,7 +9,6 @@ const ACTIVE_SUSPECT_AGE_MS = 2 * 60 * 60 * 1_000;
 const OVERDUE_SUSPECT_AGE_MS = 90 * 60 * 1_000;
 const MAX_ACTIVE_PROBES = 3;
 const MAX_OVERDUE_PROBES = 4;
-const REQUIRED_CONFIRMATIONS = 2;
 const RECHECK_MS = 25_000;
 const CONTEXT_TIMEOUT_MS = 8_000;
 
@@ -20,16 +19,10 @@ interface ScheduleResponse {
   events?: readonly ScheduleEvent[];
 }
 
-interface CompletionEvidence {
+interface ConfirmedFinality {
   signature: string;
   games: readonly SeriesGameRef[];
 }
-
-interface PendingFinality extends CompletionEvidence {
-  confirmations: number;
-}
-
-interface ConfirmedFinality extends CompletionEvidence {}
 
 function requestUrl(input: FetchInput): URL | null {
   try {
@@ -102,13 +95,14 @@ function eventTeamKey(event: ScheduleEvent, team: TeamRef | null | undefined): s
 function completionEvidence(
   event: ScheduleEvent,
   context: SeriesContext
-): CompletionEvidence | null {
+): ConfirmedFinality | null {
   if (context.seriesId !== event.series.id) return null;
   const history = context.history;
   if (!history) return null;
 
-  // A context that still contains an active game is contradictory evidence. Never
-  // turn that frame into a final result; wait for the provider to settle instead.
+  // A completed-series score cannot be trusted when the same fresh context still
+  // contains an active game. This was the source of live LPL series flipping to
+  // Final/Ended mid-game.
   if (history.games.some(game => (
     game.state === 'live' || game.state === 'draft' || game.state === 'paused'
   ))) {
@@ -135,6 +129,8 @@ function completionEvidence(
     signatureGames.push(`${game.number}:${uniqueGame}:${winnerKey}`);
   }
 
+  // Do not accept the aggregate score alone. At least winsRequired distinct
+  // completed game records must identify the same series team as winner.
   const decisive = [...winnerCounts.entries()]
     .find(([, wins]) => wins >= winsRequired);
   if (!decisive) return null;
@@ -199,7 +195,6 @@ async function loadFreshContext(
 
 export function installCatalogueFinality(): void {
   const nativeFetch = window.fetch.bind(window);
-  const pending = new Map<string, PendingFinality>();
   const confirmed = new Map<string, ConfirmedFinality>();
   const checkedAt = new Map<string, number>();
 
@@ -218,16 +213,15 @@ export function installCatalogueFinality(): void {
 
     const sourceEvents = payload.events;
     const visibleIds = new Set(sourceEvents.map(event => event.series.id));
-    for (const id of [...pending.keys()]) if (!visibleIds.has(id)) pending.delete(id);
     for (const id of [...confirmed.keys()]) if (!visibleIds.has(id)) confirmed.delete(id);
 
     const now = Date.now();
     const candidateMap = new Map<string, ScheduleEvent>();
     probeCandidates(sourceEvents, now).forEach(event => candidateMap.set(event.series.id, event));
 
-    // A locally-confirmed final that the provider still publishes as live/upcoming
-    // must keep being revalidated. This makes the override recoverable instead of
-    // permanently poisoning the catalogue after one stale context response.
+    // A local override is intentionally not sticky. If the upstream schedule still
+    // disagrees, keep re-checking context so a later live/partial frame can restore
+    // the match to Live instead of leaving it poisoned in Ended until reload.
     sourceEvents.forEach(event => {
       if (confirmed.has(event.series.id) && (activeSeries(event) || overdueSeries(event))) {
         candidateMap.set(event.series.id, event);
@@ -245,22 +239,10 @@ export function installCatalogueFinality(): void {
 
       const evidence = completionEvidence(event, context);
       if (!evidence) {
-        pending.delete(event.series.id);
         confirmed.delete(event.series.id);
         return;
       }
-
-      const previous = pending.get(event.series.id);
-      const confirmations = previous?.signature === evidence.signature
-        ? previous.confirmations + 1
-        : 1;
-      pending.set(event.series.id, { ...evidence, confirmations });
-
-      if (confirmations >= REQUIRED_CONFIRMATIONS) {
-        confirmed.set(event.series.id, evidence);
-      } else {
-        confirmed.delete(event.series.id);
-      }
+      confirmed.set(event.series.id, evidence);
     }));
 
     const events = sourceEvents.map(event => {

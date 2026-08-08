@@ -1,13 +1,15 @@
 import type {
   ScheduleEvent,
   SeriesContext,
-  SeriesGameRef
+  SeriesGameRef,
+  TeamRef
 } from '@esports-live/core';
 
 const ACTIVE_SUSPECT_AGE_MS = 2 * 60 * 60 * 1_000;
 const OVERDUE_SUSPECT_AGE_MS = 90 * 60 * 1_000;
 const MAX_ACTIVE_PROBES = 3;
 const MAX_OVERDUE_PROBES = 4;
+const REQUIRED_CONFIRMATIONS = 2;
 const RECHECK_MS = 25_000;
 const CONTEXT_TIMEOUT_MS = 8_000;
 
@@ -18,9 +20,16 @@ interface ScheduleResponse {
   events?: readonly ScheduleEvent[];
 }
 
-interface ConfirmedFinality {
+interface CompletionEvidence {
+  signature: string;
   games: readonly SeriesGameRef[];
 }
+
+interface PendingFinality extends CompletionEvidence {
+  confirmations: number;
+}
+
+interface ConfirmedFinality extends CompletionEvidence {}
 
 function requestUrl(input: FetchInput): URL | null {
   try {
@@ -72,39 +81,74 @@ function probeCandidates(
   return [...merged.values()];
 }
 
-function winnerCounts(context: SeriesContext): ReadonlyMap<string, number> {
-  const counts = new Map<string, number>();
-  for (const game of context.history?.games ?? []) {
-    if (game.state !== 'completed' || !game.winner?.id) continue;
-    counts.set(game.winner.id, (counts.get(game.winner.id) ?? 0) + 1);
-  }
-  return counts;
+function normalized(value: string | null | undefined): string {
+  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
-function contextConfirmsCompletion(context: SeriesContext): boolean {
+function eventTeamKey(event: ScheduleEvent, team: TeamRef | null | undefined): string | null {
+  if (!team) return null;
+  const teamId = team.id?.trim() ?? '';
+  const teamName = normalized(team.name);
+  const teamCode = normalized(team.code);
+
+  for (const candidate of event.series.teams) {
+    if (teamId && candidate.id?.trim() === teamId) return candidate.id;
+    if (teamName && normalized(candidate.name) === teamName) return candidate.id || teamName;
+    if (teamCode && normalized(candidate.code) === teamCode) return candidate.id || teamCode;
+  }
+  return null;
+}
+
+function completionEvidence(
+  event: ScheduleEvent,
+  context: SeriesContext
+): CompletionEvidence | null {
+  if (context.seriesId !== event.series.id) return null;
   const history = context.history;
-  if (!history) return false;
+  if (!history) return null;
+
+  // A context that still contains an active game is contradictory evidence. Never
+  // turn that frame into a final result; wait for the provider to settle instead.
+  if (history.games.some(game => (
+    game.state === 'live' || game.state === 'draft' || game.state === 'paused'
+  ))) {
+    return null;
+  }
+
   const winsRequired = Math.max(
     1,
     history.winsRequired || Math.floor(Math.max(1, history.bestOf) / 2) + 1
   );
-  if (history.score.some(score => score.wins >= winsRequired)) return true;
-  return [...winnerCounts(context).values()].some(wins => wins >= winsRequired);
-}
+  const winnerCounts = new Map<string, number>();
+  const seenGames = new Set<string>();
+  const signatureGames: string[] = [];
 
-function finalGames(
-  event: ScheduleEvent,
-  context: SeriesContext
-): readonly SeriesGameRef[] {
-  const historyGames = context.history?.games ?? [];
-  const source = historyGames.length
-    ? historyGames.map(game => ({ id: game.id, number: game.number, state: game.state }))
-    : event.series.games;
-  return source.map(game => (
-    game.state === 'live' || game.state === 'draft' || game.state === 'paused'
-      ? { ...game, state: 'completed' as const }
-      : game
-  ));
+  for (const game of history.games) {
+    if (game.state !== 'completed' || !game.winner) continue;
+    const uniqueGame = game.id?.trim() || `game-${game.number}`;
+    if (seenGames.has(uniqueGame)) continue;
+    seenGames.add(uniqueGame);
+
+    const winnerKey = eventTeamKey(event, game.winner);
+    if (!winnerKey) continue;
+    winnerCounts.set(winnerKey, (winnerCounts.get(winnerKey) ?? 0) + 1);
+    signatureGames.push(`${game.number}:${uniqueGame}:${winnerKey}`);
+  }
+
+  const decisive = [...winnerCounts.entries()]
+    .find(([, wins]) => wins >= winsRequired);
+  if (!decisive) return null;
+
+  const games = history.games.map(game => ({
+    id: game.id,
+    number: game.number,
+    state: game.state
+  }));
+  signatureGames.sort();
+  return {
+    signature: `${decisive[0]}:${decisive[1]}:${signatureGames.join('|')}`,
+    games
+  };
 }
 
 function applyConfirmedFinality(
@@ -155,6 +199,7 @@ async function loadFreshContext(
 
 export function installCatalogueFinality(): void {
   const nativeFetch = window.fetch.bind(window);
+  const pending = new Map<string, PendingFinality>();
   const confirmed = new Map<string, ConfirmedFinality>();
   const checkedAt = new Map<string, number>();
 
@@ -171,32 +216,58 @@ export function installCatalogueFinality(): void {
     }
     if (!Array.isArray(payload.events)) return response;
 
-    let events = payload.events.map(event => {
-      const finality = confirmed.get(event.series.id);
-      return finality ? applyConfirmedFinality(event, finality) : event;
-    });
+    const sourceEvents = payload.events;
+    const visibleIds = new Set(sourceEvents.map(event => event.series.id));
+    for (const id of [...pending.keys()]) if (!visibleIds.has(id)) pending.delete(id);
+    for (const id of [...confirmed.keys()]) if (!visibleIds.has(id)) confirmed.delete(id);
 
     const now = Date.now();
-    const candidates = probeCandidates(events, now).filter(event => {
-      if (confirmed.has(event.series.id)) return false;
-      return now - (checkedAt.get(event.series.id) ?? 0) >= RECHECK_MS;
+    const candidateMap = new Map<string, ScheduleEvent>();
+    probeCandidates(sourceEvents, now).forEach(event => candidateMap.set(event.series.id, event));
+
+    // A locally-confirmed final that the provider still publishes as live/upcoming
+    // must keep being revalidated. This makes the override recoverable instead of
+    // permanently poisoning the catalogue after one stale context response.
+    sourceEvents.forEach(event => {
+      if (confirmed.has(event.series.id) && (activeSeries(event) || overdueSeries(event))) {
+        candidateMap.set(event.series.id, event);
+      }
     });
+
+    const candidates = [...candidateMap.values()].filter(event => (
+      now - (checkedAt.get(event.series.id) ?? 0) >= RECHECK_MS
+    ));
 
     await Promise.all(candidates.map(async event => {
       checkedAt.set(event.series.id, now);
       const context = await loadFreshContext(nativeFetch, event.series.id);
-      if (!context || !contextConfirmsCompletion(context)) return;
-      confirmed.set(event.series.id, {
-        games: finalGames(event, context)
-      });
+      if (!context) return;
+
+      const evidence = completionEvidence(event, context);
+      if (!evidence) {
+        pending.delete(event.series.id);
+        confirmed.delete(event.series.id);
+        return;
+      }
+
+      const previous = pending.get(event.series.id);
+      const confirmations = previous?.signature === evidence.signature
+        ? previous.confirmations + 1
+        : 1;
+      pending.set(event.series.id, { ...evidence, confirmations });
+
+      if (confirmations >= REQUIRED_CONFIRMATIONS) {
+        confirmed.set(event.series.id, evidence);
+      } else {
+        confirmed.delete(event.series.id);
+      }
     }));
 
-    if (confirmed.size) {
-      events = events.map(event => {
-        const finality = confirmed.get(event.series.id);
-        return finality ? applyConfirmedFinality(event, finality) : event;
-      });
-    }
+    const events = sourceEvents.map(event => {
+      if (event.series.state === 'completed') return event;
+      const finality = confirmed.get(event.series.id);
+      return finality ? applyConfirmedFinality(event, finality) : event;
+    });
 
     return responseWithJson(response, { ...payload, events });
   };

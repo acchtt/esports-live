@@ -134,6 +134,9 @@ test('V2 refreshes schedules and the selected live snapshot when the app regains
   await expect(page.locator('#blue-kills')).toHaveText('3');
   await expect.poll(() => snapshotRequests).toBeGreaterThanOrEqual(1);
 
+  // Browser focus/pageshow can fire during initial navigation. Wait past the
+  // lifecycle debounce so this event models returning to the app later.
+  await page.waitForTimeout(300);
   const schedulesBeforeFocus = scheduleRequests;
   const snapshotsBeforeFocus = snapshotRequests;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));

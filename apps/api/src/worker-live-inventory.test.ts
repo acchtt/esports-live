@@ -90,16 +90,6 @@ function baseProvider(state: 'live' | 'completed'): LolProviderClient {
   };
 }
 
-function windowPayload() {
-  return {
-    frames: [{
-      rfc460Timestamp: SOURCE,
-      blueTeam: { participants: [{ participantId: 1 }] },
-      redTeam: { participants: [{ participantId: 6 }] }
-    }]
-  };
-}
-
 function detailsPayload() {
   return {
     frames: [{
@@ -116,7 +106,7 @@ function roundedIso(value: number): string {
   return new Date(Math.floor(value / 10_000) * 10_000).toISOString();
 }
 
-test('production live games use the wall-clock details frontier without an unanchored window probe', async () => {
+test('production live games use the wall-clock details frontier first', async () => {
   const requestedDetails: string[] = [];
   let windowRequests = 0;
   const expectedAnchor = roundedIso(Date.parse(LIVE_NOW) - 60_000);
@@ -127,7 +117,7 @@ test('production live games use the wall-clock details frontier without an unanc
       const url = new URL(String(input));
       if (url.pathname.includes('/window/')) {
         windowRequests += 1;
-        return new Response(JSON.stringify(windowPayload()), { status: 200 });
+        return new Response(null, { status: 204 });
       }
 
       const anchor = url.searchParams.get('startingTime') ?? '';
@@ -148,7 +138,39 @@ test('production live games use the wall-clock details frontier without an unanc
   assert.equal(result.complete, true);
 });
 
-test('production completed games retain their final source-window inventory anchor', async () => {
+test('production live games retry from the normalized source timestamp when wall-clock details are empty', async () => {
+  const requestedDetails: string[] = [];
+  const wallClockAnchor = roundedIso(Date.parse(LIVE_NOW) - 60_000);
+  const wallClockFallbackAnchor = roundedIso(Date.parse(LIVE_NOW) - 90_000);
+  const sourceAnchor = roundedIso(Date.parse(SOURCE) - 60_000);
+  const provider = createProductionInventoryProvider(baseProvider('live'), {
+    now: () => new Date(LIVE_NOW),
+    inventoryWaitBudgetMs: LIVE_INVENTORY_SETTLE_BUDGET_MS,
+    fetcher: async (input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(String(input));
+      assert.equal(url.pathname.includes('/window/'), false);
+      const anchor = url.searchParams.get('startingTime') ?? '';
+      requestedDetails.push(anchor);
+      return new Response(
+        anchor === sourceAnchor ? JSON.stringify(detailsPayload()) : null,
+        { status: anchor === sourceAnchor ? 200 : 204 }
+      );
+    }
+  });
+
+  const result = await provider.getSnapshot('game-1');
+
+  assert.deepEqual(requestedDetails, [
+    wallClockAnchor,
+    wallClockFallbackAnchor,
+    sourceAnchor
+  ]);
+  assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
+  assert.equal(result.complete, true);
+});
+
+test('production completed games probe directly from their final source timestamp', async () => {
   const requestedDetails: string[] = [];
   let windowRequests = 0;
   const expectedAnchor = roundedIso(Date.parse(SOURCE) - 60_000);
@@ -159,7 +181,7 @@ test('production completed games retain their final source-window inventory anch
       const url = new URL(String(input));
       if (url.pathname.includes('/window/')) {
         windowRequests += 1;
-        return new Response(JSON.stringify(windowPayload()), { status: 200 });
+        return new Response(null, { status: 204 });
       }
 
       const anchor = url.searchParams.get('startingTime') ?? '';
@@ -173,7 +195,7 @@ test('production completed games retain their final source-window inventory anch
 
   const result = await provider.getSnapshot('game-1');
 
-  assert.ok(windowRequests >= 1);
+  assert.equal(windowRequests, 0);
   assert.deepEqual(requestedDetails, [expectedAnchor]);
   assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
   assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);

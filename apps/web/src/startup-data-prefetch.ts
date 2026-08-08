@@ -38,7 +38,6 @@ const cacheMaxAge: Record<StartupResource, number> = {
   schedule: SCHEDULE_CACHE_MAX_AGE_MS
 };
 const contextPrefetches = new Map<string, Promise<StoredResponse | null>>();
-const contextBudgetExhausted = new Set<string>();
 
 function cacheKey(resource: StartupResource): string {
   return `${CACHE_PREFIX}${resource}`;
@@ -230,30 +229,19 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
   const contextSeriesId = contextSeriesIdFor(input);
   if (contextSeriesId) {
     const cached = readStored(contextCacheKey(contextSeriesId), CONTEXT_CACHE_MAX_AGE_MS);
-    if (cached) {
-      contextBudgetExhausted.delete(contextSeriesId);
-      return responseFromStored(cached);
-    }
-
-    if (contextBudgetExhausted.has(contextSeriesId)) {
-      return nativeFetch(input, init);
-    }
+    if (cached) return responseFromStored(cached);
 
     const value = await waitWithinBudget(
       startContextPrefetch(contextSeriesId),
       CONTEXT_WAIT_BUDGET_MS,
       signal
     );
-    if (value) {
-      contextBudgetExhausted.delete(contextSeriesId);
-      return responseFromStored(value);
-    }
+    if (value) return responseFromStored(value);
 
-    // Preserve the fast first render. A caller may retry once the shared
-    // background request has had time to finish; that retry falls through to
-    // the native API request instead of repeating this synthetic error forever.
-    contextBudgetExhausted.add(contextSeriesId);
-    throw new Error('Series context enrichment is still loading.');
+    // Keep the first render bounded without leaking an implementation-specific
+    // loading error into the dashboard. The shared prefetch continues filling
+    // the cache while the caller transparently completes its own API request.
+    return nativeFetch(input, init);
   }
 
   const resource = resourceFor(input);

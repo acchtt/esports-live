@@ -1,3 +1,5 @@
+import './desktop-dashboard-redesign.ts';
+
 const STORAGE_KEY = 'esports-live:platform-panel-collapsed';
 const DESKTOP_QUERY = '(min-width: 1181px)';
 

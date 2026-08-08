@@ -36,8 +36,4 @@ jobs:
 
       - name: Mobile application browser suite
         if: github.ref_name == 'mobile-demo' || github.head_ref == 'mobile-demo'
-        env:
-          WEB_APP_ROOT: apps/web-mobile
-        run: |
-          npm run build:web-mobile
-          npx playwright test tests/web/mobile-demo.spec.ts tests/web/mobile-demo-history.spec.ts tests/web/mobile-live-history-copy.spec.ts tests/web/completed-board-merge.spec.ts tests/web/history-mode-ownership.spec.ts tests/web/live-poll-recovery.spec.ts tests/web/live-telemetry-pending.spec.ts
+        run: npm run test:web-mobile

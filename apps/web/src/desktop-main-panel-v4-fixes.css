@@ -1,0 +1,23 @@
+.desktop-dashboard-redesign .analysis-panel .series-hero-topline {
+  background: linear-gradient(180deg, rgba(8, 23, 40, .78), rgba(3, 10, 20, .58)) !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer {
+  background: linear-gradient(180deg, rgba(5, 17, 30, .72), rgba(3, 10, 20, .62)) !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer > * {
+  background: linear-gradient(180deg, rgba(10, 27, 46, .76), rgba(5, 16, 29, .70)) !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel #game-selector {
+  display: flex !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel #game-selector:has(.game-button) {
+  display: none !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-hero {
+  min-height: 112px;
+}

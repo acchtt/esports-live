@@ -1,0 +1,41 @@
+/* Desktop command-center containment fixes.
+   Keep the global header in normal document flow so it never bisects the
+   dashboard during long-page scrolling or full-page capture. */
+@media (min-width: 861px) {
+  body.desktop-dashboard-redesign .topbar {
+    position: relative !important;
+    top: auto !important;
+    inset-block-start: auto !important;
+  }
+}
+
+.desktop-command-center-v5 .command-center-overview,
+.desktop-command-center-v5 > #game-content {
+  position: relative;
+  z-index: 1;
+}
+
+.desktop-command-center-v5 .series-hero-team-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.desktop-command-center-v5 .series-hero-team-copy strong {
+  display: -webkit-box !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  text-overflow: clip !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.desktop-command-center-v5 .series-hero-team.right .series-hero-team-copy strong {
+  margin-left: auto;
+}
+
+@media (max-width: 1260px) {
+  .desktop-command-center-v5 .series-hero-team-copy strong {
+    font-size: clamp(1.08rem, 1.55vw, 1.55rem) !important;
+  }
+}

@@ -33,14 +33,40 @@ export type ProductionInventoryProviderOptions = Omit<
   'useWindowOverlay'
 >;
 
+type Snapshot = Awaited<ReturnType<LolProviderClient['getSnapshot']>>;
+
+interface SourceAlignedInventoryProvider {
+  provider: LolProviderClient;
+  prime(snapshot: Snapshot): void;
+}
+
+interface GameInventoryProviders {
+  state: string;
+  primary: LolProviderClient | null;
+  sourceAligned: SourceAlignedInventoryProvider;
+}
+
+function inventoryCount(snapshot: LolProviderSnapshot): number {
+  if (!snapshot.stats) return 0;
+  return [...snapshot.stats.blue.players, ...snapshot.stats.red.players]
+    .reduce((total, player) => total + (player.items?.length ?? 0), 0);
+}
+
+function sourceTimestampMs(snapshot: Snapshot): number | null {
+  const parsed = Date.parse(snapshot.sourceTimestamp ?? '');
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /**
- * Keep Riot inventory probe state alive across snapshot requests.
+ * Keep Riot inventory probe state alive per game while selecting the correct
+ * details clock from the normalized snapshot.
  *
- * The normalized snapshot is loaded once, then supplied to one of two
- * persistent enrichment providers. Live games probe Riot's wall-clock details
- * frontier; completed games probe the final source window. Keeping both
- * providers alive preserves their adaptive delay and cached inventories while
- * routing the first completed snapshot correctly.
+ * Live games first use Riot's wall-clock details frontier. Some delayed feeds
+ * expose a scoreboard timestamp well behind wall clock, so those probes can
+ * return detail frames that are rejected as future data. When the whole board
+ * remains empty, a persistent source-aligned provider probes from the exact
+ * normalized snapshot timestamp instead of relying on Riot's unanchored window.
+ * Completed games always use that source-aligned provider.
  */
 export function createProductionInventoryProvider(
   base: LolProviderClient,
@@ -49,31 +75,98 @@ export function createProductionInventoryProvider(
   const inventoryWaitBudgetMs =
     options.inventoryWaitBudgetMs ?? LIVE_INVENTORY_SETTLE_BUDGET_MS;
   const sharedOptions = { ...options, inventoryWaitBudgetMs };
-  const snapshots = new Map<string, LolProviderSnapshot>();
-  const snapshotProvider: LolProviderClient = {
-    ...base,
-    async getSnapshot(gameId: string, after?: string) {
-      return snapshots.get(gameId) ?? base.getSnapshot(gameId, after);
-    }
-  };
-  const liveInventoryProvider = createRiotCurrentPlayerProvider(snapshotProvider, {
-    ...sharedOptions,
-    useWindowOverlay: false
-  });
-  const completedInventoryProvider = createRiotCurrentPlayerProvider(snapshotProvider, {
-    ...sharedOptions,
-    useWindowOverlay: true
-  });
+  const fallbackNow = options.now ?? (() => new Date());
+  const gameProviders = new Map<string, GameInventoryProviders>();
+
+  function createPrimedBase(gameId: string, snapshot: Snapshot): LolProviderClient {
+    let primedSnapshot: Snapshot | null = snapshot;
+    return {
+      ...base,
+      async getSnapshot(requestedGameId: string, after?: string) {
+        if (requestedGameId === gameId && primedSnapshot) {
+          const value = primedSnapshot;
+          primedSnapshot = null;
+          return value;
+        }
+        return base.getSnapshot(requestedGameId, after);
+      }
+    };
+  }
+
+  function createSourceAlignedProvider(
+    gameId: string,
+    initialSnapshot: Snapshot
+  ): SourceAlignedInventoryProvider {
+    let primedSnapshot: Snapshot | null = initialSnapshot;
+    let targetMs = sourceTimestampMs(initialSnapshot);
+    const snapshotBase: LolProviderClient = {
+      ...base,
+      async getSnapshot(requestedGameId: string, after?: string) {
+        if (requestedGameId === gameId && primedSnapshot) {
+          const value = primedSnapshot;
+          primedSnapshot = null;
+          return value;
+        }
+        return base.getSnapshot(requestedGameId, after);
+      }
+    };
+    const provider = createRiotCurrentPlayerProvider(snapshotBase, {
+      ...sharedOptions,
+      now: () => targetMs === null ? fallbackNow() : new Date(targetMs),
+      useWindowOverlay: false
+    });
+    return {
+      provider,
+      prime(snapshot: Snapshot) {
+        primedSnapshot = snapshot;
+        targetMs = sourceTimestampMs(snapshot);
+      }
+    };
+  }
+
+  function createGameProviders(gameId: string, snapshot: Snapshot): GameInventoryProviders {
+    const completed = snapshot.game.state === 'completed';
+    return {
+      state: snapshot.game.state,
+      primary: completed
+        ? null
+        : createRiotCurrentPlayerProvider(createPrimedBase(gameId, snapshot), {
+            ...sharedOptions,
+            useWindowOverlay: false
+          }),
+      sourceAligned: createSourceAlignedProvider(gameId, snapshot)
+    };
+  }
 
   return {
     ...base,
     async getSnapshot(gameId: string, after?: string) {
-      const snapshot = await base.getSnapshot(gameId, after);
-      snapshots.set(gameId, snapshot);
-      const provider = snapshot.game.state === 'completed'
-        ? completedInventoryProvider
-        : liveInventoryProvider;
-      return provider.getSnapshot(gameId, after);
+      let entry = gameProviders.get(gameId);
+      if (!entry) {
+        const firstSnapshot = await base.getSnapshot(gameId, after);
+        if (!firstSnapshot.stats || !firstSnapshot.sourceTimestamp) return firstSnapshot;
+        entry = createGameProviders(gameId, firstSnapshot);
+        gameProviders.set(gameId, entry);
+      }
+
+      let snapshot: Snapshot;
+      if (entry.primary) {
+        snapshot = await entry.primary.getSnapshot(gameId, after);
+        if (inventoryCount(snapshot) === 0) {
+          entry.sourceAligned.prime(snapshot);
+          const fallbackSnapshot = await entry.sourceAligned.provider.getSnapshot(gameId, after);
+          if (inventoryCount(fallbackSnapshot) > inventoryCount(snapshot)) {
+            snapshot = fallbackSnapshot;
+          }
+        }
+      } else {
+        snapshot = await entry.sourceAligned.provider.getSnapshot(gameId, after);
+      }
+
+      if (snapshot.stats && snapshot.sourceTimestamp && snapshot.game.state !== entry.state) {
+        gameProviders.set(gameId, createGameProviders(gameId, snapshot));
+      }
+      return snapshot;
     }
   };
 }

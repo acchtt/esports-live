@@ -164,6 +164,9 @@ test('web v2 hydrates a live LPL series whose schedule has no game IDs', async (
   await expect(page.locator('#player-board .player-row')).toHaveCount(5);
   await expect(page.locator('#blue-kills')).toHaveText('21');
   await expect(page.locator('#red-kills')).toHaveText('15');
-  expect(contextRequests).toBe(1);
+  // Lazy game hydration and the first cursorless finality verification each
+  // need context once. Keep the lookup bounded so this cannot become a loop.
+  expect(contextRequests).toBeGreaterThanOrEqual(1);
+  expect(contextRequests).toBeLessThanOrEqual(2);
   expect(errors).toEqual([]);
 });

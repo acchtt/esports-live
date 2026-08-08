@@ -160,7 +160,9 @@ test('V2 mobile statboard matches the compact legacy density and clears the nav'
   const firstRow = await rows.first().boundingBox();
   const portrait = await page.locator('.champion-portrait').first().boundingBox();
   expect(teamBanner?.height).toBeLessThanOrEqual(86);
-  expect(objectiveCard?.height).toBeLessThanOrEqual(66);
+  // The custom ARENA objective icons intentionally add a few pixels over the
+  // pre-icon card. Keep the accepted compact treatment bounded below 74px.
+  expect(objectiveCard?.height).toBeLessThanOrEqual(74);
   expect(firstRow?.height).toBeLessThanOrEqual(78);
   expect(portrait?.height).toBeLessThanOrEqual(42);
 

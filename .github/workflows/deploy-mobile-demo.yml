@@ -114,7 +114,11 @@ jobs:
             tests/web/web-v2-shell.spec.ts \
             tests/web/web-v2-performance.spec.ts \
             tests/web/web-v2-team-side-identity.spec.ts \
-            tests/web/web-v2-catalogue-history-precedence.spec.ts
+            tests/web/web-v2-catalogue-finality-recovery.spec.ts \
+            tests/web/web-v2-catalogue-history-precedence.spec.ts \
+            tests/web/web-v2-compact-header.spec.ts \
+            tests/web/web-v2-scoreboard-density.spec.ts \
+            tests/web/web-v2-sparse-live.spec.ts
 
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy

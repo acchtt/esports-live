@@ -100,12 +100,12 @@ test('V2 does not declare a live catalogue series final from contradictory activ
   await expect(card).toContainText('Game 2 in progress');
 });
 
-test('V2 requires repeated final evidence before overriding a live catalogue series', async ({ page }) => {
+test('V2 does not use an aggregate score without enough completed game winners', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installSchedule(page);
   await page.route('**/v1/lol/series/**/context**', route => json(route, context([
     completedGame('lpl-game-1', 1),
-    completedGame('lpl-game-2', 2),
+    { id: 'lpl-game-2', number: 2, state: 'unstarted', blueTeam: null, redTeam: null, winner: null, durationSeconds: null },
     { id: 'lpl-game-3', number: 3, state: 'unstarted', blueTeam: null, redTeam: null, winner: null, durationSeconds: null }
   ])));
 

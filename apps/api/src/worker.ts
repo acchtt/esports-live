@@ -4,7 +4,10 @@ import {
   createLeaguepediaHistoryFallbackProvider,
   createRiotCurrentPlayerProvider,
   createRiotDelayedLiveRecoveryProvider,
+  createRiotFinalityProvider,
   createRiotLolConsistentProvider,
+  createRiotScheduleReconciliationProvider,
+  createRiotSupplementalLeagueProvider,
   createUsableScheduleProvider,
   type LolProviderClient,
   type LolProviderSnapshot,
@@ -177,12 +180,21 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
 
   const registry = new AdapterRegistry();
   if (apiKey) {
-    const riotProvider = createRiotDelayedLiveRecoveryProvider(
-      createRiotLolConsistentProvider({
-        apiKey,
-        includeDetails: false,
-        useDetailItemFallback: false
-      })
+    const riotProvider = createRiotFinalityProvider(
+      createRiotScheduleReconciliationProvider(
+        createRiotDelayedLiveRecoveryProvider(
+          createRiotSupplementalLeagueProvider(
+            createRiotLolConsistentProvider({
+              apiKey,
+              includeDetails: false,
+              useDetailItemFallback: false
+            }),
+            { apiKey }
+          )
+        ),
+        { apiKey }
+      ),
+      { apiKey }
     );
     const provider = createUsableScheduleProvider(
       createLeaguepediaHistoryFallbackProvider(
@@ -192,9 +204,9 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
       )
     );
     registry.register(new CachedAdapter(new LolAdapter(provider), {
-      scheduleTtlMs: 45_000,
+      scheduleTtlMs: 15_000,
       liveSnapshotTtlMs: 400,
-      seriesContextTtlMs: 45_000
+      seriesContextTtlMs: 10_000
     }));
   }
 

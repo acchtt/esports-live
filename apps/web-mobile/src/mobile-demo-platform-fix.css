@@ -1,0 +1,8 @@
+@media (max-width: 760px) {
+  body.mobile-demo-active[data-mobile-view="platform"] #workspace.dashboard-v2-active > #platform-panel,
+  body.mobile-demo-active[data-mobile-view="platform"] #workspace.dashboard-v2-active > #platform-panel[hidden] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+}

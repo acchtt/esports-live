@@ -144,7 +144,7 @@ test('suppresses a live placeholder that cannot be resolved', async () => {
   assert.deepEqual(await provider.getSchedule(), []);
 });
 
-test('retains a live event with real teams while Riot game IDs are pending', async () => {
+test('keeps a real-team event scheduled while Riot game IDs are pending', async () => {
   const entry = sparseEntry();
   entry.series.teams = [
     { id: 'team-a', name: 'Anyone’s Legend', code: 'AL' },
@@ -155,7 +155,7 @@ test('retains a live event with real teams while Riot game IDs are pending', asy
   const schedule = await provider.getSchedule();
 
   assert.equal(schedule.length, 1);
-  assert.equal(schedule[0]?.series.state, 'live');
+  assert.equal(schedule[0]?.series.state, 'scheduled');
   assert.equal(schedule[0]?.series.teams[0].name, 'Anyone’s Legend');
   assert.deepEqual(schedule[0]?.series.games, []);
 });
@@ -172,6 +172,56 @@ test('retains scheduled entries before Riot publishes game IDs', async () => {
   const schedule = await createUsableScheduleProvider(base).getSchedule();
   assert.equal(schedule.length, 1);
   assert.equal(contextCalls, 0);
+});
+
+test('demotes stale LPL live metadata when no game has active telemetry', async () => {
+  const base = delayedLiveProvider();
+  const snapshotCalls: string[] = [];
+  base.getSnapshot = async gameId => {
+    snapshotCalls.push(gameId);
+    return {
+      series: sparseEntry().series,
+      game: {
+        id: gameId,
+        number: gameId === 'game-3' ? 3 : 2,
+        state: 'unstarted'
+      },
+      sourceTimestamp: null,
+      observedAt,
+      advancing: false,
+      complete: false,
+      stats: null
+    };
+  };
+
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
+
+  assert.deepEqual(snapshotCalls, ['game-2', 'game-3']);
+  assert.equal(schedule[0]?.series.state, 'scheduled');
+  assert.equal(schedule[0]?.series.games.some(game => (
+    game.state === 'live' || game.state === 'draft' || game.state === 'paused'
+  )), false);
+});
+
+test('removes a stale live listing when the active game is already completed', async () => {
+  const entry = sparseEntry();
+  entry.series.teams = [left, right];
+  entry.series.games = [{ id: 'game-1', number: 1, state: 'live' }];
+  const base = baseProvider(entry, false);
+  base.getSnapshot = async gameId => ({
+    series: entry.series,
+    game: { id: gameId, number: 1, state: 'completed' },
+    sourceTimestamp: observedAt,
+    observedAt,
+    advancing: false,
+    complete: true,
+    stats: {} as never
+  });
+
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
+
+  assert.equal(schedule[0]?.series.state, 'completed');
+  assert.equal(schedule[0]?.series.games[0]?.state, 'completed');
 });
 
 test('promotes an unstarted LPL game when the live-stat feed has gameplay', async () => {
@@ -192,6 +242,7 @@ test('promotes an unstarted LPL game when the live-stat feed has gameplay', asyn
 
   const schedule = await createUsableScheduleProvider(base).getSchedule();
   assert.deepEqual(snapshotCalls, ['game-2']);
+  assert.equal(schedule[0]?.series.state, 'live');
   assert.equal(schedule[0]?.series.games[1]?.state, 'live');
 });
 
@@ -213,5 +264,32 @@ test('tries the next unpublished game slot after a live-stat miss', async () => 
 
   const schedule = await createUsableScheduleProvider(base).getSchedule();
   assert.deepEqual(snapshotCalls, ['game-2', 'game-3']);
+  assert.equal(schedule[0]?.series.state, 'live');
   assert.equal(schedule[0]?.series.games[2]?.state, 'live');
+});
+
+test('returns completed series without loading context or snapshots', async () => {
+  const entry = sparseEntry('scheduled');
+  entry.series.state = 'completed';
+  entry.series.teams = [left, right];
+  entry.series.bestOf = 3;
+  entry.series.games = [{ id: 'game-1', number: 1, state: 'completed' }];
+  const base = baseProvider(entry, true);
+  let contextCalls = 0;
+  let snapshotCalls = 0;
+  base.getSeriesContext = async () => {
+    contextCalls += 1;
+    throw new Error('completed schedule hydration must not run');
+  };
+  base.getSnapshot = async () => {
+    snapshotCalls += 1;
+    throw new Error('completed schedule snapshots must not run');
+  };
+
+  const schedule = await createUsableScheduleProvider(base).getSchedule();
+
+  assert.equal(schedule.length, 1);
+  assert.equal(schedule[0]?.series.state, 'completed');
+  assert.equal(contextCalls, 0);
+  assert.equal(snapshotCalls, 0);
 });

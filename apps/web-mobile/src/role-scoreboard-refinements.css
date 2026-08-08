@@ -1,0 +1,56 @@
+/* Medium-width refinements for the role matchup scoreboard. */
+@media (min-width: 721px) and (max-width: 1320px) {
+  .role-scoreboard-board .role-team-summary-grid,
+  .role-scoreboard-board .role-matchup-row,
+  .role-scoreboard-board .role-objective-comparison {
+    grid-template-columns: minmax(0, 1fr) 126px minmax(0, 1fr) !important;
+  }
+
+  .role-scoreboard-board .role-team-summary {
+    grid-template-columns: 36px minmax(0, 1fr) !important;
+  }
+
+  .role-scoreboard-board .role-team-summary.red {
+    grid-template-columns: minmax(0, 1fr) 36px !important;
+  }
+
+  .role-scoreboard-board .role-team-summary.red > img,
+  .role-scoreboard-board .role-team-summary.red > .team-placeholder {
+    grid-column: 2 !important;
+  }
+
+  .role-scoreboard-board .role-team-summary.red .role-team-name {
+    grid-column: 1 !important;
+  }
+
+  .role-scoreboard-board .role-team-gold {
+    display: none !important;
+  }
+
+  .role-scoreboard-board .role-player,
+  .role-scoreboard-board .role-player.red {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 8px;
+  }
+
+  .role-scoreboard-board .role-player.red .role-player-heading,
+  .role-scoreboard-board .role-player.red .role-player-stats {
+    grid-column: 1 !important;
+  }
+
+  .role-scoreboard-board .role-player.red .role-player-heading {
+    grid-row: 1;
+  }
+
+  .role-scoreboard-board .role-player.red .role-player-stats {
+    grid-row: 2;
+  }
+
+  .role-scoreboard-board .role-player-stats {
+    justify-content: end;
+  }
+
+  .role-scoreboard-board .role-player.red .role-player-stats {
+    justify-content: start;
+  }
+}

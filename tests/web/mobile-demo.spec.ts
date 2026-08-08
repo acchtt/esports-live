@@ -1,0 +1,330 @@
+import { expect, test, type Page, type Route } from '@playwright/test';
+
+const provider = { id: 'fixture', name: 'Fixture provider' };
+const blue = { id: 'blue', name: 'Blue Mobile', code: 'BLU' };
+const red = { id: 'red', name: 'Red Mobile', code: 'RED' };
+
+function iso(offsetMs = 0): string {
+  return new Date(Date.now() + offsetMs).toISOString();
+}
+
+const series = {
+  id: 'series-mobile',
+  esport: 'lol',
+  competition: { id: 'competition-mobile', name: 'Mobile League', stage: 'Week 1' },
+  teams: [blue, red],
+  bestOf: 3,
+  state: 'live',
+  scheduledStart: iso(-45 * 60 * 1_000),
+  games: [
+    { id: 'game-mobile-1', number: 1, state: 'live' },
+    { id: 'game-mobile-2', number: 2, state: 'unstarted' },
+    { id: 'game-mobile-3', number: 3, state: 'unstarted' }
+  ]
+};
+
+const scheduleSeries = [
+  series,
+  ...Array.from({ length: 5 }, (_, index) => {
+    const number = index + 2;
+    const blueTeam = { ...blue, id: `blue-${number}`, name: `Blue Mobile ${number}`, code: `B${number}` };
+    const redTeam = { ...red, id: `red-${number}`, name: `Red Mobile ${number}`, code: `R${number}` };
+    return {
+      ...series,
+      id: `series-mobile-${number}`,
+      competition: { ...series.competition, id: `competition-mobile-${number}` },
+      teams: [blueTeam, redTeam],
+      scheduledStart: iso((-45 + number) * 60 * 1_000),
+      games: series.games.map(game => ({
+        ...game,
+        id: `game-mobile-${number}-${game.number}`
+      }))
+    };
+  })
+];
+
+const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
+const champions = ['Jayce', 'Maokai', 'Orianna', 'Ashe', 'Alistar'] as const;
+
+function players(side: 'blue' | 'red') {
+  return roles.map((role, index) => ({
+    id: String(index + (side === 'blue' ? 1 : 6)),
+    handle: `${side === 'blue' ? 'Blue' : 'Red'} ${role}`,
+    championId: champions[index],
+    role,
+    level: 9 + index,
+    kills: index === 0 ? 2 : 1,
+    deaths: index % 2,
+    assists: 3 + index,
+    creepScore: 90 + index * 17,
+    totalGold: 5_200 + index * 420,
+    items: ['1001', '2003']
+  }));
+}
+
+function team(teamRef: typeof blue, side: 'blue' | 'red') {
+  return {
+    id: teamRef.id,
+    name: teamRef.name,
+    side,
+    gold: side === 'blue' ? 31_200 : 29_800,
+    kills: side === 'blue' ? 8 : 5,
+    objectives: {
+      towers: side === 'blue' ? 3 : 1,
+      inhibitors: 0,
+      dragons: side === 'blue' ? ['infernal'] : [],
+      barons: 0,
+      heralds: 1,
+      grubs: 3
+    },
+    players: players(side)
+  };
+}
+
+function snapshot() {
+  return {
+    schemaVersion: '1.0',
+    esport: 'lol',
+    provider,
+    series,
+    game: series.games[0],
+    stats: {
+      gameClockSeconds: 1_245,
+      patch: '26.15.1',
+      blue: team(blue, 'blue'),
+      red: team(red, 'red')
+    },
+    quality: {
+      freshness: 'fresh',
+      sourceTimestamp: iso(),
+      observedAt: iso(1_000),
+      ageSeconds: 1,
+      complete: true,
+      advancing: true,
+      safeForLiveAnalysis: true,
+      reasons: []
+    }
+  };
+}
+
+async function json(route: Route, value: unknown): Promise<void> {
+  await route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(value)
+  });
+}
+
+async function installFixtures(page: Page): Promise<void> {
+  await page.route('**/health', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+
+  await page.route('**/v1/lol/schedule**', route => json(route, {
+    esport: 'lol',
+    events: scheduleSeries.map(value => ({ series: value, provider, observedAt: iso() }))
+  }));
+
+  await page.route('**/v1/lol/series/**/context**', route => json(route, {
+    schemaVersion: '1.0',
+    esport: 'lol',
+    seriesId: series.id,
+    provider,
+    observedAt: iso(),
+    rosters: [],
+    standings: [],
+    history: {
+      bestOf: 3,
+      winsRequired: 2,
+      drawPossible: false,
+      score: [
+        { team: blue, wins: 0 },
+        { team: red, wins: 0 }
+      ],
+      games: series.games.map(game => ({
+        ...game,
+        blueTeam: blue,
+        redTeam: red,
+        winner: null,
+        durationSeconds: null
+      }))
+    },
+    complete: true,
+    reasons: []
+  }));
+
+  await page.route('**/v1/lol/games/**/live**', route => json(route, snapshot()));
+  await page.route('https://ddragon.leagueoflegends.com/api/versions.json', route => json(route, ['15.15.1']));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**/img/champion/*.png', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#334155"/></svg>'
+  }));
+}
+
+test('mobile demo switches surfaces and uses the shared scoreboard contract for live matches', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(page);
+  await page.goto('/');
+
+  const nav = page.locator('.mobile-app-nav');
+  const schedule = page.locator('.schedule-panel');
+  const analysis = page.locator('.analysis-panel');
+  const platform = page.locator('#platform-panel');
+
+  await expect(page.locator('#build-version')).toContainText('DEMO v0.17.15');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-bottom-nav-clearance', 'v29');
+  await expect(nav).toBeVisible();
+  await expect(nav).toHaveAttribute('data-mobile-nav-version', '0.17');
+  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'matches');
+  await expect(schedule).toBeVisible();
+  await expect(analysis).toBeHidden();
+
+  const finalScheduleCard = page.locator('[data-series-id="series-mobile-6"]');
+  await expect(finalScheduleCard).toHaveCount(1);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() => {
+    const scrolling = document.scrollingElement;
+    if (!scrolling) return 0;
+    return scrolling.scrollHeight - scrolling.scrollTop - window.innerHeight;
+  })).toBeLessThanOrEqual(1);
+  const bottomNavClearance = await page.evaluate(() => {
+    const navElement = document.querySelector<HTMLElement>('.mobile-app-nav');
+    const cardElement = document.querySelector<HTMLElement>('[data-series-id="series-mobile-6"]');
+    if (!navElement || !cardElement) throw new Error('Mobile navigation or final schedule card is missing.');
+    return {
+      navTop: navElement.getBoundingClientRect().top,
+      cardBottom: cardElement.getBoundingClientRect().bottom
+    };
+  });
+  expect(bottomNavClearance.cardBottom).toBeLessThanOrEqual(bottomNavClearance.navTop - 8);
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  await page.locator('[data-series-id="series-mobile"]').click();
+  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'live');
+  await expect(page.locator('body')).not.toHaveAttribute('data-mobile-context', 'history');
+  await expect(analysis).toBeVisible();
+  await expect(schedule).toBeHidden();
+
+  const board = page.locator('.mobile-live-history-board[data-mobile-unified-game-id="game-mobile-1"]');
+  const header = board.locator('.completed-final-game-header');
+  await expect(board).toBeVisible();
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-version', '0.17');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-renderer', 'shared-v1');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-mode', 'live');
+  await expect(board).toHaveAttribute('data-mobile-scoreboard-readability', 'v25');
+  await expect(board).toHaveAttribute('data-mobile-live-design', 'history-current');
+  await expect(board).toHaveAttribute('data-mobile-champion-assets', 'ddragon-version-fallback-v27');
+  await expect(page.locator('html')).toHaveAttribute('data-mobile-champion-assets', 'ddragon-version-fallback-v27');
+  await expect(board).toHaveClass(/completed-final-game/);
+  await expect(board).toHaveClass(/mobile-final-recovery/);
+  await expect(header.locator(':scope > *')).toHaveCount(2);
+  await expect(header.locator('.mobile-scoreboard-game-clock')).toHaveText('20:45');
+  await expect(header.locator('.mobile-scoreboard-game-label')).toHaveText('Game 1 · Live');
+
+  const headerTypography = await header.evaluate(element => {
+    const clock = element.querySelector<HTMLElement>('.mobile-scoreboard-game-clock');
+    const label = element.querySelector<HTMLElement>('.mobile-scoreboard-game-label');
+    if (!clock || !label) throw new Error('Mobile scoreboard header typography is incomplete.');
+    return {
+      clockSize: Number.parseFloat(getComputedStyle(clock).fontSize),
+      labelSize: Number.parseFloat(getComputedStyle(label).fontSize)
+    };
+  });
+  expect(headerTypography.clockSize).toBeGreaterThanOrEqual(20);
+  expect(headerTypography.clockSize).toBeCloseTo(headerTypography.labelSize, 1);
+
+  await expect(board.locator('.mobile-unified-scoreboard-comparison')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-team-strip')).toBeVisible();
+  await expect(board.locator('.mobile-scoreboard-team.blue .mobile-scoreboard-team-kills strong')).toHaveText('8');
+  await expect(board.locator('.mobile-scoreboard-team.red .mobile-scoreboard-team-kills strong')).toHaveText('5');
+  await expect(board.locator('.mobile-live-parity-objectives')).toBeVisible();
+  await expect(board.locator('.mobile-live-parity-gold strong')).toHaveText('+1.4K');
+  await expect(board.locator('.completed-final-matchups')).toBeVisible();
+  await expect(board.locator('.completed-final-matchups .role-matchup-row')).toHaveCount(5);
+  await expect(board.locator('.role-player-portrait')).toHaveCount(10);
+  await expect(board.locator('.telemetry-champion-image[data-asset-state="loaded"]')).toHaveCount(10);
+  const portraitAssets = await board.locator('.telemetry-champion-image').evaluateAll(images => images.map(image => {
+    const portrait = image as HTMLImageElement;
+    return {
+      source: portrait.currentSrc || portrait.src,
+      complete: portrait.complete,
+      width: portrait.naturalWidth,
+      display: getComputedStyle(portrait).display
+    };
+  }));
+  expect(portraitAssets).toHaveLength(10);
+  expect(portraitAssets.every(asset => asset.source.includes('/15.15.1/img/champion/'))).toBe(true);
+  expect(portraitAssets.every(asset => asset.complete && asset.width > 0 && asset.display !== 'none')).toBe(true);
+  await expect(board.locator('.role-player-items, .telemetry-inventory, .telemetry-item-slot')).toHaveCount(0);
+  await expect(board.locator('.mobile-recovery-row')).toHaveCount(0);
+  await expect(page.locator('.v2-matchup-row')).toHaveCount(0);
+  await expect(page.locator('.role-scoreboard-board')).toHaveCount(0);
+
+  const scoreboardSizing = await board.evaluate(element => {
+    const portrait = element.querySelector<HTMLElement>('.role-player-portrait');
+    const killLabel = element.querySelector<HTMLElement>('.mobile-scoreboard-team-kills b');
+    const killValue = element.querySelector<HTMLElement>('.mobile-scoreboard-team-kills strong');
+    if (!portrait || !killLabel || !killValue) throw new Error('Mobile portrait or kill typography is missing.');
+    const portraitBounds = portrait.getBoundingClientRect();
+    return {
+      portraitWidth: portraitBounds.width,
+      portraitHeight: portraitBounds.height,
+      killLabelSize: Number.parseFloat(getComputedStyle(killLabel).fontSize),
+      killValueSize: Number.parseFloat(getComputedStyle(killValue).fontSize)
+    };
+  });
+  expect(scoreboardSizing.portraitWidth).toBeGreaterThanOrEqual(44);
+  expect(scoreboardSizing.portraitHeight).toBeGreaterThanOrEqual(44);
+  expect(scoreboardSizing.killLabelSize).toBeGreaterThanOrEqual(8);
+  expect(scoreboardSizing.killValueSize).toBeGreaterThanOrEqual(14);
+
+  const deltaTypography = await board.locator('.role-gold-delta').first().evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    const strong = element.querySelector<HTMLElement>('strong');
+    if (!strong) throw new Error('Shared live gold delta is missing.');
+    return {
+      width: bounds.width,
+      fontSize: Number.parseFloat(getComputedStyle(strong).fontSize)
+    };
+  });
+  expect(deltaTypography.width).toBeGreaterThanOrEqual(60);
+  expect(deltaTypography.fontSize).toBeGreaterThanOrEqual(11);
+
+  const boardFrame = await board.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      borders: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+      radius: style.borderRadius
+    };
+  });
+  expect(boardFrame.borders).toEqual(['1px', '1px', '1px', '1px']);
+  expect(boardFrame.radius).not.toBe('0px');
+
+  const horizontalOverflow = await page.evaluate(() => (
+    document.documentElement.scrollWidth - window.innerWidth
+  ));
+  expect(horizontalOverflow).toBeLessThanOrEqual(1);
+
+  await nav.getByRole('button', { name: 'Show matches' }).click();
+  await expect(schedule).toBeVisible();
+  await expect(analysis).toBeHidden();
+
+  await nav.getByRole('button', { name: 'Show platform status' }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-mobile-view', 'platform');
+  await expect(platform).toBeVisible();
+  await expect(page.locator('#platform-panel-content')).toBeVisible();
+
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect(nav).toBeHidden();
+  await expect(page.locator('body')).not.toHaveAttribute('data-mobile-view', /.+/);
+  await expect(page.locator('.workspace')).toBeVisible();
+
+  expect(pageErrors).toEqual([]);
+});

@@ -1,0 +1,162 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type {
+  LolProviderClient,
+  LolProviderScheduleEntry,
+  LolProviderSeries,
+  LolProviderSnapshot
+} from './provider.ts';
+import { createRiotFinalityProvider } from './riot-finality-provider.ts';
+
+const NOW = Date.parse('2026-08-07T12:20:00.000Z');
+
+function series(
+  id: string,
+  state: LolProviderSeries['state'],
+  scheduledStart: string
+): LolProviderSeries {
+  return {
+    id,
+    competition: { id: 'lck-cl', name: 'LCK Challengers' },
+    teams: [
+      { id: `${id}-blue`, name: `${id} Blue`, code: 'BLU' },
+      { id: `${id}-red`, name: `${id} Red`, code: 'RED' }
+    ],
+    bestOf: 3,
+    state,
+    scheduledStart,
+    games: [
+      { id: `${id}-game-1`, number: 1, state: state === 'live' ? 'live' : 'unstarted' },
+      { id: `${id}-game-2`, number: 2, state: 'unstarted' },
+      { id: `${id}-game-3`, number: 3, state: 'unstarted' }
+    ]
+  };
+}
+
+function entry(value: LolProviderSeries): LolProviderScheduleEntry {
+  return {
+    series: value,
+    observedAt: new Date(NOW).toISOString()
+  };
+}
+
+function payload(id: string, completed: boolean): unknown {
+  return {
+    data: {
+      event: {
+        id,
+        state: completed ? 'completed' : 'inProgress',
+        match: {
+          id,
+          strategy: { count: 3 },
+          teams: [
+            { id: `${id}-blue`, result: { gameWins: completed ? 2 : 1 } },
+            { id: `${id}-red`, result: { gameWins: 0 } }
+          ],
+          games: [
+            { id: `${id}-game-1`, number: 1, state: completed ? 'completed' : 'inProgress' },
+            { id: `${id}-game-2`, number: 2, state: completed ? 'completed' : 'unstarted' },
+            { id: `${id}-game-3`, number: 3, state: 'unstarted' }
+          ]
+        }
+      }
+    }
+  };
+}
+
+function json(value: unknown): Response {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+test('probes live and hours-overdue series even when they exceed the rotating finality budget', async () => {
+  const tesBlg = series(
+    'tes-blg-ended',
+    'live',
+    new Date(NOW - 3 * 60 * 60 * 1_000).toISOString()
+  );
+  const overdue = Array.from({ length: 6 }, (_, index) => series(
+    `overdue-${index}`,
+    'scheduled',
+    new Date(NOW - (8 * 60 + index * 5) * 60 * 1_000).toISOString()
+  ));
+  const schedule = [...overdue.map(entry), entry(tesBlg)];
+  const requested: string[] = [];
+
+  const base: LolProviderClient = {
+    id: 'fixture',
+    name: 'Fixture',
+    getSchedule: async () => schedule,
+    getSnapshot: async (): Promise<LolProviderSnapshot> => {
+      throw new Error('Snapshot should not be requested by this regression.');
+    }
+  };
+  const provider = createRiotFinalityProvider(base, {
+    apiKey: 'test-key',
+    now: () => new Date(NOW),
+    scheduleFinalityLimit: 2,
+    fetcher: async input => {
+      const id = new URL(String(input)).searchParams.get('id') ?? '';
+      requested.push(id);
+      return json(payload(id, id === tesBlg.id));
+    }
+  });
+
+  const reconciled = await provider.getSchedule();
+
+  assert.equal(requested.length, 7);
+  assert.ok(requested.includes(tesBlg.id));
+  for (const stale of overdue) assert.ok(requested.includes(stale.id));
+  assert.equal(reconciled.find(item => item.series.id === tesBlg.id)?.series.state, 'completed');
+});
+
+test('hours-overdue challengers remain deterministic across fresh workers at the real 30 second poll cadence', async () => {
+  let currentTime = NOW;
+  const nsKt = series(
+    'ns-kt-ended',
+    'scheduled',
+    new Date(NOW - 7 * 60 * 60 * 1_000 - 20 * 60 * 1_000).toISOString()
+  );
+  const hleKrx = series(
+    'hle-krx-ended',
+    'scheduled',
+    new Date(NOW - 7 * 60 * 60 * 1_000 - 15 * 60 * 1_000).toISOString()
+  );
+  const schedule = [entry(nsKt), entry(hleKrx)];
+  const requested: string[] = [];
+
+  const base: LolProviderClient = {
+    id: 'fixture',
+    name: 'Fixture',
+    getSchedule: async () => schedule,
+    getSnapshot: async (): Promise<LolProviderSnapshot> => {
+      throw new Error('Snapshot should not be requested by this regression.');
+    }
+  };
+  const makeProvider = () => createRiotFinalityProvider(base, {
+    apiKey: 'test-key',
+    now: () => new Date(currentTime),
+    scheduleFinalityLimit: 1,
+    fetcher: async input => {
+      const id = new URL(String(input)).searchParams.get('id') ?? '';
+      requested.push(id);
+      return json(payload(id, true));
+    }
+  });
+
+  const first = await makeProvider().getSchedule();
+  assert.deepEqual(requested.slice().sort(), [hleKrx.id, nsKt.id].sort());
+  assert.equal(first.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
+  assert.equal(first.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
+
+  currentTime += 30_000;
+  const second = await makeProvider().getSchedule();
+  assert.deepEqual(
+    requested.slice(2).sort(),
+    [hleKrx.id, nsKt.id].sort()
+  );
+  assert.equal(second.find(item => item.series.id === nsKt.id)?.series.state, 'completed');
+  assert.equal(second.find(item => item.series.id === hleKrx.id)?.series.state, 'completed');
+});

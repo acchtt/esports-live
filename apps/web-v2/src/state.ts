@@ -199,13 +199,18 @@ function shouldReplaceCatalogueEntry(
   event: ScheduleEvent,
   view: DataView
 ): boolean {
+  const currentCompleted = current.event.series.state === 'completed';
+  const nextCompleted = event.series.state === 'completed';
+
+  // A completed history record is stronger catalogue evidence than a stale
+  // active copy from the matches feed. False between-game completions are
+  // normalized back to Live when they still carry an active game, and the LPL
+  // recovery controller can also resurrect them from fresh telemetry.
+  if (currentCompleted !== nextCompleted) return nextCompleted;
+
   const currentActive = isActiveEvent(current.event);
   const nextActive = isActiveEvent(event);
   if (currentActive !== nextActive) return nextActive;
-
-  const currentCompleted = current.event.series.state === 'completed';
-  const nextCompleted = event.series.state === 'completed';
-  if (currentCompleted !== nextCompleted) return nextCompleted;
 
   if (nextCompleted) return view === 'history' && current.view !== 'history';
   return view === 'matches' && current.view !== 'matches';

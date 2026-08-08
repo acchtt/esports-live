@@ -260,7 +260,7 @@ test('web v2 reconciles a stale live frame to final and declares the winner', as
   await expect(page.locator('#scoreboard-notice')).toHaveText('KRX Challengers won Game 2.');
 });
 
-test('web v2 resolves stale catalogue states from fresh series context without ending a partial series', async ({ page }) => {
+test('web v2 rejects contradictory stale catalogue finality while preserving partial series', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const now = Date.now();
   const staleLive = {
@@ -374,8 +374,8 @@ test('web v2 resolves stale catalogue states from fresh series context without e
 
   await page.goto('/v2/');
 
-  await expect(page.locator(`[data-series-id="${staleLive.id}"] .match-status`)).toHaveText('FINAL');
-  await expect(page.locator(`[data-series-id="${staleUpcoming.id}"] .match-status`)).toHaveText('FINAL');
+  await expect(page.locator(`[data-series-id="${staleLive.id}"] .match-status`)).toHaveText('LIVE');
+  await expect(page.locator(`[data-series-id="${staleUpcoming.id}"] .match-status`)).toHaveText('UPCOMING');
   await expect(page.locator(`[data-series-id="${partialLive.id}"] .match-status`)).toHaveText('LIVE');
   await expect(page.locator(`[data-series-id="${future.id}"] .match-status`)).toHaveText('UPCOMING');
   expect(requested).toContain(staleLive.id);

@@ -7,6 +7,10 @@ style.textContent = `
     overflow-x:clip!important
   }
 
+  body.mobile-demo-active[data-mobile-view="live"] .workspace .analysis-panel{
+    padding:0!important
+  }
+
   body.mobile-demo-active #game-content,
   body.mobile-demo-active #completed-match-detail{
     width:100%!important;

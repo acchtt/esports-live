@@ -1,0 +1,31 @@
+@media (max-width: 760px) {
+  body.mobile-demo-active .build-version.mobile-demo-version {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 25px;
+    gap: 4px;
+    padding: 0 7px;
+    border-color: rgba(56, 189, 248, 0.42);
+    color: #9de3ff;
+    background: rgba(7, 38, 57, 0.86);
+    font-size: 0.5rem;
+    letter-spacing: 0.035em;
+  }
+
+  body.mobile-demo-active .build-version.mobile-demo-version > span {
+    display: inline !important;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  body.mobile-demo-active .build-version.mobile-demo-version > strong {
+    color: #e4f7ff;
+    font-size: 0.5rem;
+  }
+}
+
+@media (max-width: 390px) {
+  body.mobile-demo-active .build-version.mobile-demo-version > strong {
+    display: none;
+  }
+}

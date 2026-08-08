@@ -1,4 +1,5 @@
-import type { ScheduleEvent, TeamRef } from '@esports-live/core';
+import type { LiveSnapshot, ScheduleEvent, TeamRef } from '@esports-live/core';
+import type { LolStats } from '@esports-live/adapter-lol';
 import './series-hero-view.css';
 import './official-lol-logo.css';
 
@@ -28,6 +29,7 @@ hero.hidden = true;
 analysisHeader.insertBefore(hero, gameSelector);
 
 let activeEvent: ScheduleEvent | null = null;
+let latestPatch: string | null = null;
 let renderFrame: number | null = null;
 let renderKey = '';
 
@@ -118,6 +120,11 @@ function formatStart(value: string): string {
   });
 }
 
+function formatPatch(value: string | null): string {
+  const match = value?.match(/^(\d+)\.(\d+)/);
+  return match ? `${match[1]}.${match[2]}` : 'Pending';
+}
+
 function gameMark(): string {
   return `
     <span class="series-hero-game-mark official-lol-logo" aria-hidden="true">
@@ -136,9 +143,20 @@ function bindLogoFallbacks(): void {
   hero.querySelectorAll<HTMLImageElement>('.series-hero-team-logo img, .series-hero-game-mark img')
     .forEach(image => {
       const container = image.closest('.series-hero-team-logo, .series-hero-game-mark');
-      const markFailed = (): void => container?.classList.add('image-failed');
+      const markLoaded = (): void => {
+        container?.classList.remove('image-failed');
+        container?.classList.add('image-loaded');
+      };
+      const markFailed = (): void => {
+        container?.classList.remove('image-loaded');
+        container?.classList.add('image-failed');
+      };
+      image.addEventListener('load', markLoaded, { once: true });
       image.addEventListener('error', markFailed, { once: true });
-      if (image.complete && image.naturalWidth === 0) markFailed();
+      if (image.complete) {
+        if (image.naturalWidth > 0) markLoaded();
+        else markFailed();
+      }
     });
 }
 
@@ -156,6 +174,7 @@ function render(): void {
   const competition = event.series.competition.stage
     ? `${event.series.competition.name} · ${event.series.competition.stage}`
     : event.series.competition.name;
+  const gameLabel = activeGameLabel(event);
   const key = JSON.stringify({
     id: event.series.id,
     left,
@@ -164,41 +183,53 @@ function render(): void {
     progress,
     status,
     competition,
-    game: activeGameLabel(event),
-    start: event.series.scheduledStart
+    game: gameLabel,
+    start: event.series.scheduledStart,
+    patch: latestPatch
   });
   if (key === renderKey) return;
   renderKey = key;
   hero.dataset.status = statusClass;
 
   hero.innerHTML = `
-    <div class="series-hero-topline">
-      <div class="series-hero-competition">
-        ${gameMark()}
-        <div>
-          <span>League of Legends</span>
-          <strong>${escapeHtml(competition)}</strong>
+    <div class="series-hero-stage">
+      <div class="series-hero-topline">
+        <div class="series-hero-competition">
+          ${gameMark()}
+          <div>
+            <span>League of Legends</span>
+            <strong>${escapeHtml(competition)}</strong>
+          </div>
         </div>
+        <span class="series-hero-status ${escapeHtml(statusClass)}">
+          ${escapeHtml(status)}
+        </span>
       </div>
-      <span class="series-hero-status ${escapeHtml(statusClass)}">
-        ${escapeHtml(status)}
-      </span>
-    </div>
 
-    <div class="series-hero-matchup">
-      ${teamMarkup(left, 'left')}
-      <div class="series-hero-score" aria-label="Series score ${leftWins} to ${rightWins}">
-        <span>Series score</span>
-        <div><strong>${leftWins}</strong><i>–</i><strong>${rightWins}</strong></div>
-        <small>Best of ${event.series.bestOf} · First to ${winsRequired}</small>
+      <div class="series-hero-matchup">
+        ${teamMarkup(left, 'left')}
+        <div class="series-hero-score" aria-label="Series score ${leftWins} to ${rightWins}">
+          <span>Series score</span>
+          <div><strong>${leftWins}</strong><i>–</i><strong>${rightWins}</strong></div>
+          <small>Best of ${event.series.bestOf} · First to ${winsRequired}</small>
+        </div>
+        ${teamMarkup(right, 'right')}
       </div>
-      ${teamMarkup(right, 'right')}
-    </div>
 
-    <div class="series-hero-footer">
-      <span class="series-hero-live-context"><i></i>${escapeHtml(activeGameLabel(event))}</span>
-      <span>${progress.completed} of ${progress.total} games completed</span>
-      <time datetime="${escapeHtml(event.series.scheduledStart)}">${escapeHtml(formatStart(event.series.scheduledStart))}</time>
+      <div class="series-hero-footer">
+        <span class="series-hero-live-context">
+          <i></i><span><b>Current game</b><span>${escapeHtml(gameLabel)}</span></span>
+        </span>
+        <span class="series-hero-progress">
+          <span><b>Series progress</b><span>${progress.completed} of ${progress.total} games completed</span></span>
+        </span>
+        <time datetime="${escapeHtml(event.series.scheduledStart)}">
+          <span><b>Start time</b><span>${escapeHtml(formatStart(event.series.scheduledStart))}</span></span>
+        </time>
+        <span class="series-hero-patch">
+          <span><b>Patch</b><span>${escapeHtml(formatPatch(latestPatch))}</span></span>
+        </span>
+      </div>
     </div>`;
 
   hero.hidden = false;
@@ -212,7 +243,17 @@ function scheduleRender(): void {
 }
 
 window.addEventListener('esports-live:selection', event => {
-  activeEvent = (event as CustomEvent<ScheduleEvent>).detail;
+  const next = (event as CustomEvent<ScheduleEvent>).detail;
+  if (activeEvent?.series.id !== next.series.id) latestPatch = null;
+  activeEvent = next;
+  renderKey = '';
+  scheduleRender();
+});
+
+window.addEventListener('esports-live:snapshot', event => {
+  const snapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
+  if (!snapshot?.stats || snapshot.series.id !== activeEvent?.series.id) return;
+  latestPatch = snapshot.stats.patch;
   renderKey = '';
   scheduleRender();
 });

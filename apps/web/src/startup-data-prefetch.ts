@@ -238,9 +238,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     );
     if (value) return responseFromStored(value);
 
-    // Missing-game context is optional enrichment. Fail it quickly so the base
-    // schedule can render while the shared background request continues.
-    throw new Error('Series context enrichment is still loading.');
+    // Keep the first render bounded without leaking an implementation-specific
+    // loading error into the dashboard. The shared prefetch continues filling
+    // the cache while the caller transparently completes its own API request.
+    return nativeFetch(input, init);
   }
 
   const resource = resourceFor(input);

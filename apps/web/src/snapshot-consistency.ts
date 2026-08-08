@@ -9,6 +9,15 @@ function sourceMs(snapshot: LiveSnapshot<LolStats>): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function mergeItems(
+  previous: LolPlayerState['items'],
+  incoming: LolPlayerState['items']
+): LolPlayerState['items'] {
+  if (incoming?.length) return incoming;
+  if (previous?.length) return previous;
+  return incoming ?? previous;
+}
+
 function mergePlayer(previous: LolPlayerState | undefined, incoming: LolPlayerState): LolPlayerState {
   if (!previous) return incoming;
   return {
@@ -22,7 +31,10 @@ function mergePlayer(previous: LolPlayerState | undefined, incoming: LolPlayerSt
     assists: incoming.assists ?? previous.assists,
     creepScore: incoming.creepScore ?? previous.creepScore,
     totalGold: incoming.totalGold ?? previous.totalGold,
-    items: incoming.items ?? previous.items
+    // Riot can briefly publish an empty inventory while counters continue to
+    // advance. Keep the last verified build until a non-empty replacement
+    // arrives instead of clearing every item slot for that polling frame.
+    items: mergeItems(previous.items, incoming.items)
   };
 }
 

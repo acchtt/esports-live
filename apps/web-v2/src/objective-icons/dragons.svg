@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Dragon objective">
+  <path d="M50 12 38 18l5-9-16 7-10 10-9 3 7 6-4 10 12-3 8 10 3-13 10 6-4-11 11-4-9-5 8-13Z" fill="#B7FF00"/>
+  <path d="M20 28h11l-6 6-9-1 4-5Z" fill="#08100A"/>
+  <path d="M37 24h5l-2 5-5-1 2-4Z" fill="#08100A"/>
+  <path d="M25 42c7 1 12-1 17-7" fill="none" stroke="#E7FFC2" stroke-width="2" stroke-linecap="round"/>
+</svg>

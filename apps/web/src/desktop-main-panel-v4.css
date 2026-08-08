@@ -1,0 +1,442 @@
+.desktop-dashboard-redesign .analysis-panel {
+  --v4-line: rgba(113, 151, 195, 0.18);
+  --v4-line-strong: rgba(74, 188, 255, 0.34);
+  --v4-surface: rgba(8, 19, 34, 0.92);
+  --v4-surface-2: rgba(10, 25, 44, 0.94);
+  --v4-muted: #8192aa;
+  padding: 10px !important;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 18% -8%, rgba(28, 151, 255, 0.10), transparent 34%),
+    radial-gradient(circle at 90% -6%, rgba(255, 54, 105, 0.08), transparent 32%),
+    #030a14;
+}
+
+.desktop-dashboard-redesign .analysis-panel > .analysis-header.series-hero-active {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero {
+  padding: 0 !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-stage {
+  position: relative;
+  overflow: hidden;
+  min-height: 250px;
+  border: 1px solid var(--v4-line);
+  border-radius: 18px;
+  background:
+    linear-gradient(105deg, rgba(6, 43, 76, 0.96) 0%, rgba(5, 17, 31, 0.98) 43%, rgba(10, 12, 25, 0.98) 57%, rgba(68, 13, 36, 0.94) 100%);
+  box-shadow: 0 24px 62px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255,255,255,.035);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-stage::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 30px, rgba(117, 177, 231, 0.035) 30px 31px),
+    linear-gradient(90deg, rgba(35, 170, 255, .08), transparent 40%, transparent 60%, rgba(255, 55, 104, .08));
+  content: '';
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-topline {
+  position: relative;
+  z-index: 2;
+  min-height: 54px;
+  margin: 0;
+  padding: 13px 18px;
+  border: 0;
+  border-bottom: 1px solid rgba(132, 165, 202, 0.14);
+  border-radius: 0;
+  background: rgba(3, 10, 20, 0.50);
+  box-shadow: none;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-game-mark {
+  min-width: 56px;
+  min-height: 32px;
+  border-color: rgba(230, 189, 87, .30);
+  color: #f7cf68;
+  background: rgba(195, 151, 48, .08);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-competition strong {
+  font-size: .86rem;
+  letter-spacing: .055em;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-matchup {
+  position: relative;
+  z-index: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .44fr) minmax(0, 1fr) !important;
+  gap: 0;
+  min-height: 132px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team {
+  min-height: 132px;
+  gap: 18px;
+  padding: 24px 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team.left {
+  justify-content: flex-start;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team.right {
+  justify-content: flex-start;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team-logo {
+  width: 72px;
+  height: 72px;
+  border-color: rgba(142, 181, 220, .25);
+  border-radius: 20px;
+  background: rgba(4, 13, 24, .42);
+  box-shadow: 0 12px 30px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.05);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team-logo img {
+  width: 58px;
+  height: 58px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team-copy strong {
+  max-width: 100%;
+  font-size: clamp(1.35rem, 2.05vw, 2.05rem);
+  line-height: 1.04;
+  letter-spacing: -.035em;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-team-copy > small {
+  margin-top: 7px;
+  font-size: .62rem;
+  letter-spacing: .15em;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-score {
+  align-self: stretch;
+  min-width: 220px;
+  padding: 18px;
+  border-inline: 1px solid rgba(115, 162, 205, .20);
+  border-radius: 0;
+  background: rgba(2, 9, 18, .52);
+  backdrop-filter: blur(12px);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-score strong {
+  font-size: clamp(3rem, 4.5vw, 4.4rem);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-score small {
+  font-size: .72rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer {
+  position: relative;
+  z-index: 2;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 0;
+  padding: 0;
+  border-top: 1px solid rgba(132, 165, 202, 0.14);
+  background: rgba(3, 10, 20, .55);
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer > span,
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer > time,
+.desktop-dashboard-redesign .analysis-panel .series-hero-progress {
+  min-height: 62px;
+  padding: 12px 18px 12px 50px;
+  border: 0;
+  border-right: 1px solid rgba(132, 165, 202, .13);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer > :last-child {
+  border-right: 0;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer b {
+  font-size: .56rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer span span,
+.desktop-dashboard-redesign .analysis-panel .series-hero-footer time span {
+  font-size: .74rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel #game-selector {
+  display: none !important;
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results {
+  margin: 10px 0 0 !important;
+  padding: 10px 12px 12px !important;
+  border: 1px solid var(--v4-line) !important;
+  border-radius: 15px;
+  background: rgba(5, 15, 28, .86) !important;
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-section-heading {
+  min-height: 26px;
+  padding: 0 2px 7px;
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-games {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px;
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-game {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  grid-template-areas: 'top top' 'blue red' 'result result' !important;
+  gap: 7px 10px;
+  min-height: 90px !important;
+  padding: 10px 12px !important;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(12, 30, 50, .92), rgba(6, 18, 32, .95));
+}
+
+.desktop-dashboard-redesign #series-history.live-series-results .completed-side {
+  min-height: 32px;
+  padding: 5px 7px;
+  border-color: rgba(110, 151, 193, .13);
+  background: rgba(255,255,255,.015);
+}
+
+.desktop-dashboard-redesign .analysis-panel > #game-content {
+  margin-top: 10px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .live-dashboard-v2 {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--v4-line);
+  border-radius: 17px;
+  background: rgba(4, 14, 26, .94);
+  box-shadow: 0 24px 52px rgba(0,0,0,.24);
+}
+
+.desktop-dashboard-redesign .analysis-panel .live-dashboard-v2 > .player-board-toolbar {
+  grid-template-columns: minmax(190px, .75fr) minmax(0, 2.3fr) auto !important;
+  min-height: 58px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--v4-line);
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(9, 28, 48, .95), rgba(7, 17, 30, .95));
+}
+
+.desktop-dashboard-redesign .analysis-panel .player-board-toolbar-copy strong {
+  font-size: .86rem;
+  letter-spacing: .06em;
+}
+
+.desktop-dashboard-redesign .analysis-panel .player-board-toolbar-summary {
+  grid-template-columns: repeat(5, minmax(70px, 1fr));
+}
+
+.desktop-dashboard-redesign .analysis-panel .player-board-summary-cell {
+  min-height: 38px;
+  padding: 3px 10px;
+  border-left: 1px solid rgba(113,151,195,.12);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-hero {
+  min-height: 94px;
+  border: 0;
+  border-bottom: 1px solid var(--v4-line);
+  border-radius: 0;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-team {
+  gap: 14px;
+  padding: 14px 20px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-team-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-team-copy strong {
+  font-size: clamp(1.08rem, 1.6vw, 1.55rem);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-team-kills {
+  font-size: clamp(2.6rem, 3.7vw, 3.65rem);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-clock {
+  min-width: 148px;
+  padding: 10px 16px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-clock strong {
+  font-size: 1.72rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-summary-row {
+  grid-template-columns: minmax(250px, .28fr) minmax(0, 1fr);
+  gap: 0;
+  border-bottom: 1px solid var(--v4-line);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-gold-card,
+.desktop-dashboard-redesign .analysis-panel .v2-objectives-card {
+  min-height: 74px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(4, 15, 28, .92);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-gold-card {
+  border-right: 1px solid var(--v4-line);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v3-objective-hud {
+  min-height: 72px !important;
+  padding: 7px 10px !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v3-objective-stat {
+  min-height: 56px !important;
+  border-radius: 9px !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-board-head.compact-matchup-header {
+  min-height: 52px;
+  border: 0;
+  border-bottom: 1px solid var(--v4-line);
+  border-radius: 0;
+  background: rgba(8, 21, 37, .96);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-matchup-row {
+  min-height: 102px !important;
+  border-bottom-color: rgba(105, 145, 188, .13);
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-player,
+.desktop-dashboard-redesign .analysis-panel .v2-player.red {
+  grid-template-rows: minmax(46px, auto) 32px !important;
+  row-gap: 7px !important;
+  padding: 10px 16px !important;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-champion {
+  width: 54px;
+  height: 54px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-player-copy strong {
+  font-size: .9rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-player-copy small {
+  margin-top: 3px;
+  font-size: .61rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-player-stat small {
+  font-size: .56rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-player-stat strong {
+  font-size: .88rem;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-player-media {
+  min-height: 32px;
+  gap: 6px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-item-slot {
+  width: 30px !important;
+  height: 30px !important;
+  flex-basis: 30px !important;
+  border-radius: 6px;
+}
+
+.desktop-dashboard-redesign .analysis-panel .v2-footer {
+  min-height: 42px;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--v4-line);
+  border-radius: 0;
+}
+
+@media (max-width: 1280px) {
+  .desktop-dashboard-redesign .analysis-panel .series-hero-matchup {
+    grid-template-columns: minmax(0,1fr) 180px minmax(0,1fr) !important;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-team {
+    padding-inline: 18px;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-team-logo {
+    width: 62px;
+    height: 62px;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-score {
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 980px) {
+  .desktop-dashboard-redesign .analysis-panel .series-hero-stage {
+    min-height: 0;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-matchup {
+    grid-template-columns: minmax(0,1fr) 132px minmax(0,1fr) !important;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-team {
+    display: grid;
+    justify-items: center;
+    padding: 16px 10px;
+    text-align: center;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-team.right {
+    text-align: center;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .series-hero-footer {
+    grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .live-dashboard-v2 > .player-board-toolbar {
+    grid-template-columns: 1fr auto !important;
+  }
+
+  .desktop-dashboard-redesign .analysis-panel .player-board-toolbar-summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

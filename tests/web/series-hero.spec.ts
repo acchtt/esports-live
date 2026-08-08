@@ -137,6 +137,7 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
   await expect(teams.nth(0)).toContainText('THUNDER TALK GAMING');
   await expect(teams.nth(1)).toContainText("Xi'an Team WE");
   await expect(hero.locator('.series-hero-team-logo img')).toHaveCount(2);
+  await expect(hero.locator('.series-hero-team-logo.image-loaded')).toHaveCount(2);
 
   const score = hero.locator('.series-hero-score strong');
   await expect(score.nth(0)).toHaveText('1');
@@ -146,30 +147,37 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
   const footer = hero.locator('.series-hero-footer');
   await expect(footer).toContainText('Game 2 live');
   await expect(footer).toContainText('1 of 3 games completed');
-  await expect(footer.locator(':scope > *')).toHaveCount(3);
+  await expect(footer).toContainText('Patch');
+  await expect(footer.locator(':scope > *')).toHaveCount(4);
 
   const surfaces = await hero.evaluate(element => {
     const top = element.querySelector<HTMLElement>('.series-hero-topline');
     const footerCell = element.querySelector<HTMLElement>('.series-hero-footer > *');
     const footerGrid = element.querySelector<HTMLElement>('.series-hero-footer');
-    if (!top || !footerCell || !footerGrid) return null;
+    const matchup = element.querySelector<HTMLElement>('.series-hero-matchup');
+    if (!top || !footerCell || !footerGrid || !matchup) return null;
     const topStyle = getComputedStyle(top);
     const footerStyle = getComputedStyle(footerCell);
     const gridStyle = getComputedStyle(footerGrid);
+    const matchupStyle = getComputedStyle(matchup);
     return {
-      topBackground: topStyle.backgroundColor,
-      footerBackground: footerStyle.backgroundColor,
+      topBackgroundImage: topStyle.backgroundImage,
+      footerBackgroundImage: footerStyle.backgroundImage,
       topBorder: topStyle.borderTopColor,
       footerBorder: footerStyle.borderTopColor,
       footerDisplay: gridStyle.display,
-      footerColumns: gridStyle.gridTemplateColumns.split(' ').length
+      footerColumns: gridStyle.gridTemplateColumns.split(' ').length,
+      matchupMinHeight: Number.parseFloat(matchupStyle.minHeight)
     };
   });
   expect(surfaces).not.toBeNull();
-  expect(surfaces?.topBackground).toBe(surfaces?.footerBackground);
-  expect(surfaces?.topBorder).toBe(surfaces?.footerBorder);
+  expect(surfaces?.topBackgroundImage).not.toBe('none');
+  expect(surfaces?.footerBackgroundImage).not.toBe('none');
+  expect(surfaces?.topBorder).not.toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.footerBorder).not.toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerDisplay).toBe('grid');
-  expect(surfaces?.footerColumns).toBe(3);
+  expect(surfaces?.footerColumns).toBe(4);
+  expect(surfaces?.matchupMinHeight).toBeGreaterThanOrEqual(120);
 
   const headerBox = await page.locator('.analysis-header').boundingBox();
   const scoreBox = await hero.locator('.series-hero-score').boundingBox();

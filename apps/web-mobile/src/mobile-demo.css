@@ -1,0 +1,766 @@
+.mobile-app-nav,
+.mobile-context-bar {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  :root {
+    font-size: 15px;
+  }
+
+  html {
+    scroll-padding-top: 68px;
+    scroll-padding-bottom: 84px;
+  }
+
+  body {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    background: #050914;
+  }
+
+  body .app-frame {
+    min-height: 100dvh;
+  }
+
+  body .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: 64px;
+    padding: 9px 12px;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    border-bottom-color: rgba(148, 163, 184, 0.13);
+    background: rgba(5, 9, 20, 0.96);
+  }
+
+  body .brand {
+    min-width: 0;
+    gap: 9px;
+  }
+
+  body .brand-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    font-size: 0.72rem;
+  }
+
+  body .brand > div {
+    min-width: 0;
+  }
+
+  body .brand strong {
+    overflow: hidden;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body .brand small,
+  body .connection small,
+  body #status-badge {
+    display: none;
+  }
+
+  body .connection {
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
+    gap: 8px;
+  }
+
+  body .connection > div {
+    min-width: 0;
+  }
+
+  body .connection strong {
+    overflow: hidden;
+    max-width: 112px;
+    color: #cbd5e1;
+    font-size: 0.67rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body .status-dot {
+    width: 8px;
+    height: 8px;
+    box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.1);
+  }
+
+  body .build-version {
+    min-height: 24px;
+    padding: 0 7px;
+    font-size: 0.56rem;
+  }
+
+  body .build-version > span {
+    display: none;
+  }
+
+  body .workspace,
+  body .workspace.platform-collapsed,
+  body #workspace.dashboard-v2-active {
+    display: block !important;
+    width: 100%;
+    padding: 0;
+  }
+
+  body .workspace > .panel {
+    width: 100%;
+    min-height: calc(100dvh - 136px);
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  body[data-mobile-view="matches"] .analysis-panel,
+  body[data-mobile-view="matches"] #platform-panel,
+  body[data-mobile-view="live"] .schedule-panel,
+  body[data-mobile-view="live"] #platform-panel,
+  body[data-mobile-view="platform"] .schedule-panel,
+  body[data-mobile-view="platform"] .analysis-panel {
+    display: none !important;
+  }
+
+  body[data-mobile-view="matches"] .schedule-panel,
+  body[data-mobile-view="live"] .analysis-panel,
+  body[data-mobile-view="platform"] #platform-panel {
+    display: block !important;
+  }
+
+  body[data-mobile-view="platform"] #platform-panel[hidden] {
+    display: block !important;
+  }
+
+  body .workspace .schedule-panel,
+  body .workspace .analysis-panel,
+  body .workspace .platform-panel {
+    position: static;
+    max-height: none;
+  }
+
+  body .workspace .schedule-panel {
+    padding-bottom: 8px;
+  }
+
+  body .workspace .panel-heading {
+    padding: 16px;
+  }
+
+  body .workspace .schedule-list {
+    max-height: none;
+    padding: 10px 12px 18px;
+    overflow: visible;
+  }
+
+  body .match-card {
+    min-height: 92px;
+    padding: 14px;
+    border-radius: 14px;
+    touch-action: manipulation;
+  }
+
+  body .match-card-top {
+    margin-bottom: 8px;
+  }
+
+  body .sport-tabs {
+    position: sticky;
+    top: 64px;
+    z-index: 8;
+    padding: 10px 12px;
+    background: rgba(9, 16, 31, 0.98);
+    backdrop-filter: blur(14px);
+  }
+
+  body .schedule-mode-tabs {
+    position: sticky;
+    top: 119px;
+    z-index: 8;
+    padding: 8px 12px 10px;
+    background: rgba(9, 16, 31, 0.98);
+    backdrop-filter: blur(14px);
+  }
+
+  body .analysis-panel {
+    background: #07101e;
+  }
+
+  body .workspace .analysis-header {
+    min-height: 0;
+    padding: 14px 14px 12px;
+    gap: 10px;
+  }
+
+  body .analysis-header h2 {
+    font-size: 1rem;
+    line-height: 1.28;
+  }
+
+  body .selected-meta {
+    margin-top: 5px;
+    font-size: 0.7rem;
+  }
+
+  body .game-selector {
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  body .game-selector::-webkit-scrollbar {
+    display: none;
+  }
+
+  body .game-button {
+    flex: 0 0 auto;
+    min-width: 58px;
+    min-height: 42px;
+  }
+
+  body .workspace .game-content {
+    padding: 8px;
+  }
+
+  body .analysis-empty {
+    min-height: 54dvh;
+    padding: 30px 18px;
+  }
+
+  body .quality-banner {
+    margin: 8px;
+  }
+
+  body .mobile-context-bar {
+    position: sticky;
+    top: 64px;
+    z-index: 24;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    background: rgba(7, 16, 30, 0.96);
+    backdrop-filter: blur(14px);
+  }
+
+  body .mobile-context-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 10px;
+    color: #b9e7ff;
+    background: rgba(56, 189, 248, 0.06);
+    font-size: 0.68rem;
+    font-weight: 850;
+  }
+
+  body .mobile-context-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #dce8f7;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body .mobile-app-nav {
+    position: fixed;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 8px;
+    z-index: 80;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    min-height: 58px;
+    padding: 5px;
+    border: 1px solid rgba(112, 151, 196, 0.2);
+    border-radius: 18px;
+    background: rgba(7, 16, 30, 0.96);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.46);
+    backdrop-filter: blur(20px);
+  }
+
+  body .mobile-app-nav button {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: 46px;
+    padding: 4px;
+    border: 0;
+    border-radius: 13px;
+    color: #7f8ea4;
+    background: transparent;
+    font-size: 0.58rem;
+    font-weight: 850;
+    letter-spacing: 0.03em;
+    touch-action: manipulation;
+  }
+
+  body .mobile-app-nav button svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  body .mobile-app-nav button.active {
+    color: #cbeeff;
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.16), rgba(56, 189, 248, 0.07));
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+  }
+
+  body #platform-panel {
+    min-height: calc(100dvh - 136px);
+  }
+
+  body #platform-panel .platform-panel-heading {
+    border-bottom: 1px solid var(--border);
+  }
+
+  body #platform-panel .platform-panel-content[aria-hidden="true"] {
+    display: block;
+  }
+
+  body #platform-panel .adapter-list {
+    grid-template-columns: 1fr;
+  }
+
+  body footer {
+    display: none;
+  }
+
+  body .live-dashboard-v2 {
+    gap: 8px;
+  }
+
+  body .v2-hero {
+    grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);
+    min-height: 92px;
+    border-radius: 12px;
+  }
+
+  body .v2-team {
+    gap: 7px;
+    min-width: 0;
+    padding: 11px 9px;
+  }
+
+  body .v2-team.red {
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  body .v2-team-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+  }
+
+  body .v2-team-copy {
+    min-width: 0;
+    gap: 2px;
+  }
+
+  body .v2-team-copy small {
+    display: none;
+  }
+
+  body .v2-team-copy strong {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.72rem;
+    line-height: 1.15;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  body .v2-team-kills,
+  body .v2-team.red .v2-team-kills {
+    margin: 0;
+    font-size: 1.6rem;
+  }
+
+  body .v2-team.blue .v2-team-kills {
+    margin-left: auto;
+  }
+
+  body .v2-team.red .v2-team-kills {
+    order: 0;
+    margin-right: auto;
+  }
+
+  body .v2-clock {
+    order: initial;
+    min-width: 72px;
+    padding: 10px 4px;
+    border-top: 0;
+    border-right: 1px solid rgba(112, 151, 196, 0.12);
+    border-left: 1px solid rgba(112, 151, 196, 0.12);
+  }
+
+  body .v2-clock small {
+    font-size: 0.48rem;
+  }
+
+  body .v2-clock strong {
+    font-size: 1.15rem;
+  }
+
+  body .v2-clock span {
+    font-size: 0.5rem;
+  }
+
+  body .v2-summary-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  body .v2-gold-card,
+  body .v2-objectives-card {
+    min-height: 0;
+    border-radius: 11px;
+  }
+
+  body .v2-gold-card {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 5px 12px;
+    padding: 12px 14px;
+  }
+
+  body .v2-gold-card > span,
+  body .v2-gold-card > small {
+    grid-column: 1;
+  }
+
+  body .v2-gold-card > strong {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    font-size: 1.05rem;
+    text-align: right;
+  }
+
+  body .v2-gold-bars {
+    grid-column: 1 / -1;
+  }
+
+  body .v2-objectives-card {
+    padding: 10px 8px;
+  }
+
+  body .v2-card-title {
+    display: block;
+    padding: 0 4px;
+  }
+
+  body .v2-objective-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  body .v2-objective {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 3px;
+    padding: 7px 2px;
+  }
+
+  body .v2-objective-label {
+    display: none;
+  }
+
+  body .v2-objective-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  body .v2-objective-score {
+    grid-column: 1;
+    width: 100%;
+    margin-top: 1px;
+    font-size: 0.72rem;
+  }
+
+  body .v2-objective-score i {
+    height: 13px;
+  }
+
+  body .v2-board {
+    overflow: hidden;
+  }
+
+  body .v2-board > * {
+    min-width: 0 !important;
+  }
+
+  body .v2-board-tabs {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  body .v2-board-tabs button {
+    flex: 1 0 auto;
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  body .v2-board-tabs button:disabled {
+    display: none;
+  }
+
+  body .v2-board-head {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    min-height: 42px;
+    padding: 0 10px;
+    font-size: 0.68rem;
+  }
+
+  body .v2-board-head > span {
+    display: none;
+  }
+
+  body .v2-board-head > strong:last-child {
+    text-align: right;
+  }
+
+  body .v2-matchup-row {
+    grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
+    min-height: 92px;
+  }
+
+  body .v2-player,
+  body .v2-player.red {
+    display: grid;
+    grid-template-columns: 34px repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto auto;
+    gap: 5px 4px;
+    padding: 9px 6px;
+    text-align: left;
+  }
+
+  body .v2-player.red {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 34px;
+    text-align: right;
+  }
+
+  body .v2-player-role {
+    display: none;
+  }
+
+  body .v2-player .v2-champion {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  body .v2-player .v2-player-copy {
+    grid-column: 2 / 5;
+    grid-row: 1;
+  }
+
+  body .v2-player .v2-player-stat:nth-last-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  body .v2-player .v2-player-stat:nth-last-child(2) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  body .v2-player .v2-player-stat:nth-last-child(1) {
+    grid-column: 4;
+    grid-row: 2;
+  }
+
+  body .v2-player.red .v2-champion {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  body .v2-player.red .v2-player-copy {
+    grid-column: 1 / 4;
+    grid-row: 1;
+  }
+
+  body .v2-player.red .v2-player-stat:nth-last-child(3) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  body .v2-player.red .v2-player-stat:nth-last-child(2) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  body .v2-player.red .v2-player-stat:nth-last-child(1) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  body .v2-champion {
+    width: 32px;
+    height: 32px;
+    font-size: 0.55rem;
+  }
+
+  body .v2-player-copy strong {
+    font-size: 0.66rem;
+  }
+
+  body .v2-player-copy small {
+    font-size: 0.52rem;
+  }
+
+  body .v2-player-stat {
+    gap: 1px;
+    text-align: center;
+  }
+
+  body .v2-player-stat small {
+    font-size: 0.43rem;
+  }
+
+  body .v2-player-stat strong {
+    font-size: 0.61rem;
+  }
+
+  body .v2-lane-icon {
+    border-right: 1px solid rgba(112, 151, 196, 0.1);
+    border-left: 1px solid rgba(112, 151, 196, 0.1);
+  }
+
+  body .v2-lane-icon svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  body .v2-footer {
+    min-height: 42px;
+    padding: 8px 10px;
+    flex-wrap: wrap;
+    gap: 5px 8px;
+    font-size: 0.56rem;
+  }
+
+  body .v2-footer em {
+    margin-left: auto;
+  }
+
+  body .completed-match-detail {
+    min-height: calc(100dvh - 136px);
+    padding: 8px;
+  }
+
+  body .completed-detail-header,
+  body .completed-scoreboard,
+  body .completed-match-detail > .completed-series-hero + .completed-games-panel {
+    padding: 12px;
+  }
+
+  body .completed-games {
+    grid-template-columns: 1fr;
+  }
+
+  body .completed-game-tabs {
+    display: flex !important;
+    grid-template-columns: none !important;
+    overflow-x: auto;
+  }
+
+  body .completed-game-tab {
+    flex: 0 0 min(74vw, 250px);
+  }
+
+  body .completed-team-comparison.completed-history-dashboard-v2 {
+    overflow: hidden;
+  }
+
+  body .history-v2-team-header,
+  body .history-v2-summary,
+  body .history-v2-objectives {
+    min-width: 0;
+  }
+
+  body .history-v2-team-header {
+    gap: 8px;
+    padding: 0 5px;
+  }
+
+  body .history-v2-team strong {
+    font-size: 0.72rem;
+  }
+
+  body .history-v2-summary {
+    grid-template-columns: 1fr;
+  }
+
+  body .history-v2-objective-hud {
+    grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1fr);
+  }
+
+  body .history-v2-objective-side {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  body .history-v2-objective-label {
+    display: none;
+  }
+
+  body .history-v2-objective-stat {
+    min-height: 48px;
+  }
+
+  body .history-v2-objective-title {
+    width: 70%;
+  }
+}
+
+@media (max-width: 390px) {
+  body .connection strong {
+    display: none;
+  }
+
+  body .v2-team-logo {
+    width: 34px;
+    height: 34px;
+  }
+
+  body .v2-team {
+    padding-inline: 6px;
+  }
+
+  body .v2-team-kills,
+  body .v2-team.red .v2-team-kills {
+    font-size: 1.35rem;
+  }
+
+  body .v2-matchup-row {
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  }
+
+  body .v2-player,
+  body .v2-player.red {
+    padding-inline: 4px;
+  }
+}

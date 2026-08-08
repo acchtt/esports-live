@@ -3,9 +3,14 @@ import {
   createCompletedInventoryProvider,
   createLeaguepediaHistoryFallbackProvider,
   createRiotCurrentPlayerProvider,
+  createRiotDelayedLiveRecoveryProvider,
+  createRiotFinalityProvider,
   createRiotLolConsistentProvider,
+  createRiotScheduleReconciliationProvider,
+  createRiotSupplementalLeagueProvider,
   createUsableScheduleProvider,
   type LolProviderClient,
+  type LolProviderSnapshot,
   type RiotCurrentPlayerProviderOptions
 } from '@esports-live/adapter-lol';
 import { AdapterRegistry, CachedAdapter } from '@esports-live/core';
@@ -28,42 +33,140 @@ export type ProductionInventoryProviderOptions = Omit<
   'useWindowOverlay'
 >;
 
+type Snapshot = Awaited<ReturnType<LolProviderClient['getSnapshot']>>;
+
+interface SourceAlignedInventoryProvider {
+  provider: LolProviderClient;
+  prime(snapshot: Snapshot): void;
+}
+
+interface GameInventoryProviders {
+  state: string;
+  primary: LolProviderClient | null;
+  sourceAligned: SourceAlignedInventoryProvider;
+}
+
+function inventoryCount(snapshot: LolProviderSnapshot): number {
+  if (!snapshot.stats) return 0;
+  return [...snapshot.stats.blue.players, ...snapshot.stats.red.players]
+    .reduce((total, player) => total + (player.items?.length ?? 0), 0);
+}
+
+function sourceTimestampMs(snapshot: Snapshot): number | null {
+  const parsed = Date.parse(snapshot.sourceTimestamp ?? '');
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /**
- * Select the inventory clock independently from the normalized scoreboard.
+ * Keep Riot inventory probe state alive per game while selecting the correct
+ * details clock from the normalized snapshot.
  *
- * Riot's public live clients request details using wall-clock timestamps. An
- * unanchored window response can contain an initial or otherwise stale frame,
- * which makes an inventory probe miss even while the base scoreboard is
- * current. Completed games still need their final source timestamp because a
- * wall-clock request after the game has ended can be outside the feed window.
+ * Live games first use Riot's wall-clock details frontier. Some delayed feeds
+ * expose a scoreboard timestamp well behind wall clock, so those probes can
+ * return detail frames that are rejected as future data. When the whole board
+ * remains empty, a persistent source-aligned provider probes from the exact
+ * normalized snapshot timestamp instead of relying on Riot's unanchored window.
+ * Completed games always use that source-aligned provider.
  */
 export function createProductionInventoryProvider(
   base: LolProviderClient,
   options: ProductionInventoryProviderOptions = {}
 ): LolProviderClient {
+  const inventoryWaitBudgetMs =
+    options.inventoryWaitBudgetMs ?? LIVE_INVENTORY_SETTLE_BUDGET_MS;
+  const sharedOptions = { ...options, inventoryWaitBudgetMs };
+  const fallbackNow = options.now ?? (() => new Date());
+  const gameProviders = new Map<string, GameInventoryProviders>();
+
+  function createPrimedBase(gameId: string, snapshot: Snapshot): LolProviderClient {
+    let primedSnapshot: Snapshot | null = snapshot;
+    return {
+      ...base,
+      async getSnapshot(requestedGameId: string, after?: string) {
+        if (requestedGameId === gameId && primedSnapshot) {
+          const value = primedSnapshot;
+          primedSnapshot = null;
+          return value;
+        }
+        return base.getSnapshot(requestedGameId, after);
+      }
+    };
+  }
+
+  function createSourceAlignedProvider(
+    gameId: string,
+    initialSnapshot: Snapshot
+  ): SourceAlignedInventoryProvider {
+    let primedSnapshot: Snapshot | null = initialSnapshot;
+    let targetMs = sourceTimestampMs(initialSnapshot);
+    const snapshotBase: LolProviderClient = {
+      ...base,
+      async getSnapshot(requestedGameId: string, after?: string) {
+        if (requestedGameId === gameId && primedSnapshot) {
+          const value = primedSnapshot;
+          primedSnapshot = null;
+          return value;
+        }
+        return base.getSnapshot(requestedGameId, after);
+      }
+    };
+    const provider = createRiotCurrentPlayerProvider(snapshotBase, {
+      ...sharedOptions,
+      now: () => targetMs === null ? fallbackNow() : new Date(targetMs),
+      useWindowOverlay: false
+    });
+    return {
+      provider,
+      prime(snapshot: Snapshot) {
+        primedSnapshot = snapshot;
+        targetMs = sourceTimestampMs(snapshot);
+      }
+    };
+  }
+
+  function createGameProviders(gameId: string, snapshot: Snapshot): GameInventoryProviders {
+    const completed = snapshot.game.state === 'completed';
+    return {
+      state: snapshot.game.state,
+      primary: completed
+        ? null
+        : createRiotCurrentPlayerProvider(createPrimedBase(gameId, snapshot), {
+            ...sharedOptions,
+            useWindowOverlay: false
+          }),
+      sourceAligned: createSourceAlignedProvider(gameId, snapshot)
+    };
+  }
+
   return {
     ...base,
     async getSnapshot(gameId: string, after?: string) {
-      const snapshot = await base.getSnapshot(gameId, after);
-      if (!snapshot.stats || !snapshot.sourceTimestamp) return snapshot;
+      let entry = gameProviders.get(gameId);
+      if (!entry) {
+        const firstSnapshot = await base.getSnapshot(gameId, after);
+        if (!firstSnapshot.stats || !firstSnapshot.sourceTimestamp) return firstSnapshot;
+        entry = createGameProviders(gameId, firstSnapshot);
+        gameProviders.set(gameId, entry);
+      }
 
-      const snapshotProvider: LolProviderClient = {
-        ...base,
-        async getSnapshot() {
-          return snapshot;
+      let snapshot: Snapshot;
+      if (entry.primary) {
+        snapshot = await entry.primary.getSnapshot(gameId, after);
+        if (inventoryCount(snapshot) === 0) {
+          entry.sourceAligned.prime(snapshot);
+          const fallbackSnapshot = await entry.sourceAligned.provider.getSnapshot(gameId, after);
+          if (inventoryCount(fallbackSnapshot) > inventoryCount(snapshot)) {
+            snapshot = fallbackSnapshot;
+          }
         }
-      };
+      } else {
+        snapshot = await entry.sourceAligned.provider.getSnapshot(gameId, after);
+      }
 
-      const inventoryProvider = createRiotCurrentPlayerProvider(snapshotProvider, {
-        ...options,
-        // Live details use the same wall-clock frontier as Riot's public web
-        // clients. Final games use the source window so history still resolves.
-        useWindowOverlay: snapshot.game.state === 'completed',
-        inventoryWaitBudgetMs:
-          options.inventoryWaitBudgetMs ?? LIVE_INVENTORY_SETTLE_BUDGET_MS
-      });
-
-      return inventoryProvider.getSnapshot(gameId, after);
+      if (snapshot.stats && snapshot.sourceTimestamp && snapshot.game.state !== entry.state) {
+        gameProviders.set(gameId, createGameProviders(gameId, snapshot));
+      }
+      return snapshot;
     }
   };
 }
@@ -77,11 +180,22 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
 
   const registry = new AdapterRegistry();
   if (apiKey) {
-    const riotProvider = createRiotLolConsistentProvider({
-      apiKey,
-      includeDetails: false,
-      useDetailItemFallback: false
-    });
+    const riotProvider = createRiotFinalityProvider(
+      createRiotScheduleReconciliationProvider(
+        createRiotDelayedLiveRecoveryProvider(
+          createRiotSupplementalLeagueProvider(
+            createRiotLolConsistentProvider({
+              apiKey,
+              includeDetails: false,
+              useDetailItemFallback: false
+            }),
+            { apiKey }
+          )
+        ),
+        { apiKey }
+      ),
+      { apiKey }
+    );
     const provider = createUsableScheduleProvider(
       createLeaguepediaHistoryFallbackProvider(
         createCompletedInventoryProvider(
@@ -90,9 +204,9 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
       )
     );
     registry.register(new CachedAdapter(new LolAdapter(provider), {
-      scheduleTtlMs: 45_000,
+      scheduleTtlMs: 15_000,
       liveSnapshotTtlMs: 400,
-      seriesContextTtlMs: 45_000
+      seriesContextTtlMs: 10_000
     }));
   }
 

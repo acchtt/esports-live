@@ -1,0 +1,337 @@
+/* Expanded desktop workspace and collapsible platform status rail. */
+body .workspace {
+  width: min(1920px, calc(100% - 24px));
+  gap: 16px;
+  padding-top: 16px;
+  transition: grid-template-columns 180ms ease;
+}
+
+body .workspace .schedule-panel {
+  max-height: calc(100vh - 104px);
+}
+
+body .workspace .schedule-list {
+  max-height: calc(100vh - 250px);
+  padding: 16px;
+}
+
+body .workspace .analysis-panel {
+  min-height: calc(100vh - 104px);
+}
+
+body .workspace .analysis-header {
+  padding-inline: 26px;
+}
+
+body .workspace .game-content {
+  padding: 20px;
+}
+
+.platform-panel-heading {
+  align-items: flex-start;
+}
+
+.platform-panel-title {
+  min-width: 0;
+}
+
+.platform-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 38px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.platform-panel-toggle:hover {
+  border-color: rgba(56, 189, 248, 0.38);
+  color: #f8fafc;
+  background: rgba(56, 189, 248, 0.07);
+}
+
+.platform-panel-toggle:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.72);
+  outline-offset: 2px;
+}
+
+.platform-panel-toggle-icon {
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.platform-panel-toggle-label {
+  color: #91a0b5;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.platform-panel-content {
+  min-width: 0;
+}
+
+.platform-panel-content[aria-hidden="true"] {
+  display: none;
+}
+
+@media (min-width: 1181px) {
+  body .workspace {
+    grid-template-columns: minmax(350px, 410px) minmax(0, 1fr) minmax(260px, 300px);
+  }
+
+  body .workspace.platform-collapsed {
+    grid-template-columns: minmax(380px, 440px) minmax(0, 1fr) 58px;
+  }
+
+  body .workspace .platform-panel {
+    display: block;
+    position: fixed;
+    top: 94px;
+    right: 0;
+    z-index: 18;
+    width: clamp(260px, 17vw, 300px);
+    min-width: 0;
+    max-height: calc(100vh - 104px);
+    overflow-y: auto;
+    border-right: 0;
+    border-radius: 20px 0 0 20px;
+    box-shadow: -22px 24px 80px rgba(0, 0, 0, 0.34);
+    transition: width 180ms ease, border-color 180ms ease, background 180ms ease;
+  }
+
+  body .workspace.platform-collapsed .platform-panel {
+    width: 58px;
+    border-color: rgba(56, 189, 248, 0.2);
+    background: rgba(8, 15, 29, 0.96);
+  }
+
+  body .workspace.platform-collapsed .platform-panel-heading {
+    display: flex;
+    min-height: 232px;
+    padding: 9px 8px;
+    border: 0;
+  }
+
+  body .workspace.platform-collapsed .platform-panel-title,
+  body .workspace.platform-collapsed .platform-panel-content {
+    display: none;
+  }
+
+  body .workspace.platform-collapsed .platform-panel-toggle {
+    flex-direction: column;
+    width: 40px;
+    min-height: 212px;
+    padding: 12px 7px;
+    border-color: rgba(56, 189, 248, 0.22);
+    background: rgba(56, 189, 248, 0.045);
+  }
+
+  body .workspace.platform-collapsed .platform-panel-toggle-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+}
+
+@media (max-width: 1180px) {
+  body .workspace,
+  body .workspace.platform-collapsed {
+    grid-template-columns: minmax(310px, 370px) minmax(0, 1fr);
+  }
+
+  body .workspace .platform-panel,
+  body .workspace.platform-collapsed .platform-panel {
+    display: block;
+    grid-column: 1 / -1;
+    position: static;
+    width: auto;
+    max-height: none;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+  }
+
+  body .workspace.platform-collapsed .platform-panel-heading {
+    min-height: 0;
+    padding: 16px 20px;
+    border-bottom: 0;
+  }
+
+  body .workspace.platform-collapsed .platform-panel-title {
+    display: block;
+  }
+
+  body .workspace.platform-collapsed .platform-panel-content {
+    display: none;
+  }
+
+  body .workspace.platform-collapsed .platform-panel-toggle {
+    flex-direction: row;
+    width: auto;
+    min-height: 36px;
+    padding: 0 10px;
+  }
+
+  body .workspace.platform-collapsed .platform-panel-toggle-label {
+    writing-mode: initial;
+    transform: none;
+  }
+}
+
+@media (max-width: 860px) {
+  body .workspace,
+  body .workspace.platform-collapsed {
+    grid-template-columns: 1fr;
+    width: min(100% - 20px, 1920px);
+  }
+
+  body .workspace .schedule-panel {
+    max-height: none;
+  }
+
+  body .workspace .schedule-list {
+    max-height: 520px;
+  }
+
+  body .workspace .analysis-panel {
+    min-height: 720px;
+  }
+}
+
+@media (max-width: 620px) {
+  body .workspace,
+  body .workspace.platform-collapsed {
+    width: min(100% - 12px, 1920px);
+    gap: 10px;
+  }
+
+  body .workspace .analysis-header {
+    padding-inline: 20px;
+  }
+
+  body .workspace .game-content {
+    padding: 12px;
+  }
+}
+
+/* Unified completed-series summary and compact game results. */
+body .completed-match-detail {
+  align-content: start;
+  grid-auto-rows: max-content;
+  gap: 0;
+}
+
+body .completed-match-detail > .completed-series-hero {
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+}
+
+body .completed-match-detail > .completed-series-hero + .completed-games-panel {
+  gap: 14px;
+  padding: 20px 22px 22px;
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 0 0 18px 18px;
+  background:
+    linear-gradient(110deg, rgba(14, 165, 233, 0.045), transparent 42%),
+    linear-gradient(250deg, rgba(244, 63, 94, 0.04), transparent 42%),
+    rgba(255, 255, 255, 0.012);
+}
+
+body .completed-match-detail .completed-game {
+  min-height: 88px;
+  gap: 10px;
+}
+
+body .completed-match-detail .completed-side {
+  display: none !important;
+}
+
+body .completed-match-detail .completed-result {
+  margin-top: 0;
+  padding-top: 10px;
+}
+
+body .completed-match-detail .completed-result > span {
+  display: none !important;
+}
+
+/* Keep the completed result card stable until final scoreboard data is ready. */
+body #completed-final-telemetry:has(> .completed-telemetry-loading) {
+  display: none;
+}
+
+/* Align completed scoreboard controls with the game-result columns above. */
+body #completed-final-telemetry {
+  margin-top: 22px;
+}
+
+body #completed-final-telemetry .completed-telemetry-heading {
+  align-items: baseline;
+  min-height: 24px;
+  padding-inline: 2px;
+}
+
+body #completed-final-telemetry .completed-telemetry-heading h3,
+body #completed-final-telemetry .completed-telemetry-heading > span {
+  line-height: 1.25;
+}
+
+body #completed-final-telemetry .completed-telemetry-heading > span {
+  text-align: right;
+}
+
+body #completed-final-telemetry .completed-game-tabs {
+  gap: 10px;
+  padding: 5px;
+}
+
+body #completed-final-telemetry .completed-game-tab {
+  align-content: center;
+  min-height: 54px;
+  padding: 9px 13px;
+}
+
+@media (min-width: 921px) {
+  body .completed-match-detail:has(.completed-games > .completed-game:nth-child(1):last-child) #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  body .completed-match-detail:has(.completed-games > .completed-game:nth-child(3):last-child) #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body .completed-match-detail:has(.completed-games > .completed-game:nth-child(5):last-child) #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  body #completed-final-telemetry .completed-game-tabs {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  body .completed-match-detail > .completed-series-hero + .completed-games-panel {
+    padding: 17px;
+  }
+
+  body #completed-final-telemetry .completed-telemetry-heading {
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  body #completed-final-telemetry .completed-telemetry-heading > span {
+    text-align: left;
+  }
+}

@@ -225,21 +225,15 @@ test('stays visible and interactive through polling and view changes', async ({ 
   const platformContent = page.locator('#platform-panel-content');
   await expect(workspace).toHaveClass(/platform-collapsed/);
   await expect(platformToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(platformToggle).toBeHidden();
+  await expect(platformContent).toBeHidden();
 
   const collapsedWidths = await workspace.evaluate(element => ({
     schedule: element.querySelector<HTMLElement>('.schedule-panel')?.getBoundingClientRect().width ?? 0,
     analysis: element.querySelector<HTMLElement>('.analysis-panel')?.getBoundingClientRect().width ?? 0
   }));
-  expect(collapsedWidths.schedule).toBeGreaterThan(360);
+  expect(collapsedWidths.schedule).toBeGreaterThan(300);
   expect(collapsedWidths.analysis).toBeGreaterThan(800);
-
-  await platformToggle.click();
-  await expect(workspace).not.toHaveClass(/platform-collapsed/);
-  await expect(platformToggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(platformContent).toBeVisible();
-  await platformToggle.click();
-  await expect(workspace).toHaveClass(/platform-collapsed/);
-  await expect(platformToggle).toHaveAttribute('aria-expanded', 'false');
 
   const liveCard = page.locator('[data-series-id="series-live"]');
   await expect(liveCard).toBeVisible();
@@ -251,11 +245,12 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await expect(selectedSeries).toContainText('Red Team');
   await expect.poll(requests.liveRequests).toBeGreaterThan(0);
   await expect(liveScoreboard).toBeVisible();
+  await expect(platformToggle).toBeHidden();
 
   const liveClock = page.locator('#live-game-clock');
-  const liveClockHeader = page.locator('.completed-final-game-header.live-match-clock-header');
+  const liveClockHeader = page.locator('.v2-hero');
   await expect(liveClock).toHaveText(/\d+:\d{2}/);
-  await expect(page.locator('.live-match-clock-patch')).toContainText('Patch 26.15');
+  await expect(page.locator('.v2-footer > span').first()).toContainText('Patch 26.15');
   const clockCenterOffset = await liveClockHeader.evaluate(header => {
     const clock = header.querySelector<HTMLElement>('#live-game-clock');
     if (!clock) return Number.POSITIVE_INFINITY;

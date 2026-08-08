@@ -1,4 +1,5 @@
-export {};
+import type { LiveSnapshot } from '@esports-live/core';
+import type { LolStats } from '@esports-live/adapter-lol';
 
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -10,6 +11,7 @@ const gameContent = requiredElement<HTMLElement>('#game-content');
 const REFRESH_TIMEOUT_MS = 12_000;
 let refreshing = false;
 let lastUpdatedAt: string | null = null;
+let latestSnapshot: LiveSnapshot<LolStats> | null = null;
 let refreshTimeout: number | null = null;
 let injectionQueued = false;
 
@@ -48,6 +50,42 @@ style.textContent = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  .player-board-toolbar-summary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(72px, 1fr));
+    min-width: 0;
+  }
+
+  .player-board-summary-cell {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .player-board-summary-cell > span {
+    color: #71829a;
+    font-size: 0.5rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .player-board-summary-values {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .player-board-summary-values b {
+    color: #7dd3fc;
+    font-size: 0.72rem;
+  }
+
+  .player-board-summary-values b:last-child { color: #fb7185; }
+  .player-board-summary-values i { color: #526178; font-size: 0.54rem; font-style: normal; }
 
   .player-board-refresh-button {
     display: inline-flex;
@@ -106,19 +144,87 @@ style.textContent = `
     }
   }
 
-  @media (max-width: 620px) {
+  @media (max-width: 900px) {
     .player-board-toolbar {
       align-items: stretch;
       flex-direction: column;
       gap: 9px;
     }
 
-    .player-board-refresh-button {
-      width: 100%;
-    }
+    .player-board-toolbar-summary { width: 100%; }
+    .player-board-refresh-button { width: 100%; }
   }
 `;
 document.head.append(style);
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function formatCompact(value: number | null): string {
+  if (value === null) return '—';
+  return Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(1)}K` : value.toLocaleString();
+}
+
+function summaryCell(label: string, blue: number | null, red: number | null): string {
+  return `
+    <span class="player-board-summary-cell">
+      <span>${escapeHtml(label)}</span>
+      <span class="player-board-summary-values">
+        <b>${escapeHtml(formatCompact(blue))}</b><i>–</i><b>${escapeHtml(formatCompact(red))}</b>
+      </span>
+    </span>`;
+}
+
+function summaryMarkup(): string {
+  const stats = latestSnapshot?.stats;
+  if (!stats) {
+    return [
+      summaryCell('Kills', null, null),
+      summaryCell('Gold', null, null),
+      summaryCell('Towers', null, null),
+      summaryCell('Dragons', null, null),
+      summaryCell('Barons', null, null)
+    ].join('');
+  }
+
+  const blueDragons = stats.blue.objectives.dragons === null
+    ? null
+    : stats.blue.objectives.dragons.length;
+  const redDragons = stats.red.objectives.dragons === null
+    ? null
+    : stats.red.objectives.dragons.length;
+
+  return [
+    summaryCell('Kills', stats.blue.kills, stats.red.kills),
+    summaryCell('Gold', stats.blue.gold, stats.red.gold),
+    summaryCell('Towers', stats.blue.objectives.towers, stats.red.objectives.towers),
+    summaryCell('Dragons', blueDragons, redDragons),
+    summaryCell('Barons', stats.blue.objectives.barons, stats.red.objectives.barons)
+  ].join('');
+}
+
+function summaryRenderKey(): string {
+  const stats = latestSnapshot?.stats;
+  if (!stats) return 'empty';
+  return JSON.stringify([
+    stats.blue.kills,
+    stats.red.kills,
+    stats.blue.gold,
+    stats.red.gold,
+    stats.blue.objectives.towers,
+    stats.red.objectives.towers,
+    stats.blue.objectives.dragons?.length ?? null,
+    stats.red.objectives.dragons?.length ?? null,
+    stats.blue.objectives.barons,
+    stats.red.objectives.barons
+  ]);
+}
 
 function clearRefreshTimeout(): void {
   if (refreshTimeout !== null) window.clearTimeout(refreshTimeout);
@@ -126,17 +232,25 @@ function clearRefreshTimeout(): void {
 }
 
 function updatedLabel(): string {
-  if (!lastUpdatedAt) return 'Refreshes the selected game immediately';
+  if (!lastUpdatedAt) return 'Live match data and player performance';
   const date = new Date(lastUpdatedAt);
   if (!Number.isFinite(date.getTime())) return 'Latest verified snapshot received';
-  return `Last updated ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+  return `Live match data · Updated ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
 }
 
 function updateControl(toolbar: HTMLElement): void {
   const detail = toolbar.querySelector<HTMLElement>('[data-player-board-refresh-detail]');
+  const summary = toolbar.querySelector<HTMLElement>('[data-player-board-summary]');
   const button = toolbar.querySelector<HTMLButtonElement>('[data-player-board-refresh]');
   const detailText = refreshing ? 'Requesting a fresh verified snapshot…' : updatedLabel();
   if (detail && detail.textContent !== detailText) detail.textContent = detailText;
+  if (summary) {
+    const renderKey = summaryRenderKey();
+    if (summary.dataset.summaryRenderKey !== renderKey) {
+      summary.dataset.summaryRenderKey = renderKey;
+      summary.innerHTML = summaryMarkup();
+    }
+  }
   if (!button) return;
 
   button.disabled = refreshing;
@@ -160,6 +274,7 @@ function installControl(): void {
         <strong>Player board</strong>
         <small data-player-board-refresh-detail></small>
       </div>
+      <div class="player-board-toolbar-summary" data-player-board-summary aria-label="Current team comparison"></div>
       <button
         type="button"
         class="player-board-refresh-button"
@@ -211,14 +326,17 @@ const observer = new MutationObserver(queueControl);
 observer.observe(gameContent, { childList: true, subtree: true });
 
 window.addEventListener('esports-live:snapshot', event => {
-  const snapshot = (event as CustomEvent<{ quality?: { sourceTimestamp?: string | null; observedAt?: string | null } }>).detail;
-  lastUpdatedAt = snapshot?.quality?.sourceTimestamp ?? snapshot?.quality?.observedAt ?? new Date().toISOString();
+  latestSnapshot = (event as CustomEvent<LiveSnapshot<LolStats>>).detail;
+  lastUpdatedAt = latestSnapshot?.quality?.sourceTimestamp
+    ?? latestSnapshot?.quality?.observedAt
+    ?? new Date().toISOString();
   finishRefresh();
 });
 
 window.addEventListener('esports-live:selection', () => {
   refreshing = false;
   lastUpdatedAt = null;
+  latestSnapshot = null;
   clearRefreshTimeout();
   queueControl();
 });

@@ -112,7 +112,7 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
   });
 }
 
-async function installRaceFixtures(page: Page) {
+async function installRaceFixtures(page: Page, contextDelayMs = 0) {
   let activeScheduleRequests = 0;
   let gameOneRequests = 0;
   let gameTwoRequests = 0;
@@ -139,9 +139,10 @@ async function installRaceFixtures(page: Page) {
     });
   });
 
-  await page.route('**/v1/lol/series/**/context**', route => (
-    fulfillJson(route, context(activeScheduleRequests >= 2))
-  ));
+  await page.route('**/v1/lol/series/**/context**', async route => {
+    if (contextDelayMs > 0) await new Promise(resolve => setTimeout(resolve, contextDelayMs));
+    await fulfillJson(route, context(activeScheduleRequests >= 2));
+  });
 
   await page.route('**/v1/lol/games/**/live**', async route => {
     const match = new URL(route.request().url()).pathname.match(/\/games\/([^/]+)\/live$/);
@@ -179,4 +180,14 @@ test('continues polling the newly selected live game after an older request fini
 
   await expect.poll(requests.gameTwoRequests).toBeGreaterThan(0);
   await expect(page.locator('[data-live-history-game-id="game-live-2"]')).toBeVisible();
+});
+
+test('slow series context resolves without exposing the startup prefetch timeout', async ({ page }) => {
+  await installRaceFixtures(page, 900);
+  await page.goto('/');
+
+  await page.locator('[data-series-id="series-live"]').click();
+  await expect(page.locator('[data-live-history-game-id="game-live-1"]')).toBeVisible();
+  await expect(page.locator('#series-history')).toContainText('Game results', { timeout: 5_000 });
+  await expect(page.getByText('Series context enrichment is still loading.')).toHaveCount(0);
 });

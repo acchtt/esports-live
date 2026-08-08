@@ -1,0 +1,153 @@
+.live-dashboard-v2 .v2-summary-row,
+.live-dashboard-v2 .v2-summary-row.gold-lead-removed {
+  grid-template-columns: minmax(250px, 0.3fr) minmax(0, 1fr) !important;
+  gap: 10px;
+}
+
+.live-dashboard-v2 .v2-gold-card {
+  min-height: 82px !important;
+  padding: 12px 16px !important;
+}
+
+.live-dashboard-v2 .v2-gold-card::before {
+  top: 12px;
+  bottom: 12px;
+}
+
+.live-dashboard-v2 .v2-gold-card > strong {
+  font-size: clamp(17px, 1.15vw, 21px) !important;
+}
+
+.live-dashboard-v2 .v2-objectives-card {
+  min-height: 82px !important;
+}
+
+.live-dashboard-v2 .v2-player-role,
+.live-dashboard-v2 .v2-lane-icon {
+  display: none !important;
+}
+
+.live-dashboard-v2 .v2-matchup-row {
+  grid-template-columns: minmax(0, 1fr) 94px minmax(0, 1fr) !important;
+  min-height: 64px;
+}
+
+.live-dashboard-v2 .v2-player {
+  grid-template-columns: 44px minmax(120px, 1fr) repeat(3, minmax(62px, auto)) !important;
+  grid-template-areas: 'champion copy kda cs gold';
+  gap: 10px;
+  padding: 7px 14px;
+}
+
+.live-dashboard-v2 .v2-player.red {
+  grid-template-columns: repeat(3, minmax(62px, auto)) minmax(120px, 1fr) 44px !important;
+  grid-template-areas: 'gold cs kda copy champion';
+  text-align: right;
+}
+
+.live-dashboard-v2 .v2-champion {
+  grid-area: champion !important;
+}
+
+.live-dashboard-v2 .v2-player-copy {
+  grid-area: copy !important;
+}
+
+.live-dashboard-v2 .v2-player-stat.kda {
+  grid-area: kda !important;
+}
+
+.live-dashboard-v2 .v2-player-stat.cs {
+  grid-area: cs !important;
+}
+
+.live-dashboard-v2 .v2-player-stat.gold {
+  grid-area: gold !important;
+}
+
+.live-dashboard-v2 .v2-role-gold {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  min-width: 0;
+  border-right: 1px solid rgba(112, 151, 196, 0.09);
+  border-left: 1px solid rgba(112, 151, 196, 0.09);
+  background: rgba(3, 12, 22, 0.2);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.live-dashboard-v2 .v2-role-gold small {
+  color: #71839a;
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.live-dashboard-v2 .v2-role-gold strong {
+  min-width: 58px;
+  padding: 5px 7px;
+  border: 1px solid rgba(112, 151, 196, 0.13);
+  border-radius: 7px;
+  color: #aebccd;
+  background: rgba(4, 15, 27, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.live-dashboard-v2 .v2-role-gold.blue strong {
+  border-color: rgba(58, 168, 255, 0.22);
+  color: #78c5ff;
+  background: rgba(27, 101, 158, 0.12);
+}
+
+.live-dashboard-v2 .v2-role-gold.red strong {
+  border-color: rgba(255, 73, 100, 0.22);
+  color: #ff6d83;
+  background: rgba(151, 31, 55, 0.12);
+}
+
+.live-dashboard-v2 .v2-role-gold.neutral strong {
+  color: #8f9db2;
+}
+
+@media (max-width: 1180px) {
+  .live-dashboard-v2 .v2-summary-row,
+  .live-dashboard-v2 .v2-summary-row.gold-lead-removed {
+    grid-template-columns: minmax(225px, 0.29fr) minmax(0, 1fr) !important;
+  }
+
+  .live-dashboard-v2 .v2-matchup-row {
+    grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr) !important;
+  }
+
+  .live-dashboard-v2 .v2-player {
+    grid-template-columns: 40px minmax(92px, 1fr) repeat(3, minmax(48px, auto)) !important;
+    gap: 7px;
+  }
+
+  .live-dashboard-v2 .v2-player.red {
+    grid-template-columns: repeat(3, minmax(48px, auto)) minmax(92px, 1fr) 40px !important;
+  }
+
+  .live-dashboard-v2 .v2-role-gold strong {
+    min-width: 52px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 900px) {
+  .live-dashboard-v2 .v2-summary-row,
+  .live-dashboard-v2 .v2-summary-row.gold-lead-removed {
+    grid-template-columns: 1fr !important;
+  }
+
+  .live-dashboard-v2 .v2-gold-card,
+  .live-dashboard-v2 .v2-objectives-card {
+    min-height: 78px !important;
+  }
+}

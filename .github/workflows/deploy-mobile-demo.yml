@@ -49,7 +49,7 @@ jobs:
             fs.writeFileSync("/tmp/mobile-preview-status.json", JSON.stringify({
               state: "pending",
               context: "esports-live/mobile-preview",
-              description: "Mobile application validation is running",
+              description: "ARENA V2 mobile validation is running",
               target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
             }));
           '
@@ -86,10 +86,10 @@ jobs:
       - name: Validate shared application code
         run: npm run check
 
-      - name: Validate mobile application layout
+      - name: Validate legacy mobile application layout
         run: npm run test:web-mobile
 
-      - name: Validate rebuilt web v2 shell
+      - name: Validate ARENA V2 shell
         run: npm run test:web-v2
 
       - name: Enable Worker preview URLs
@@ -102,7 +102,7 @@ jobs:
           output="$(npx wrangler versions upload \
             --preview-alias mobile-demo \
             --keep-vars \
-            --message "Mobile application $MOBILE_DEMO_COMMIT_SHA" 2>&1)"
+            --message "ARENA V2 mobile $MOBILE_DEMO_COMMIT_SHA" 2>&1)"
           echo "$output"
           url="$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' <<<"$output" | tail -n 1)"
           test -n "$url" || { echo "Wrangler did not return a Worker preview URL."; exit 1; }
@@ -138,76 +138,71 @@ jobs:
           echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
 
-      - name: Build current and rebuilt mobile applications
+      - name: Build legacy mobile and ARENA V2
         shell: bash
         run: |
           npm run build:web-mobile
           npm run build:web-v2
-          rm -rf apps/web-mobile/dist/v2
-          mkdir -p apps/web-mobile/dist/v2
-          cp -R apps/web-v2/dist/. apps/web-mobile/dist/v2/
+          mkdir -p apps/web-v2/dist/v2
+          cp apps/web-v2/dist/index.html apps/web-v2/dist/v2/index.html
         env:
           VITE_API_BASE_URL: ${{ steps.api-preview.outputs.url }}
 
-      - name: Confirm mobile API and build metadata are embedded
+      - name: Confirm API and build metadata are embedded
         env:
           API_BASE_URL: ${{ steps.api-preview.outputs.url }}
         shell: bash
         run: |
           grep -R "$API_BASE_URL" apps/web-mobile/dist/assets
-          grep -R "$API_BASE_URL" apps/web-mobile/dist/v2/assets
+          grep -R "$API_BASE_URL" apps/web-v2/dist/assets
           grep -q "$VITE_BUILD_SHA_SHORT" apps/web-mobile/dist/index.html
-          grep -q "$MOBILE_DEMO_COMMIT_SHA" apps/web-mobile/dist/v2/index.html
-          grep -q '<title>ARENA</title>' apps/web-mobile/dist/v2/index.html
+          grep -q "$MOBILE_DEMO_COMMIT_SHA" apps/web-v2/dist/index.html
+          grep -q '<title>ARENA</title>' apps/web-v2/dist/index.html
+          grep -q '<title>ARENA</title>' apps/web-v2/dist/v2/index.html
           grep -R "DEMO v$MOBILE_DEMO_VERSION" apps/web-mobile/dist/assets
 
-      - name: Deploy isolated mobile Pages application
+      - name: Deploy ARENA V2 as mobile root
         id: pages-deploy
         shell: bash
         run: |
-          output="$(npx wrangler pages deploy apps/web-mobile/dist \
+          output="$(npx wrangler pages deploy apps/web-v2/dist \
             --project-name esports-live \
             --branch mobile-demo \
             --commit-hash "$MOBILE_DEMO_COMMIT_SHA" \
-            --commit-message "Mobile application $MOBILE_DEMO_COMMIT_SHA" 2>&1)"
+            --commit-message "ARENA V2 mobile root $MOBILE_DEMO_COMMIT_SHA" 2>&1)"
           echo "$output"
           url="$(grep -Eo 'https://[a-z0-9]+\.esports-live\.pages\.dev' <<<"$output" | head -n 1)"
           test -n "$url" || { echo "Wrangler did not return an immutable Pages deployment URL."; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      - name: Verify current and rebuilt mobile applications
+      - name: Verify ARENA V2 root and compatibility alias
         env:
           PAGES_DEPLOYMENT_URL: ${{ steps.pages-deploy.outputs.url }}
         shell: bash
         run: |
-          current_url="$PAGES_DEPLOYMENT_URL/?commit=$MOBILE_DEMO_COMMIT_SHA"
-          v2_url="$PAGES_DEPLOYMENT_URL/v2/?commit=$MOBILE_DEMO_COMMIT_SHA"
+          root_url="$PAGES_DEPLOYMENT_URL/?commit=$MOBILE_DEMO_COMMIT_SHA"
+          alias_url="$PAGES_DEPLOYMENT_URL/v2/?commit=$MOBILE_DEMO_COMMIT_SHA"
           for attempt in {1..12}; do
-            html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$current_url" || true)"
+            html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$root_url" || true)"
             asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$html" | head -n 1 | cut -d'"' -f2)"
             if [[ "$asset" == /* ]]; then asset="$PAGES_DEPLOYMENT_URL$asset"; fi
             script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$asset" || true)"
 
-            v2_html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$v2_url" || true)"
-            v2_asset="$(grep -Eo 'src="[^"]+assets/[^"]+\.js"' <<<"$v2_html" | head -n 1 | cut -d'"' -f2)"
-            if [[ "$v2_asset" == /* ]]; then v2_asset="$PAGES_DEPLOYMENT_URL$v2_asset"; fi
-            v2_script="$(curl -fsSL --connect-timeout 10 --max-time 30 "$v2_asset" || true)"
+            alias_html="$(curl -fsSL --connect-timeout 10 --max-time 30 "$alias_url" || true)"
 
-            if grep -q '<title>Esports Live</title>' <<<"$html" \
-              && grep -q 'class="app-frame"' <<<"$html" \
-              && grep -q "$VITE_BUILD_SHA_SHORT" <<<"$html" \
-              && grep -q "DEMO v$MOBILE_DEMO_VERSION" <<<"$script" \
-              && grep -q '<title>ARENA</title>' <<<"$v2_html" \
-              && grep -q "$MOBILE_DEMO_COMMIT_SHA" <<<"$v2_html" \
-              && grep -q 'data-component="scoreboard"' <<<"$v2_script"; then
-              echo "Current mobile application is available at $current_url"
-              echo "Rebuilt mobile application is available at $v2_url"
+            if grep -q '<title>ARENA</title>' <<<"$html" \
+              && grep -q "$MOBILE_DEMO_COMMIT_SHA" <<<"$html" \
+              && grep -q 'data-component="scoreboard"' <<<"$script" \
+              && grep -q '<title>ARENA</title>' <<<"$alias_html" \
+              && grep -q "$MOBILE_DEMO_COMMIT_SHA" <<<"$alias_html"; then
+              echo "ARENA V2 mobile root is available at $root_url"
+              echo "Compatibility alias is available at $alias_url"
               exit 0
             fi
-            echo "Mobile applications not ready (attempt $attempt/12)."
+            echo "ARENA V2 mobile root not ready (attempt $attempt/12)."
             sleep 5
           done
-          echo "Mobile application verification failed for build $VITE_BUILD_SHA_SHORT."
+          echo "ARENA V2 mobile root verification failed for build $VITE_BUILD_SHA_SHORT."
           exit 1
 
       - name: Publish mobile application status
@@ -219,10 +214,10 @@ jobs:
         run: |
           if [[ "$DEPLOY_JOB_STATUS" == "success" ]]; then
             state="success"
-            description="Mobile applications deployed and verified"
+            description="ARENA V2 deployed as mobile root"
           else
             state="failure"
-            description="Mobile application deployment failed"
+            description="ARENA V2 mobile root deployment failed"
           fi
           STATE="$state" DESCRIPTION="$description" node -e '
             const fs = require("node:fs");

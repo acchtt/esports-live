@@ -108,7 +108,7 @@ test('ARENA V2 renders Riot Void Grubs counts without overflowing mobile', async
   const icon = await card.locator('> span').evaluate(element => (
     getComputedStyle(element, '::before').backgroundImage
   ));
-  expect(icon).toContain('grubs');
+  expect(icon).toContain('Void%20Grub%20objective');
 
   const viewport = await page.evaluate(() => ({
     width: window.innerWidth,

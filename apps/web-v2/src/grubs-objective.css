@@ -6,3 +6,13 @@
   background-image: url('./objective-icons/grubs.svg');
   filter: drop-shadow(0 0 7px rgba(192, 132, 252, 0.24));
 }
+
+.objective-grid article[data-objective="grubs"] strong > em {
+  grid-column: 1 / -1;
+  color: #a78bfa;
+  font-size: clamp(0.7rem, 2.4vw, 0.92rem);
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}

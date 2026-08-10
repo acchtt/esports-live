@@ -4,20 +4,25 @@ import { readSnapshotCache, SNAPSHOT_UPDATED_EVENT } from './snapshot-cache.ts';
 
 type Side = 'blue' | 'red';
 
-interface GrubCounts {
+interface GrubState {
   blue: number | null;
   red: number | null;
+  gameState: string;
 }
+
+const LIVE_UNAVAILABLE_COPY = 'LIVE N/A';
+const LIVE_UNAVAILABLE_EXPLANATION = 'Riot live telemetry does not provide Void Grub counts.';
 
 function normalizedCount(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function countsFromSnapshot(snapshot: LiveSnapshot<LolStats>): GrubCounts | null {
+function stateFromSnapshot(snapshot: LiveSnapshot<LolStats>): GrubState | null {
   if (!snapshot.stats) return null;
   return {
     blue: normalizedCount(snapshot.stats.blue.objectives.grubs),
-    red: normalizedCount(snapshot.stats.red.objectives.grubs)
+    red: normalizedCount(snapshot.stats.red.objectives.grubs),
+    gameState: snapshot.game.state
   };
 }
 
@@ -44,7 +49,11 @@ function ensureCard(root: ParentNode): HTMLElement | null {
   const scores = document.createElement('strong');
   const separator = document.createElement('i');
   separator.textContent = '−';
-  scores.append(createScore('blue'), separator, createScore('red'));
+  const unavailable = document.createElement('em');
+  unavailable.dataset.grubsLiveUnavailable = 'true';
+  unavailable.textContent = LIVE_UNAVAILABLE_COPY;
+  unavailable.hidden = true;
+  scores.append(createScore('blue'), separator, createScore('red'), unavailable);
   card.append(label, scores);
 
   const barons = grid.querySelector('[data-objective="barons"]');
@@ -59,29 +68,55 @@ function setScore(card: ParentNode, side: Side, value: number | null): void {
   if (score.textContent !== next) score.textContent = next;
 }
 
+function isLiveUnavailable(state: GrubState | undefined): boolean {
+  if (!state || state.blue !== null || state.red !== null) return false;
+  return state.gameState === 'live' || state.gameState === 'paused';
+}
+
+function setLiveUnavailable(card: HTMLElement, unavailable: boolean): void {
+  if (card.dataset.availability === (unavailable ? 'live-unavailable' : 'scores')) return;
+  card.dataset.availability = unavailable ? 'live-unavailable' : 'scores';
+  card.querySelectorAll<HTMLElement>('strong > b, strong > i').forEach(element => {
+    element.hidden = unavailable;
+  });
+  const message = card.querySelector<HTMLElement>('[data-grubs-live-unavailable]');
+  if (message) message.hidden = !unavailable;
+  if (unavailable) {
+    card.title = LIVE_UNAVAILABLE_EXPLANATION;
+    card.setAttribute('aria-label', `Grubs: ${LIVE_UNAVAILABLE_COPY}. ${LIVE_UNAVAILABLE_EXPLANATION}`);
+  } else {
+    card.removeAttribute('title');
+    card.removeAttribute('aria-label');
+  }
+}
+
 export function installGrubsObjective(root: HTMLElement): () => void {
-  const values = new Map<string, GrubCounts>();
+  const values = new Map<string, GrubState>();
   let syncQueued = false;
 
   const remember = (snapshot: LiveSnapshot<LolStats>): void => {
-    const counts = countsFromSnapshot(snapshot);
-    if (counts) values.set(snapshot.game.id, counts);
+    const state = stateFromSnapshot(snapshot);
+    if (state) values.set(snapshot.game.id, state);
   };
 
   const sync = (): void => {
     const card = ensureCard(root);
     if (!card) return;
     const gameId = root.querySelector<HTMLElement>('#scoreboard')?.dataset.gameId ?? '';
-    let counts = gameId ? values.get(gameId) : undefined;
-    if (!counts && gameId) {
+    let state = gameId ? values.get(gameId) : undefined;
+    if (!state && gameId) {
       const cached = readSnapshotCache(gameId);
       if (cached) {
         remember(cached);
-        counts = values.get(gameId);
+        state = values.get(gameId);
       }
     }
-    setScore(card, 'blue', counts?.blue ?? null);
-    setScore(card, 'red', counts?.red ?? null);
+    const unavailable = isLiveUnavailable(state);
+    setLiveUnavailable(card, unavailable);
+    if (!unavailable) {
+      setScore(card, 'blue', state?.blue ?? null);
+      setScore(card, 'red', state?.red ?? null);
+    }
   };
 
   const queueSync = (): void => {

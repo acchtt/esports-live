@@ -197,8 +197,9 @@ function decorateChampionLevel(row: HTMLElement, side: PlayerSide, player: Playe
   }
 
   const badge = existing ?? document.createElement('b');
+  const text = String(level);
   badge.className = 'champion-level';
-  badge.textContent = String(level);
+  if (badge.textContent !== text) badge.textContent = text;
   badge.setAttribute('aria-label', `Level ${level}`);
   if (!existing) portrait.append(badge);
 }

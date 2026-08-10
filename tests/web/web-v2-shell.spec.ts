@@ -451,7 +451,7 @@ test('web v2 mobile match detail keeps the reference board within the viewport',
 
   await expect(page.locator('#scoreboard')).toBeVisible();
   await expect(page.locator('.scoreboard-header')).toContainText('Game 2 · Live');
-  await expect(page.locator('.objective-grid article')).toHaveCount(4);
+  await expect(page.locator('.objective-grid article')).toHaveCount(5);
   await expect(page.locator('.player-row')).toHaveCount(5);
   await expect(navigation.getByRole('button', { name: 'Match', exact: true })).toHaveClass(/active/);
 

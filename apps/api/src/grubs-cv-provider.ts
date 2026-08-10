@@ -15,14 +15,14 @@ export interface GrubsCvProviderOptions {
 }
 
 interface GrubsCvPayload {
-  schemaVersion?: string;
-  gameId?: string;
-  blue?: number;
-  red?: number;
-  confidence?: number;
-  observedAt?: string;
-  source?: string;
-  mode?: GrubsCvMode;
+  schemaVersion?: string | undefined;
+  gameId?: string | undefined;
+  blue?: number | undefined;
+  red?: number | undefined;
+  confidence?: number | undefined;
+  observedAt?: string | undefined;
+  source?: string | undefined;
+  mode?: GrubsCvMode | undefined;
 }
 
 interface CachedCvResult {

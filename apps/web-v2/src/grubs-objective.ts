@@ -54,7 +54,9 @@ function ensureCard(root: ParentNode): HTMLElement | null {
 
 function setScore(card: ParentNode, side: Side, value: number | null): void {
   const score = card.querySelector<HTMLElement>(`[data-side="${side}"]`);
-  if (score) score.textContent = value === null ? '—' : value.toLocaleString();
+  if (!score) return;
+  const next = value === null ? '—' : value.toLocaleString();
+  if (score.textContent !== next) score.textContent = next;
 }
 
 export function installGrubsObjective(root: HTMLElement): () => void {

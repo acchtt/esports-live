@@ -155,16 +155,29 @@ test('V2 mobile statboard matches the compact legacy density and clears the nav'
   ))).toBe(true);
   expect(portraitState[0]?.source).toContain('/Ornn.png');
 
+  const levels = page.locator('.champion-level');
+  await expect(levels).toHaveCount(10);
+  await expect(levels.first()).toHaveText('16');
+  await expect(levels.first()).toHaveAttribute('aria-label', 'Level 16');
+
   const teamBanner = await page.locator('.team-banner').boundingBox();
   const objectiveCard = await page.locator('.objective-grid article').first().boundingBox();
   const firstRow = await rows.first().boundingBox();
   const portrait = await page.locator('.champion-portrait').first().boundingBox();
+  const levelBadge = await levels.first().boundingBox();
   expect(teamBanner?.height).toBeLessThanOrEqual(86);
   // The custom ARENA objective icons intentionally add a few pixels over the
   // pre-icon card. Keep the accepted compact treatment bounded below 74px.
   expect(objectiveCard?.height).toBeLessThanOrEqual(74);
   expect(firstRow?.height).toBeLessThanOrEqual(78);
   expect(portrait?.height).toBeLessThanOrEqual(42);
+  expect(levelBadge).not.toBeNull();
+  expect((levelBadge?.x ?? 0)).toBeGreaterThanOrEqual(portrait?.x ?? 0);
+  expect((levelBadge?.y ?? 0)).toBeGreaterThanOrEqual(portrait?.y ?? 0);
+  expect((levelBadge?.x ?? 0) + (levelBadge?.width ?? 0))
+    .toBeLessThanOrEqual((portrait?.x ?? 0) + (portrait?.width ?? 0));
+  expect((levelBadge?.y ?? 0) + (levelBadge?.height ?? 0))
+    .toBeLessThanOrEqual((portrait?.y ?? 0) + (portrait?.height ?? 0));
 
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.waitForTimeout(50);

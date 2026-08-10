@@ -6,6 +6,7 @@ interface PlayerTelemetry {
   handle?: string | null;
   championId?: string | null;
   role?: string | null;
+  level?: number | null;
   kills?: number | null;
   deaths?: number | null;
   assists?: number | null;
@@ -178,6 +179,30 @@ function ensureChampionLine(copy: HTMLElement): HTMLElement {
   return line;
 }
 
+function normalizedLevel(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.trunc(value)
+    : null;
+}
+
+function decorateChampionLevel(row: HTMLElement, side: PlayerSide, player: PlayerTelemetry | null): void {
+  const portrait = row.querySelector<HTMLElement>(`.${side}-player .champion-portrait`);
+  if (!portrait) return;
+
+  const level = normalizedLevel(player?.level);
+  const existing = portrait.querySelector<HTMLElement>('.champion-level');
+  if (level === null) {
+    existing?.remove();
+    return;
+  }
+
+  const badge = existing ?? document.createElement('b');
+  badge.className = 'champion-level';
+  badge.textContent = String(level);
+  badge.setAttribute('aria-label', `Level ${level}`);
+  if (!existing) portrait.append(badge);
+}
+
 function decorateSide(row: HTMLElement, side: PlayerSide, player: PlayerTelemetry | null): void {
   const copy = row.querySelector<HTMLElement>(`.${side}-player .player-copy`);
   if (!copy) return;
@@ -192,6 +217,7 @@ function decorateSide(row: HTMLElement, side: PlayerSide, player: PlayerTelemetr
   const champion = ensureChampionLine(copy);
   const championName = championDisplayName(player?.championId);
   if (champion.textContent !== championName) champion.textContent = championName;
+  decorateChampionLevel(row, side, player);
 }
 
 export function installPlayerBoardCopy(root: HTMLElement): () => void {

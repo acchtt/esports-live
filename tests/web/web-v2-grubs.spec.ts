@@ -125,6 +125,11 @@ test('ARENA V2 renders supplied Void Grubs counts without overflowing mobile', a
   await expect(card.locator('[data-grubs-live-unavailable]')).toHaveCount(0);
   await expect(page.locator('.objective-grid article')).toHaveCount(5);
 
+  const gridColumns = await page.locator('.objective-grid').evaluate(element => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean)
+  ));
+  expect(gridColumns).toHaveLength(5);
+
   const icon = await card.locator('> span').evaluate(element => (
     getComputedStyle(element, '::before').backgroundImage
   ));
@@ -143,6 +148,19 @@ test('ARENA V2 removes the Grubs placeholder when live counts are unavailable', 
   await expect(page.locator('[data-objective="grubs"]')).toHaveCount(0);
   await expect(page.getByText('LIVE N/A', { exact: true })).toHaveCount(0);
   await expect(page.locator('.objective-grid article')).toHaveCount(4);
+
+  const grid = page.locator('.objective-grid');
+  const gridColumns = await grid.evaluate(element => (
+    getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean)
+  ));
+  expect(gridColumns).toHaveLength(4);
+
+  const gridBox = await grid.boundingBox();
+  const lastCardBox = await page.locator('.objective-grid article').last().boundingBox();
+  expect(gridBox).not.toBeNull();
+  expect(lastCardBox).not.toBeNull();
+  expect((gridBox?.x ?? 0) + (gridBox?.width ?? 0) - ((lastCardBox?.x ?? 0) + (lastCardBox?.width ?? 0)))
+    .toBeLessThanOrEqual(10);
 
   const viewport = await page.evaluate(() => ({
     width: window.innerWidth,

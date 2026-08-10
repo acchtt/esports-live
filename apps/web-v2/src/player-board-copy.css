@@ -17,6 +17,27 @@
   text-align: right;
 }
 
+.champion-portrait .champion-level {
+  position: absolute;
+  z-index: 2;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0 4px;
+  border: 1px solid rgba(148, 209, 240, 0.68);
+  border-radius: 7px;
+  color: #f4fbff;
+  background: rgba(3, 12, 22, 0.92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 950;
+  line-height: 1;
+}
+
 @media (max-width: 760px) {
   .player-copy {
     gap: 3px;
@@ -29,5 +50,15 @@
   .player-copy .player-champion {
     font-size: 0.54rem;
     line-height: 1;
+  }
+
+  .champion-portrait .champion-level {
+    right: 2px;
+    bottom: 2px;
+    min-width: 17px;
+    height: 17px;
+    padding-inline: 3px;
+    border-radius: 5px;
+    font-size: 0.5rem;
   }
 }

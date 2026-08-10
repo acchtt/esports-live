@@ -1,4 +1,4 @@
-.objective-grid {
+.objective-grid:has(> article[data-objective="grubs"]) {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 

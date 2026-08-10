@@ -4,15 +4,15 @@ export class GrubsCvContainer extends Container {
   defaultPort = 8080;
   sleepAfter = '10m';
 
-  override onStart() {
+  onStart() {
     console.log('[grubs-cv] container started');
   }
 
-  override onStop() {
+  onStop() {
     console.log('[grubs-cv] container stopped');
   }
 
-  override onError(error) {
+  onError(error) {
     console.error('[grubs-cv] container error', error);
   }
 }

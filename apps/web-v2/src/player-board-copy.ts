@@ -172,9 +172,23 @@ function isSnapshotRequest(input: RequestInfo | URL): boolean {
 
 function ensureChampionLine(copy: HTMLElement): HTMLElement {
   const existing = copy.querySelector<HTMLElement>('.player-champion');
-  if (existing) return existing;
+  if (existing) {
+    if (!existing.querySelector('.player-champion-name')) {
+      const currentName = existing.textContent?.trim() ?? '';
+      existing.textContent = '';
+      const name = document.createElement('span');
+      name.className = 'player-champion-name';
+      name.textContent = currentName;
+      existing.append(name);
+    }
+    return existing;
+  }
+
   const line = document.createElement('small');
   line.className = 'player-champion';
+  const name = document.createElement('span');
+  name.className = 'player-champion-name';
+  line.append(name);
   copy.append(line);
   return line;
 }
@@ -185,23 +199,21 @@ function normalizedLevel(value: number | null | undefined): number | null {
     : null;
 }
 
-function decorateChampionLevel(row: HTMLElement, side: PlayerSide, player: PlayerTelemetry | null): void {
-  const portrait = row.querySelector<HTMLElement>(`.${side}-player .champion-portrait`);
-  if (!portrait) return;
-
+function decorateChampionLevel(champion: HTMLElement, player: PlayerTelemetry | null): void {
   const level = normalizedLevel(player?.level);
-  const existing = portrait.querySelector<HTMLElement>('.champion-level');
+  const existing = champion.querySelector<HTMLElement>('.champion-level');
   if (level === null) {
     existing?.remove();
     return;
   }
 
   const badge = existing ?? document.createElement('b');
-  const text = String(level);
+  const text = `Lv ${level}`;
+  const label = `Level ${level}`;
   badge.className = 'champion-level';
   if (badge.textContent !== text) badge.textContent = text;
-  badge.setAttribute('aria-label', `Level ${level}`);
-  if (!existing) portrait.append(badge);
+  if (badge.getAttribute('aria-label') !== label) badge.setAttribute('aria-label', label);
+  if (!existing) champion.append(badge);
 }
 
 function decorateSide(row: HTMLElement, side: PlayerSide, player: PlayerTelemetry | null): void {
@@ -217,8 +229,11 @@ function decorateSide(row: HTMLElement, side: PlayerSide, player: PlayerTelemetr
 
   const champion = ensureChampionLine(copy);
   const championName = championDisplayName(player?.championId);
-  if (champion.textContent !== championName) champion.textContent = championName;
-  decorateChampionLevel(row, side, player);
+  const championNameElement = champion.querySelector<HTMLElement>('.player-champion-name');
+  if (championNameElement && championNameElement.textContent !== championName) {
+    championNameElement.textContent = championName;
+  }
+  decorateChampionLevel(champion, player);
 }
 
 export function installPlayerBoardCopy(root: HTMLElement): () => void {

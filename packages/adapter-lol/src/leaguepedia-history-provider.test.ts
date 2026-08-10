@@ -4,7 +4,8 @@ import type { SeriesHistoryRef, TeamRef } from '@esports-live/core';
 import type {
   LolProviderClient,
   LolProviderScheduleEntry,
-  LolProviderSeriesContext
+  LolProviderSeriesContext,
+  LolProviderSnapshot
 } from './provider.ts';
 import { createLeaguepediaHistoryFallbackProvider } from './leaguepedia-history-provider.ts';
 
@@ -63,15 +64,63 @@ function context(value: SeriesHistoryRef): LolProviderSeriesContext {
   };
 }
 
-function baseProvider(value: SeriesHistoryRef): LolProviderClient {
+function baseProvider(value: SeriesHistoryRef, snapshot?: LolProviderSnapshot): LolProviderClient {
   return {
     id: 'riot',
     name: 'Riot Games',
     getSchedule: async () => [schedule],
     getSnapshot: async () => {
+      if (snapshot) return snapshot;
       throw new Error('Snapshot not used in this test.');
     },
     getSeriesContext: async () => context(value)
+  };
+}
+
+function completedSnapshot(): LolProviderSnapshot {
+  return {
+    series: schedule.series,
+    game: schedule.series.games[1]!,
+    sourceTimestamp: '2026-08-01T16:49:11.000Z',
+    observedAt,
+    advancing: false,
+    complete: true,
+    stats: {
+      gameClockSeconds: 2_951,
+      patch: '26.15',
+      blue: {
+        id: right.id,
+        name: right.name,
+        side: 'blue',
+        gold: 61_000,
+        kills: 13,
+        objectives: {
+          towers: 8,
+          inhibitors: 1,
+          dragons: ['infernal', 'cloud', 'mountain', 'hextech'],
+          barons: 1,
+          heralds: 0,
+          grubs: null
+        },
+        players: []
+      },
+      red: {
+        id: left.id,
+        name: left.name,
+        side: 'red',
+        gold: 57_000,
+        kills: 7,
+        objectives: {
+          towers: 1,
+          inhibitors: 0,
+          dragons: ['ocean'],
+          barons: 0,
+          heralds: 1,
+          grubs: null
+        },
+        players: []
+      }
+    }
   };
 }
 
@@ -123,6 +172,47 @@ test('supplements ambiguous completed-game winners and durations from Leaguepedi
   assert.deepEqual(result.history?.games.map(game => game.winner?.id ?? null), ['left', 'right', null]);
   assert.deepEqual(result.history?.games.map(game => game.durationSeconds), [2_527, 2_951, null]);
   assert.ok(result.reasons?.some(reason => reason.code === 'history_supplemented'));
+});
+
+test('supplements completed-game Void Grubs from Leaguepedia by team identity', async () => {
+  let requests = 0;
+  const provider = createLeaguepediaHistoryFallbackProvider(
+    baseProvider(history([left, right, null], [2_527, 2_951, null]), completedSnapshot()),
+    {
+      now: () => new Date(observedAt),
+      fetcher: async input => {
+        requests += 1;
+        const url = new URL(String(input));
+        const fields = url.searchParams.get('fields') ?? '';
+        assert.match(fields, /SG\.Team1VoidGrubs=Team1VoidGrubs/);
+        assert.match(fields, /SG\.Team2VoidGrubs=Team2VoidGrubs/);
+        return Response.json({
+          cargoquery: [{
+            title: {
+              MatchId: 'lec-week-2-match-1',
+              Team1: 'GIANTX',
+              Team2: 'SK Gaming',
+              WinTeam: 'SK Gaming',
+              Winner: '2',
+              Gamelength: '49:11',
+              N_GameInMatch: '2',
+              DateTime_UTC: '2026-08-01 16:50:00',
+              Team1VoidGrubs: '2',
+              Team2VoidGrubs: '4'
+            }
+          }]
+        });
+      }
+    }
+  );
+
+  const result = await provider.getSnapshot('game-2');
+
+  assert.equal(requests, 1);
+  assert.equal(result.stats?.blue.id, right.id);
+  assert.equal(result.stats?.red.id, left.id);
+  assert.equal(result.stats?.blue.objectives.grubs, 4);
+  assert.equal(result.stats?.red.objectives.grubs, 2);
 });
 
 test('does not request fallback data when completed games already have results', async () => {

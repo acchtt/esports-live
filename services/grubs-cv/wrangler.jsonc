@@ -1,0 +1,33 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "esports-live-grubs-cv-mobile-demo",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-10",
+  "workers_dev": true,
+  "preview_urls": true,
+  "observability": {
+    "enabled": true
+  },
+  "containers": [
+    {
+      "class_name": "GrubsCvContainer",
+      "image": "./Dockerfile",
+      "max_instances": 1,
+      "name": "esports-live-grubs-cv-mobile-demo"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "GrubsCvContainer",
+        "name": "GRUBS_CV_CONTAINER"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["GrubsCvContainer"]
+    }
+  ]
+}

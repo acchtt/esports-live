@@ -171,25 +171,30 @@ function isSnapshotRequest(input: RequestInfo | URL): boolean {
 }
 
 function ensureChampionLine(copy: HTMLElement): HTMLElement {
-  const existing = copy.querySelector<HTMLElement>('.player-champion');
-  if (existing) {
-    if (!existing.querySelector('.player-champion-name')) {
-      const currentName = existing.textContent?.trim() ?? '';
-      existing.textContent = '';
-      const name = document.createElement('span');
-      name.className = 'player-champion-name';
-      name.textContent = currentName;
-      existing.append(name);
+  let meta = copy.querySelector<HTMLElement>('.player-champion-meta');
+  let line = copy.querySelector<HTMLElement>('.player-champion');
+
+  if (!meta) {
+    meta = document.createElement('div');
+    meta.className = 'player-champion-meta';
+    if (line) {
+      const name = line.querySelector<HTMLElement>('.player-champion-name')?.textContent
+        ?? line.textContent
+        ?? '';
+      line.textContent = name.trim();
+      meta.append(line);
+    } else {
+      line = document.createElement('small');
+      line.className = 'player-champion';
+      meta.append(line);
     }
-    return existing;
+    copy.append(meta);
+  } else if (!line) {
+    line = document.createElement('small');
+    line.className = 'player-champion';
+    meta.prepend(line);
   }
 
-  const line = document.createElement('small');
-  line.className = 'player-champion';
-  const name = document.createElement('span');
-  name.className = 'player-champion-name';
-  line.append(name);
-  copy.append(line);
   return line;
 }
 
@@ -200,8 +205,11 @@ function normalizedLevel(value: number | null | undefined): number | null {
 }
 
 function decorateChampionLevel(champion: HTMLElement, player: PlayerTelemetry | null): void {
+  const meta = champion.closest<HTMLElement>('.player-champion-meta');
+  if (!meta) return;
+
   const level = normalizedLevel(player?.level);
-  const existing = champion.querySelector<HTMLElement>('.champion-level');
+  const existing = meta.querySelector<HTMLElement>('.champion-level');
   if (level === null) {
     existing?.remove();
     return;
@@ -213,7 +221,7 @@ function decorateChampionLevel(champion: HTMLElement, player: PlayerTelemetry | 
   badge.className = 'champion-level';
   if (badge.textContent !== text) badge.textContent = text;
   if (badge.getAttribute('aria-label') !== label) badge.setAttribute('aria-label', label);
-  if (!existing) champion.append(badge);
+  if (!existing) meta.append(badge);
 }
 
 function decorateSide(row: HTMLElement, side: PlayerSide, player: PlayerTelemetry | null): void {
@@ -229,10 +237,7 @@ function decorateSide(row: HTMLElement, side: PlayerSide, player: PlayerTelemetr
 
   const champion = ensureChampionLine(copy);
   const championName = championDisplayName(player?.championId);
-  const championNameElement = champion.querySelector<HTMLElement>('.player-champion-name');
-  if (championNameElement && championNameElement.textContent !== championName) {
-    championNameElement.textContent = championName;
-  }
+  if (champion.textContent !== championName) champion.textContent = championName;
   decorateChampionLevel(champion, player);
 }
 

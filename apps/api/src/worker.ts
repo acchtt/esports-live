@@ -1,5 +1,6 @@
 import {
   LolAdapter,
+  createChampionKillProvider,
   createCompletedInventoryProvider,
   createLeaguepediaHistoryFallbackProvider,
   createRiotCurrentPlayerProvider,
@@ -234,7 +235,7 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
           allowSimulated: grubsCvAllowSimulated
         })
       : historyProvider;
-    const provider = createUsableScheduleProvider(enrichedProvider);
+    const provider = createUsableScheduleProvider(createChampionKillProvider(enrichedProvider));
     registry.register(new CachedAdapter(new LolAdapter(provider), {
       scheduleTtlMs: 15_000,
       liveSnapshotTtlMs: 400,

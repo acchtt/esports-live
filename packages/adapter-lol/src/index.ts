@@ -1,4 +1,5 @@
 export * from './adapter.ts';
+export * from './champion-kill-provider.ts';
 export * from './completed-inventory-provider.ts';
 export * from './leaguepedia-history-provider.ts';
 export * from './provider.ts';

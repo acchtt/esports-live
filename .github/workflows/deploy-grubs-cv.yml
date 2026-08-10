@@ -44,8 +44,15 @@ jobs:
         id: deploy
         shell: bash
         run: |
+          set +e
           output="$(npx wrangler deploy --config services/grubs-cv/wrangler.jsonc 2>&1)"
+          status=$?
+          set -e
           echo "$output"
+          if [[ $status -ne 0 ]]; then
+            echo "Wrangler container deployment failed with exit code $status."
+            exit "$status"
+          fi
           url="$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' <<<"$output" | tail -n 1)"
           test -n "$url" || { echo "Wrangler did not return a workers.dev URL."; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"

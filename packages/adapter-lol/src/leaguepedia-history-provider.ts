@@ -13,8 +13,22 @@ import type {
 const LEAGUEPEDIA_API = 'https://lol.fandom.com/api.php';
 const REQUEST_TIMEOUT_MS = 5_000;
 const RESULT_CACHE_MS = 5 * 60 * 1_000;
-const LOOKBACK_MS = 18 * 60 * 60 * 1_000;
-const LOOKAHEAD_MS = 36 * 60 * 60 * 1_000;
+const EMPTY_RESULT_CACHE_MS = 10_000;
+const LOOKBACK_MS = 8 * 60 * 60 * 1_000;
+const LOOKAHEAD_MS = 8 * 60 * 60 * 1_000;
+const REQUEST_RETRY_DELAYS_MS = [0, 750] as const;
+const LEAGUEPEDIA_USER_AGENT = 'esports-live/1.0 (Leaguepedia completed-game enrichment)';
+const GENERIC_TEAM_TOKENS = new Set([
+  'academy',
+  'challenger',
+  'challengers',
+  'club',
+  'esport',
+  'esports',
+  'gaming',
+  'team',
+  'youth'
+]);
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -22,10 +36,12 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 interface LeaguepediaHistoryOptions {
   fetcher?: FetchLike;
   now?: () => Date;
+  sleep?: (delayMs: number) => Promise<void>;
 }
 
 interface LeaguepediaRow {
   matchId: string;
+  gameId: string;
   team1: string;
   team2: string;
   winTeam: string;
@@ -53,7 +69,9 @@ const object = (value: unknown): Json => (
 const array = (value: unknown): readonly unknown[] => Array.isArray(value) ? value : [];
 
 function stringValue(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return '';
 }
 
 function numberValue(value: unknown): number | null {
@@ -81,11 +99,94 @@ function teamAliases(team: TeamRef): ReadonlySet<string> {
   );
 }
 
+function tokens(value: string): readonly string[] {
+  return normalizeName(value).split(' ').filter(Boolean);
+}
+
+function identityTokens(value: string): readonly string[] {
+  const filtered = tokens(value).filter(token => !GENERIC_TEAM_TOKENS.has(token));
+  return filtered.length ? filtered : tokens(value);
+}
+
+function acronym(values: readonly string[]): string {
+  return values.map(value => value.length <= 3 ? value : value[0]).join('');
+}
+
+function aliasMatchScore(alias: string, candidate: string): number {
+  const normalizedAlias = normalizeName(alias);
+  const normalizedCandidate = normalizeName(candidate);
+  if (!normalizedAlias || !normalizedCandidate) return 0;
+  if (normalizedAlias === normalizedCandidate) return 100;
+
+  const aliasTokens = tokens(normalizedAlias);
+  const candidateTokens = tokens(normalizedCandidate);
+  if (candidateTokens.includes(normalizedAlias) || aliasTokens.includes(normalizedCandidate)) return 94;
+  if (
+    normalizedAlias.length >= 2
+    && (
+      normalizedCandidate.startsWith(`${normalizedAlias} `)
+      || normalizedAlias.startsWith(`${normalizedCandidate} `)
+    )
+  ) {
+    return 92;
+  }
+
+  const aliasIdentity = identityTokens(normalizedAlias);
+  const candidateIdentity = identityTokens(normalizedCandidate);
+  const aliasCompact = aliasIdentity.join('');
+  const candidateCompact = candidateIdentity.join('');
+  if (aliasCompact && aliasCompact === candidateCompact) return 90;
+
+  const aliasAcronym = acronym(aliasIdentity);
+  const candidateAcronym = acronym(candidateIdentity);
+  if (
+    aliasCompact.length >= 2
+    && candidateAcronym.length >= 2
+    && aliasCompact === candidateAcronym
+  ) {
+    return 88;
+  }
+  if (
+    candidateCompact.length >= 2
+    && aliasAcronym.length >= 2
+    && candidateCompact === aliasAcronym
+  ) {
+    return 88;
+  }
+  if (
+    aliasAcronym.length >= 2
+    && aliasAcronym === candidateAcronym
+  ) {
+    return 84;
+  }
+
+  const overlap = aliasIdentity.filter(token => candidateIdentity.includes(token)).length;
+  if (overlap > 0 && overlap === Math.min(aliasIdentity.length, candidateIdentity.length)) {
+    return 76 + Math.min(6, overlap * 2);
+  }
+  return 0;
+}
+
+function teamMatchScore(team: TeamRef, value: string): number {
+  let score = 0;
+  for (const alias of teamAliases(team)) score = Math.max(score, aliasMatchScore(alias, value));
+  return score;
+}
+
 function teamIndex(series: LolProviderSeries, value: string): number | null {
   const normalized = normalizeName(value);
   if (!normalized) return null;
-  const index = series.teams.findIndex(team => teamAliases(team).has(normalized));
-  return index >= 0 ? index : null;
+  const exact = series.teams.findIndex(team => teamAliases(team).has(normalized));
+  if (exact >= 0) return exact;
+
+  const ranked = series.teams
+    .map((team, index) => ({ index, score: teamMatchScore(team, value) }))
+    .sort((left, right) => right.score - left.score);
+  const best = ranked[0];
+  if (!best || best.score < 70) return null;
+  const second = ranked[1];
+  if (second && second.score > 0 && best.score - second.score < 8) return null;
+  return best.index;
 }
 
 function snapshotTeamIndex(
@@ -98,10 +199,6 @@ function snapshotTeamIndex(
 
 function cargoDate(milliseconds: number): string {
   return new Date(milliseconds).toISOString().replace('T', ' ').slice(0, 19);
-}
-
-function cargoString(value: string): string {
-  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 }
 
 function parseDuration(value: unknown): number | null {
@@ -123,6 +220,7 @@ function parseDate(value: unknown): number | null {
 function parseRows(payload: unknown): readonly LeaguepediaRow[] {
   return array(object(payload).cargoquery).map(entry => object(object(entry).title)).map((row, index) => ({
     matchId: stringValue(row.MatchId) || `row-${index}`,
+    gameId: stringValue(row.GameId),
     team1: stringValue(row.Team1),
     team2: stringValue(row.Team2),
     winTeam: stringValue(row.WinTeam),
@@ -135,24 +233,48 @@ function parseRows(payload: unknown): readonly LeaguepediaRow[] {
   })).filter(row => row.team1 && row.team2);
 }
 
+function pairScore(
+  firstTeam: TeamRef,
+  firstName: string,
+  secondTeam: TeamRef,
+  secondName: string
+): number {
+  const first = teamMatchScore(firstTeam, firstName);
+  const second = teamMatchScore(secondTeam, secondName);
+  return Math.min(first, second) >= 70 ? first + second : -1;
+}
+
+function groupMatchScore(series: LolProviderSeries, rows: readonly LeaguepediaRow[]): number {
+  const row = rows[0];
+  if (!row) return -1;
+  return Math.max(
+    pairScore(series.teams[0], row.team1, series.teams[1], row.team2),
+    pairScore(series.teams[0], row.team2, series.teams[1], row.team1)
+  );
+}
+
 function matchingRows(series: LolProviderSeries, rows: readonly LeaguepediaRow[]): readonly LeaguepediaRow[] {
   const grouped = new Map<string, LeaguepediaRow[]>();
   for (const row of rows) {
-    const indices = [teamIndex(series, row.team1), teamIndex(series, row.team2)];
-    if (!indices.includes(0) || !indices.includes(1)) continue;
     const current = grouped.get(row.matchId) ?? [];
     current.push(row);
     grouped.set(row.matchId, current);
   }
 
   const scheduled = Date.parse(series.scheduledStart);
-  return [...grouped.values()]
+  const candidates = [...grouped.values()]
+    .map(group => ({ group, score: groupMatchScore(series, group) }))
+    .filter(candidate => candidate.score >= 140)
     .sort((left, right) => {
-      const leftDate = left.map(row => row.dateTimeMs).find((value): value is number => value !== null) ?? 0;
-      const rightDate = right.map(row => row.dateTimeMs).find((value): value is number => value !== null) ?? 0;
+      const score = right.score - left.score;
+      if (score) return score;
+      const leftDate = left.group.map(row => row.dateTimeMs).find((value): value is number => value !== null) ?? 0;
+      const rightDate = right.group.map(row => row.dateTimeMs).find((value): value is number => value !== null) ?? 0;
       return Math.abs(leftDate - scheduled) - Math.abs(rightDate - scheduled);
-    })[0]
-    ?.slice()
+    });
+
+  return candidates[0]?.group
+    .slice()
     .sort((left, right) => (left.gameNumber ?? 0) - (right.gameNumber ?? 0))
     ?? [];
 }
@@ -245,24 +367,23 @@ function supplementSnapshotGrubs(
 
 async function requestRows(
   fetcher: FetchLike,
+  sleep: (delayMs: number) => Promise<void>,
   series: LolProviderSeries
 ): Promise<readonly LeaguepediaRow[]> {
   const start = Date.parse(series.scheduledStart);
   if (!Number.isFinite(start)) return [];
-  const teamNames = series.teams.map(team => cargoString(team.name));
   const where = [
     `SG.DateTime_UTC >= "${cargoDate(start - LOOKBACK_MS)}"`,
-    `SG.DateTime_UTC <= "${cargoDate(start + LOOKAHEAD_MS)}"`,
-    `((SG.Team1="${teamNames[0]}" OR SG.Team2="${teamNames[0]}")`,
-    `AND (SG.Team1="${teamNames[1]}" OR SG.Team2="${teamNames[1]}"))`
-  ].join(' ');
+    `SG.DateTime_UTC <= "${cargoDate(start + LOOKAHEAD_MS)}"`
+  ].join(' AND ');
   const url = new URL(LEAGUEPEDIA_API);
   url.searchParams.set('action', 'cargoquery');
   url.searchParams.set('format', 'json');
-  url.searchParams.set('limit', '50');
+  url.searchParams.set('limit', '500');
   url.searchParams.set('tables', 'ScoreboardGames=SG');
   url.searchParams.set('fields', [
     'SG.MatchId=MatchId',
+    'SG.GameId=GameId',
     'SG.Team1=Team1',
     'SG.Team2=Team2',
     'SG.WinTeam=WinTeam',
@@ -277,21 +398,36 @@ async function requestRows(
   url.searchParams.set('order_by', 'SG.DateTime_UTC ASC, SG.N_GameInMatch ASC');
   url.searchParams.set('origin', '*');
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetcher(url, {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
-      signal: controller.signal
-    });
-    if (!response.ok) return [];
-    return parseRows(await response.json());
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timer);
+  for (let attempt = 0; attempt < REQUEST_RETRY_DELAYS_MS.length; attempt += 1) {
+    const delay = REQUEST_RETRY_DELAYS_MS[attempt] ?? 0;
+    if (delay > 0) await sleep(delay);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetcher(url, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': LEAGUEPEDIA_USER_AGENT
+        },
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      if (response.status === 429 || response.status >= 500) continue;
+      if (!response.ok) return [];
+      const body = await response.text();
+      if (!body.trim()) return [];
+      const payload = JSON.parse(body) as unknown;
+      const error = object(object(payload).error);
+      if (stringValue(error.code).toLowerCase() === 'ratelimited') continue;
+      if (Object.keys(error).length) return [];
+      return parseRows(payload);
+    } catch {
+      // Retry bounded transient transport failures, then degrade to no enrichment.
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  return [];
 }
 
 export function createLeaguepediaHistoryFallbackProvider(
@@ -301,9 +437,11 @@ export function createLeaguepediaHistoryFallbackProvider(
   if (!base.getSeriesContext) throw new Error('Leaguepedia history fallback requires series context support.');
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? (() => new Date());
+  const sleep = options.sleep ?? (delayMs => new Promise(resolve => setTimeout(resolve, delayMs)));
   const seriesById = new Map<string, LolProviderSeries>();
   const seriesGameById = new Map<string, SeriesGameLocator>();
   const rowCache = new Map<string, CachedRows>();
+  const rowInFlight = new Map<string, Promise<readonly LeaguepediaRow[]>>();
 
   const remember = (entries: readonly LolProviderScheduleEntry[]): readonly LolProviderScheduleEntry[] => {
     for (const entry of entries) {
@@ -318,11 +456,25 @@ export function createLeaguepediaHistoryFallbackProvider(
   const getSchedule = async (): Promise<readonly LolProviderScheduleEntry[]> => remember(await base.getSchedule());
 
   const rowsFor = async (series: LolProviderSeries): Promise<readonly LeaguepediaRow[]> => {
+    const currentTime = now().getTime();
     const cached = rowCache.get(series.id);
-    if (cached && cached.expiresAt > now().getTime()) return cached.rows;
-    const rows = await requestRows(fetcher, series);
-    rowCache.set(series.id, { rows, expiresAt: now().getTime() + RESULT_CACHE_MS });
-    return rows;
+    if (cached && cached.expiresAt > currentTime) return cached.rows;
+    const pending = rowInFlight.get(series.id);
+    if (pending) return pending;
+
+    const request = requestRows(fetcher, sleep, series)
+      .then(rows => {
+        rowCache.set(series.id, {
+          rows,
+          expiresAt: now().getTime() + (rows.length ? RESULT_CACHE_MS : EMPTY_RESULT_CACHE_MS)
+        });
+        return rows;
+      })
+      .finally(() => {
+        if (rowInFlight.get(series.id) === request) rowInFlight.delete(series.id);
+      });
+    rowInFlight.set(series.id, request);
+    return request;
   };
 
   const locateGame = async (gameId: string): Promise<{ series: LolProviderSeries; gameNumber: number } | null> => {
@@ -356,8 +508,12 @@ export function createLeaguepediaHistoryFallbackProvider(
 
       const located = await locateGame(gameId);
       if (!located) return snapshot;
-      const rows = matchingRows(located.series, await rowsFor(located.series));
-      const row = rows.find(candidate => candidate.gameNumber === located.gameNumber);
+      const allRows = await rowsFor(located.series);
+      const directRow = allRows.find(candidate => (
+        candidate.gameId && candidate.gameId.toLowerCase() === gameId.toLowerCase()
+      ));
+      const row = directRow
+        ?? matchingRows(located.series, allRows).find(candidate => candidate.gameNumber === located.gameNumber);
       return row ? supplementSnapshotGrubs(located.series, snapshot, row) : snapshot;
     },
     async getSeriesContext(seriesId: string) {

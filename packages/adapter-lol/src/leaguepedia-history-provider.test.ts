@@ -124,6 +124,30 @@ function completedSnapshot(): LolProviderSnapshot {
   };
 }
 
+function grubsPayload(
+  team1 = 'GIANTX Academy',
+  team2 = 'SK Gaming Academy',
+  gameId = 'leaguepedia-game-2'
+) {
+  return {
+    cargoquery: [{
+      title: {
+        MatchId: 'lec-week-2-match-1',
+        GameId: gameId,
+        Team1: team1,
+        Team2: team2,
+        WinTeam: team2,
+        Winner: '2',
+        Gamelength: '49:11',
+        N_GameInMatch: '2',
+        DateTime_UTC: '2026-08-01 16:50:00',
+        Team1VoidGrubs: '2',
+        Team2VoidGrubs: '4'
+      }
+    }]
+  };
+}
+
 test('supplements ambiguous completed-game winners and durations from Leaguepedia', async () => {
   let requests = 0;
   const provider = createLeaguepediaHistoryFallbackProvider(baseProvider(history()), {
@@ -132,13 +156,16 @@ test('supplements ambiguous completed-game winners and durations from Leaguepedi
       requests += 1;
       const url = new URL(String(input));
       assert.equal(url.searchParams.get('action'), 'cargoquery');
-      assert.match(url.searchParams.get('where') ?? '', /GIANTX/);
-      assert.match(url.searchParams.get('where') ?? '', /SK Gaming/);
+      const where = url.searchParams.get('where') ?? '';
+      assert.match(where, /SG\.DateTime_UTC/);
+      assert.doesNotMatch(where, /GIANTX/);
+      assert.doesNotMatch(where, /SK Gaming/);
       return Response.json({
         cargoquery: [
           {
             title: {
               MatchId: 'lec-week-2-match-1',
+              GameId: 'leaguepedia-game-1',
               Team1: 'GIANTX',
               Team2: 'SK Gaming',
               WinTeam: 'GIANTX',
@@ -151,6 +178,7 @@ test('supplements ambiguous completed-game winners and durations from Leaguepedi
           {
             title: {
               MatchId: 'lec-week-2-match-1',
+              GameId: 'leaguepedia-game-2',
               Team1: 'GIANTX',
               Team2: 'SK Gaming',
               WinTeam: 'SK Gaming',
@@ -174,34 +202,24 @@ test('supplements ambiguous completed-game winners and durations from Leaguepedi
   assert.ok(result.reasons?.some(reason => reason.code === 'history_supplemented'));
 });
 
-test('supplements completed-game Void Grubs from Leaguepedia by team identity', async () => {
+test('supplements completed-game Void Grubs despite Leaguepedia team-name drift', async () => {
   let requests = 0;
   const provider = createLeaguepediaHistoryFallbackProvider(
     baseProvider(history([left, right, null], [2_527, 2_951, null]), completedSnapshot()),
     {
       now: () => new Date(observedAt),
-      fetcher: async input => {
+      fetcher: async (input, init) => {
         requests += 1;
         const url = new URL(String(input));
         const fields = url.searchParams.get('fields') ?? '';
+        const where = url.searchParams.get('where') ?? '';
+        assert.match(fields, /SG\.GameId=GameId/);
         assert.match(fields, /SG\.Team1VoidGrubs=Team1VoidGrubs/);
         assert.match(fields, /SG\.Team2VoidGrubs=Team2VoidGrubs/);
-        return Response.json({
-          cargoquery: [{
-            title: {
-              MatchId: 'lec-week-2-match-1',
-              Team1: 'GIANTX',
-              Team2: 'SK Gaming',
-              WinTeam: 'SK Gaming',
-              Winner: '2',
-              Gamelength: '49:11',
-              N_GameInMatch: '2',
-              DateTime_UTC: '2026-08-01 16:50:00',
-              Team1VoidGrubs: '2',
-              Team2VoidGrubs: '4'
-            }
-          }]
-        });
+        assert.doesNotMatch(where, /GIANTX/);
+        assert.doesNotMatch(where, /SK Gaming/);
+        assert.equal(new Headers(init?.headers).get('user-agent'), 'esports-live/1.0 (Leaguepedia completed-game enrichment)');
+        return Response.json(grubsPayload());
       }
     }
   );
@@ -211,6 +229,32 @@ test('supplements completed-game Void Grubs from Leaguepedia by team identity', 
   assert.equal(requests, 1);
   assert.equal(result.stats?.blue.id, right.id);
   assert.equal(result.stats?.red.id, left.id);
+  assert.equal(result.stats?.blue.objectives.grubs, 4);
+  assert.equal(result.stats?.red.objectives.grubs, 2);
+});
+
+test('retries a transient Leaguepedia Cargo throttle before giving up Grubs enrichment', async () => {
+  let requests = 0;
+  const delays: number[] = [];
+  const provider = createLeaguepediaHistoryFallbackProvider(
+    baseProvider(history([left, right, null], [2_527, 2_951, null]), completedSnapshot()),
+    {
+      now: () => new Date(observedAt),
+      sleep: async delayMs => { delays.push(delayMs); },
+      fetcher: async () => {
+        requests += 1;
+        if (requests === 1) {
+          return Response.json({ error: { code: 'ratelimited', info: 'Try again later.' } });
+        }
+        return Response.json(grubsPayload('GIANTX', 'SK Gaming', 'game-2'));
+      }
+    }
+  );
+
+  const result = await provider.getSnapshot('game-2');
+
+  assert.equal(requests, 2);
+  assert.deepEqual(delays, [750]);
   assert.equal(result.stats?.blue.objectives.grubs, 4);
   assert.equal(result.stats?.red.objectives.grubs, 2);
 });

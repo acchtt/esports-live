@@ -3,36 +3,42 @@
 }
 
 .player-copy .player-champion {
+  display: flex;
+  align-items: center;
   min-width: 0;
+  gap: 5px;
   overflow: hidden;
   color: #7f90a7;
   font-size: 0.68rem;
   font-weight: 780;
   line-height: 1.05;
+  white-space: nowrap;
+}
+
+.player-copy .player-champion-name {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .player-copy.red .player-champion {
+  justify-content: flex-end;
   text-align: right;
 }
 
-.champion-portrait .champion-level {
-  position: absolute;
-  z-index: 2;
-  right: 3px;
-  bottom: 3px;
-  display: grid;
-  min-width: 22px;
-  height: 22px;
+.player-copy .champion-level {
+  display: inline-grid;
+  flex: 0 0 auto;
+  min-width: 29px;
+  height: 17px;
   place-items: center;
   padding: 0 4px;
-  border: 1px solid rgba(148, 209, 240, 0.68);
-  border-radius: 7px;
-  color: #f4fbff;
-  background: rgba(3, 12, 22, 0.92);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
-  font-size: 0.62rem;
+  border: 1px solid rgba(148, 209, 240, 0.48);
+  border-radius: 5px;
+  color: #dcefff;
+  background: rgba(12, 31, 49, 0.86);
+  font-size: 0.5rem;
   font-variant-numeric: tabular-nums;
   font-weight: 950;
   line-height: 1;
@@ -48,17 +54,16 @@
   }
 
   .player-copy .player-champion {
+    gap: 4px;
     font-size: 0.54rem;
     line-height: 1;
   }
 
-  .champion-portrait .champion-level {
-    right: 2px;
-    bottom: 2px;
-    min-width: 17px;
-    height: 17px;
+  .player-copy .champion-level {
+    min-width: 26px;
+    height: 14px;
     padding-inline: 3px;
-    border-radius: 5px;
-    font-size: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.44rem;
   }
 }

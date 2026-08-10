@@ -14,10 +14,15 @@ import {
   type RiotCurrentPlayerProviderOptions
 } from '@esports-live/adapter-lol';
 import { AdapterRegistry, CachedAdapter } from '@esports-live/core';
+import { createGrubsCvProvider } from './grubs-cv-provider.ts';
 import { createApiHandler } from './router.ts';
 
 export interface WorkerEnv {
   LOL_ESPORTS_API_KEY?: string;
+  GRUBS_CV_URL?: string;
+  GRUBS_CV_TOKEN?: string;
+  GRUBS_CV_MIN_CONFIDENCE?: string;
+  GRUBS_CV_ALLOW_SIMULATED?: string;
 }
 
 type ApiHandler = (request: Request) => Promise<Response>;
@@ -55,6 +60,15 @@ function inventoryCount(snapshot: LolProviderSnapshot): number {
 function sourceTimestampMs(snapshot: Snapshot): number | null {
   const parsed = Date.parse(snapshot.sourceTimestamp ?? '');
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function confidenceEnv(value: string | undefined): number {
+  const parsed = Number.parseFloat(value ?? '');
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 0.9;
+}
+
+function booleanEnv(value: string | undefined): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(value?.trim().toLowerCase() ?? '');
 }
 
 /**
@@ -171,12 +185,23 @@ export function createProductionInventoryProvider(
   };
 }
 
-let cachedApiKey: string | null = null;
+let cachedConfigKey: string | null = null;
 let cachedHandler: ApiHandler | null = null;
 
 export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const apiKey = env.LOL_ESPORTS_API_KEY?.trim() ?? '';
-  if (cachedHandler && cachedApiKey === apiKey) return cachedHandler;
+  const grubsCvUrl = env.GRUBS_CV_URL?.trim() ?? '';
+  const grubsCvToken = env.GRUBS_CV_TOKEN?.trim() ?? '';
+  const grubsCvMinConfidence = confidenceEnv(env.GRUBS_CV_MIN_CONFIDENCE);
+  const grubsCvAllowSimulated = booleanEnv(env.GRUBS_CV_ALLOW_SIMULATED);
+  const configKey = JSON.stringify([
+    apiKey,
+    grubsCvUrl,
+    grubsCvToken,
+    grubsCvMinConfidence,
+    grubsCvAllowSimulated
+  ]);
+  if (cachedHandler && cachedConfigKey === configKey) return cachedHandler;
 
   const registry = new AdapterRegistry();
   if (apiKey) {
@@ -196,13 +221,20 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
       ),
       { apiKey }
     );
-    const provider = createUsableScheduleProvider(
-      createLeaguepediaHistoryFallbackProvider(
-        createCompletedInventoryProvider(
-          createProductionInventoryProvider(riotProvider)
-        )
+    const historyProvider = createLeaguepediaHistoryFallbackProvider(
+      createCompletedInventoryProvider(
+        createProductionInventoryProvider(riotProvider)
       )
     );
+    const enrichedProvider = grubsCvUrl
+      ? createGrubsCvProvider(historyProvider, {
+          baseUrl: grubsCvUrl,
+          token: grubsCvToken,
+          minConfidence: grubsCvMinConfidence,
+          allowSimulated: grubsCvAllowSimulated
+        })
+      : historyProvider;
+    const provider = createUsableScheduleProvider(enrichedProvider);
     registry.register(new CachedAdapter(new LolAdapter(provider), {
       scheduleTtlMs: 15_000,
       liveSnapshotTtlMs: 400,
@@ -210,7 +242,7 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
     }));
   }
 
-  cachedApiKey = apiKey;
+  cachedConfigKey = configKey;
   cachedHandler = createApiHandler(registry);
   return cachedHandler;
 }

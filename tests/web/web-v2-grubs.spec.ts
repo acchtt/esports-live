@@ -122,7 +122,7 @@ test('ARENA V2 renders supplied Void Grubs counts without overflowing mobile', a
   await expect(card.locator('> span')).toHaveText('GRUBS');
   await expect(card.locator('[data-side="blue"]')).toHaveText('4');
   await expect(card.locator('[data-side="red"]')).toHaveText('2');
-  await expect(card.locator('[data-grubs-live-unavailable]')).toBeHidden();
+  await expect(card.locator('[data-grubs-live-unavailable]')).toHaveCount(0);
   await expect(page.locator('.objective-grid article')).toHaveCount(5);
 
   const icon = await card.locator('> span').evaluate(element => (
@@ -137,17 +137,12 @@ test('ARENA V2 renders supplied Void Grubs counts without overflowing mobile', a
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
 });
 
-test('ARENA V2 labels missing live Grubs as unavailable instead of pending', async ({ page }) => {
+test('ARENA V2 removes the Grubs placeholder when live counts are unavailable', async ({ page }) => {
   await openFixture(page, liveUnavailableSnapshot);
 
-  const card = page.locator('[data-objective="grubs"]');
-  await expect(card).toBeVisible();
-  await expect(card).toHaveAttribute('data-availability', 'live-unavailable');
-  await expect(card.locator('[data-grubs-live-unavailable]')).toBeVisible();
-  await expect(card.locator('[data-grubs-live-unavailable]')).toHaveText('LIVE N/A');
-  await expect(card.locator('[data-side="blue"]')).toBeHidden();
-  await expect(card.locator('[data-side="red"]')).toBeHidden();
-  await expect(card).toHaveAttribute('title', 'Riot live telemetry does not provide Void Grub counts.');
+  await expect(page.locator('[data-objective="grubs"]')).toHaveCount(0);
+  await expect(page.getByText('LIVE N/A', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.objective-grid article')).toHaveCount(4);
 
   const viewport = await page.evaluate(() => ({
     width: window.innerWidth,

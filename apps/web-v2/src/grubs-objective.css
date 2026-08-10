@@ -1,0 +1,8 @@
+.objective-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.objective-grid article[data-objective="grubs"] > span::before {
+  background-image: url('./objective-icons/grubs.svg');
+  filter: drop-shadow(0 0 7px rgba(192, 132, 252, 0.24));
+}

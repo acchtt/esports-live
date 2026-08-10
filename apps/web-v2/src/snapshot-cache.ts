@@ -5,6 +5,7 @@ const CACHE_VERSION = 1;
 const LIVE_CACHE_MAX_AGE_MS = 90 * 1_000;
 const COMPLETED_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 const CACHE_PREFIX = 'esports-live:v2:snapshot:';
+export const SNAPSHOT_UPDATED_EVENT = 'esports-live:v2-snapshot-updated';
 
 interface StoredSnapshot {
   version: number;
@@ -55,4 +56,7 @@ export function writeSnapshotCache(snapshot: LiveSnapshot<LolStats>): void {
   } catch {
     // Storage is an optional acceleration layer; network telemetry remains authoritative.
   }
+  window.dispatchEvent(new CustomEvent<LiveSnapshot<LolStats>>(SNAPSHOT_UPDATED_EVENT, {
+    detail: snapshot
+  }));
 }

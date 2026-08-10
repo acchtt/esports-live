@@ -1,4 +1,4 @@
-import { expect, test, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 const provider = { id: 'fixture', name: 'Fixture provider' };
 const blueTeam = { id: 'blue-team', name: 'Blue Team', code: 'BLU' };
@@ -58,6 +58,21 @@ const snapshot = {
   }
 };
 
+const liveUnavailableSnapshot = {
+  ...snapshot,
+  stats: {
+    ...snapshot.stats,
+    blue: {
+      ...snapshot.stats.blue,
+      objectives: { ...snapshot.stats.blue.objectives, grubs: null }
+    },
+    red: {
+      ...snapshot.stats.red,
+      objectives: { ...snapshot.stats.red.objectives, grubs: null }
+    }
+  }
+};
+
 async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({
     status: 200,
@@ -66,7 +81,7 @@ async function json(route: Route, value: unknown): Promise<void> {
   });
 }
 
-test('ARENA V2 renders Riot Void Grubs counts without overflowing mobile', async ({ page }) => {
+async function openFixture(page: Page, liveSnapshot: unknown): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/health**', route => json(route, {
     ok: true,
@@ -91,24 +106,48 @@ test('ARENA V2 renders Riot Void Grubs counts without overflowing mobile', async
     complete: false,
     reasons: []
   }));
-  await page.route('**/v1/lol/games/**/live**', route => json(route, snapshot));
+  await page.route('**/v1/lol/games/**/live**', route => json(route, liveSnapshot));
 
   await page.goto('/v2/');
   const match = page.locator('[data-series-id="series-grubs"]');
   await expect(match).toBeVisible();
   await match.click();
+}
+
+test('ARENA V2 renders supplied Void Grubs counts without overflowing mobile', async ({ page }) => {
+  await openFixture(page, snapshot);
 
   const card = page.locator('[data-objective="grubs"]');
   await expect(card).toBeVisible();
   await expect(card.locator('> span')).toHaveText('GRUBS');
   await expect(card.locator('[data-side="blue"]')).toHaveText('4');
   await expect(card.locator('[data-side="red"]')).toHaveText('2');
+  await expect(card.locator('[data-grubs-live-unavailable]')).toBeHidden();
   await expect(page.locator('.objective-grid article')).toHaveCount(5);
 
   const icon = await card.locator('> span').evaluate(element => (
     getComputedStyle(element, '::before').backgroundImage
   ));
   expect(icon).toContain('Void%20Grub%20objective');
+
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth
+  }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
+});
+
+test('ARENA V2 labels missing live Grubs as unavailable instead of pending', async ({ page }) => {
+  await openFixture(page, liveUnavailableSnapshot);
+
+  const card = page.locator('[data-objective="grubs"]');
+  await expect(card).toBeVisible();
+  await expect(card).toHaveAttribute('data-availability', 'live-unavailable');
+  await expect(card.locator('[data-grubs-live-unavailable]')).toBeVisible();
+  await expect(card.locator('[data-grubs-live-unavailable]')).toHaveText('LIVE N/A');
+  await expect(card.locator('[data-side="blue"]')).toBeHidden();
+  await expect(card.locator('[data-side="red"]')).toBeHidden();
+  await expect(card).toHaveAttribute('title', 'Riot live telemetry does not provide Void Grub counts.');
 
   const viewport = await page.evaluate(() => ({
     width: window.innerWidth,

@@ -6,7 +6,8 @@ import type {
 import type {
   LolProviderClient,
   LolProviderScheduleEntry,
-  LolProviderSeries
+  LolProviderSeries,
+  LolProviderSnapshot
 } from './provider.ts';
 
 const LEAGUEPEDIA_API = 'https://lol.fandom.com/api.php';
@@ -32,11 +33,18 @@ interface LeaguepediaRow {
   gameNumber: number | null;
   durationSeconds: number | null;
   dateTimeMs: number | null;
+  team1VoidGrubs: number | null;
+  team2VoidGrubs: number | null;
 }
 
 interface CachedRows {
   expiresAt: number;
   rows: readonly LeaguepediaRow[];
+}
+
+interface SeriesGameLocator {
+  seriesId: string;
+  gameNumber: number;
 }
 
 const object = (value: unknown): Json => (
@@ -49,6 +57,7 @@ function stringValue(value: unknown): string {
 }
 
 function numberValue(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -77,6 +86,14 @@ function teamIndex(series: LolProviderSeries, value: string): number | null {
   if (!normalized) return null;
   const index = series.teams.findIndex(team => teamAliases(team).has(normalized));
   return index >= 0 ? index : null;
+}
+
+function snapshotTeamIndex(
+  series: LolProviderSeries,
+  team: { id: string; name: string }
+): number | null {
+  const byId = series.teams.findIndex(candidate => candidate.id === team.id);
+  return byId >= 0 ? byId : teamIndex(series, team.name);
 }
 
 function cargoDate(milliseconds: number): string {
@@ -112,7 +129,9 @@ function parseRows(payload: unknown): readonly LeaguepediaRow[] {
     winner: numberValue(row.Winner),
     gameNumber: numberValue(row.N_GameInMatch),
     durationSeconds: parseDuration(row.Gamelength),
-    dateTimeMs: parseDate(row.DateTime_UTC)
+    dateTimeMs: parseDate(row.DateTime_UTC),
+    team1VoidGrubs: numberValue(row.Team1VoidGrubs),
+    team2VoidGrubs: numberValue(row.Team2VoidGrubs)
   })).filter(row => row.team1 && row.team2);
 }
 
@@ -172,6 +191,58 @@ function supplementHistory(
   return { history: changed ? { ...history, games } : history, changed };
 }
 
+function supplementSnapshotGrubs(
+  series: LolProviderSeries,
+  snapshot: LolProviderSnapshot,
+  row: LeaguepediaRow
+): LolProviderSnapshot {
+  if (!snapshot.stats) return snapshot;
+
+  const team1Index = teamIndex(series, row.team1);
+  const team2Index = teamIndex(series, row.team2);
+  const blueIndex = snapshotTeamIndex(series, snapshot.stats.blue);
+  const redIndex = snapshotTeamIndex(series, snapshot.stats.red);
+  if (
+    team1Index === null
+    || team2Index === null
+    || team1Index === team2Index
+    || blueIndex === null
+    || redIndex === null
+    || blueIndex === redIndex
+  ) {
+    return snapshot;
+  }
+
+  const countForIndex = (index: number): number | null => {
+    if (index === team1Index) return row.team1VoidGrubs;
+    if (index === team2Index) return row.team2VoidGrubs;
+    return null;
+  };
+  const blueGrubs = snapshot.stats.blue.objectives.grubs ?? countForIndex(blueIndex);
+  const redGrubs = snapshot.stats.red.objectives.grubs ?? countForIndex(redIndex);
+  if (
+    blueGrubs === snapshot.stats.blue.objectives.grubs
+    && redGrubs === snapshot.stats.red.objectives.grubs
+  ) {
+    return snapshot;
+  }
+
+  return {
+    ...snapshot,
+    stats: {
+      ...snapshot.stats,
+      blue: {
+        ...snapshot.stats.blue,
+        objectives: { ...snapshot.stats.blue.objectives, grubs: blueGrubs }
+      },
+      red: {
+        ...snapshot.stats.red,
+        objectives: { ...snapshot.stats.red.objectives, grubs: redGrubs }
+      }
+    }
+  };
+}
+
 async function requestRows(
   fetcher: FetchLike,
   series: LolProviderSeries
@@ -198,7 +269,9 @@ async function requestRows(
     'SG.Winner=Winner',
     'SG.Gamelength=Gamelength',
     'SG.N_GameInMatch=N_GameInMatch',
-    'SG.DateTime_UTC=DateTime_UTC'
+    'SG.DateTime_UTC=DateTime_UTC',
+    'SG.Team1VoidGrubs=Team1VoidGrubs',
+    'SG.Team2VoidGrubs=Team2VoidGrubs'
   ].join(','));
   url.searchParams.set('where', where);
   url.searchParams.set('order_by', 'SG.DateTime_UTC ASC, SG.N_GameInMatch ASC');
@@ -229,10 +302,16 @@ export function createLeaguepediaHistoryFallbackProvider(
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? (() => new Date());
   const seriesById = new Map<string, LolProviderSeries>();
+  const seriesGameById = new Map<string, SeriesGameLocator>();
   const rowCache = new Map<string, CachedRows>();
 
   const remember = (entries: readonly LolProviderScheduleEntry[]): readonly LolProviderScheduleEntry[] => {
-    for (const entry of entries) seriesById.set(entry.series.id, entry.series);
+    for (const entry of entries) {
+      seriesById.set(entry.series.id, entry.series);
+      for (const game of entry.series.games) {
+        seriesGameById.set(game.id, { seriesId: entry.series.id, gameNumber: game.number });
+      }
+    }
     return entries;
   };
 
@@ -246,12 +325,41 @@ export function createLeaguepediaHistoryFallbackProvider(
     return rows;
   };
 
+  const locateGame = async (gameId: string): Promise<{ series: LolProviderSeries; gameNumber: number } | null> => {
+    let locator = seriesGameById.get(gameId);
+    if (!locator) {
+      await getSchedule();
+      locator = seriesGameById.get(gameId);
+    }
+    if (!locator) return null;
+    const series = seriesById.get(locator.seriesId);
+    return series ? { series, gameNumber: locator.gameNumber } : null;
+  };
+
   return {
     id: base.id,
     name: base.name,
     ...(base.sourceUrl ? { sourceUrl: base.sourceUrl } : {}),
     getSchedule,
-    getSnapshot: (gameId: string, after?: string) => base.getSnapshot(gameId, after),
+    async getSnapshot(gameId: string, after?: string) {
+      const snapshot = await base.getSnapshot(gameId, after);
+      if (
+        snapshot.game.state !== 'completed'
+        || !snapshot.stats
+        || (
+          snapshot.stats.blue.objectives.grubs !== null
+          && snapshot.stats.red.objectives.grubs !== null
+        )
+      ) {
+        return snapshot;
+      }
+
+      const located = await locateGame(gameId);
+      if (!located) return snapshot;
+      const rows = matchingRows(located.series, await rowsFor(located.series));
+      const row = rows.find(candidate => candidate.gameNumber === located.gameNumber);
+      return row ? supplementSnapshotGrubs(located.series, snapshot, row) : snapshot;
+    },
     async getSeriesContext(seriesId: string) {
       const context = await base.getSeriesContext!(seriesId);
       const missing = context.history?.games.some(game => (

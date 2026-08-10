@@ -9,24 +9,42 @@ import type {
   LolProviderClient,
   LolProviderScheduleEntry,
   LolProviderSeries,
-  LolProviderSeriesContext
+  LolProviderSeriesContext,
+  LolProviderSnapshot
 } from './provider.ts';
 import { createRiotLolResolvedProvider } from './riot-resolved-provider.ts';
 import type { RiotLolProviderOptions } from './riot-provider.ts';
 
 const PERSISTED_BASE = 'https://esports-api.lolesports.com/persisted/gw';
+const LIVE_BASE = 'https://feed.lolesports.com/livestats/v1';
 const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_RECENT_SERIES = 500;
 const BASE_CONTEXT_TTL_MS = 5 * 60 * 1_000;
 const DETAILS_RETRY_ATTEMPTS = 3;
 const DETAILS_RETRY_DELAY_MS = 250;
+const GRUB_PHASE_START_SECONDS = 6 * 60;
+const GRUB_PHASE_FINAL_SECONDS = 14 * 60 + 30;
+const GRUB_REPROBE_SECONDS = 30;
+const GRUB_PROBE_SECONDS = [7 * 60, 10 * 60 + 30, 13 * 60 + 30] as const;
 
 type Json = Record<string, unknown>;
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type Side = 'blue' | 'red';
 
 interface BaseContextCacheEntry {
   expiresAt: number;
   value: LolProviderSeriesContext;
+}
+
+interface GrubCounts {
+  blue: number | null;
+  red: number | null;
+}
+
+interface GrubCacheEntry {
+  counts: GrubCounts;
+  lastProbeClock: number;
+  final: boolean;
 }
 
 const object = (value: unknown): Json => (
@@ -60,6 +78,108 @@ function firstNumber(source: Json, keys: readonly string[]): number | null {
     if (value !== null) return value;
   }
   return null;
+}
+
+function roundedIso(value: number): string {
+  return new Date(Math.floor(value / 10_000) * 10_000).toISOString();
+}
+
+function frameTeam(frame: Json, side: Side): Json {
+  const direct = object(frame[side === 'blue' ? 'blueTeam' : 'redTeam']);
+  if (Object.keys(direct).length) return direct;
+  const expected = side === 'blue' ? '100' : '200';
+  return object(array(frame.teams).find(value => {
+    const team = object(value);
+    return String(team.teamID ?? team.teamId ?? team.id ?? '') === expected;
+  }));
+}
+
+function grubCount(container: Json): number | null {
+  const direct = firstNumber(container, ['voidGrubs', 'voidGrubKills', 'grubs', 'hordes', 'hordeKills']);
+  if (direct !== null) return direct;
+
+  for (const key of ['horde', 'hordes', 'voidGrub', 'voidGrubs', 'grubs'] as const) {
+    const value = container[key];
+    if (Array.isArray(value)) return value.length;
+    const nested = firstNumber(object(value), ['kills', 'count', 'captures']);
+    if (nested !== null) return nested;
+  }
+  return null;
+}
+
+function teamGrubCount(team: Json): number | null {
+  const direct = grubCount(team);
+  if (direct !== null) return direct;
+  for (const key of ['objectives', 'objectiveCounts', 'epicMonsters', 'monsters'] as const) {
+    const nested = grubCount(object(team[key]));
+    if (nested !== null) return nested;
+  }
+  return null;
+}
+
+function maxCount(left: number | null, right: number | null): number | null {
+  if (left === null) return right;
+  if (right === null) return left;
+  return Math.max(left, right);
+}
+
+function mergeGrubCounts(left: GrubCounts, right: GrubCounts): GrubCounts {
+  return {
+    blue: maxCount(left.blue, right.blue),
+    red: maxCount(left.red, right.red)
+  };
+}
+
+function payloadGrubCounts(payload: unknown): GrubCounts {
+  let counts: GrubCounts = { blue: null, red: null };
+  for (const value of array(object(payload).frames)) {
+    const frame = object(value);
+    counts = mergeGrubCounts(counts, {
+      blue: teamGrubCount(frameTeam(frame, 'blue')),
+      red: teamGrubCount(frameTeam(frame, 'red'))
+    });
+  }
+  return counts;
+}
+
+function snapshotGrubCounts(snapshot: LolProviderSnapshot): GrubCounts {
+  return {
+    blue: snapshot.stats?.blue.objectives.grubs ?? null,
+    red: snapshot.stats?.red.objectives.grubs ?? null
+  };
+}
+
+function completeGrubCounts(counts: GrubCounts): boolean {
+  return counts.blue !== null && counts.red !== null;
+}
+
+function anyGrubCount(counts: GrubCounts): boolean {
+  return counts.blue !== null || counts.red !== null;
+}
+
+function applyGrubCounts(snapshot: LolProviderSnapshot, counts: GrubCounts): LolProviderSnapshot {
+  if (!snapshot.stats) return snapshot;
+  const merged = mergeGrubCounts(snapshotGrubCounts(snapshot), counts);
+  if (
+    merged.blue === snapshot.stats.blue.objectives.grubs
+    && merged.red === snapshot.stats.red.objectives.grubs
+  ) {
+    return snapshot;
+  }
+  return {
+    ...snapshot,
+    stats: {
+      ...snapshot.stats,
+      blue: {
+        ...snapshot.stats.blue,
+        objectives: { ...snapshot.stats.blue.objectives, grubs: merged.blue }
+      },
+      red: {
+        ...snapshot.stats.red,
+        objectives: { ...snapshot.stats.red.objectives, grubs: merged.red }
+      }
+    }
+  };
 }
 
 function rawGameState(value: unknown): GameState {
@@ -265,6 +385,58 @@ async function requestJson(fetcher: FetchLike, url: URL, apiKey: string): Promis
   }
 }
 
+export function createRiotGrubsRecovery(fetcher: FetchLike, apiKey: string) {
+  const cache = new Map<string, GrubCacheEntry>();
+
+  return async (gameId: string, snapshot: LolProviderSnapshot): Promise<LolProviderSnapshot> => {
+    if (!snapshot.stats || !snapshot.sourceTimestamp) return snapshot;
+
+    const direct = snapshotGrubCounts(snapshot);
+    const clock = snapshot.stats.gameClockSeconds;
+    const source = Date.parse(snapshot.sourceTimestamp);
+    if (completeGrubCounts(direct)) {
+      cache.set(gameId, {
+        counts: direct,
+        lastProbeClock: clock ?? 0,
+        final: (clock ?? 0) >= GRUB_PHASE_FINAL_SECONDS
+      });
+      return snapshot;
+    }
+    if (clock === null || !Number.isFinite(source) || clock < GRUB_PHASE_START_SECONDS) return snapshot;
+
+    const cached = cache.get(gameId);
+    if (cached?.final) return applyGrubCounts(snapshot, cached.counts);
+    if (cached && clock - cached.lastProbeClock < GRUB_REPROBE_SECONDS) {
+      return applyGrubCounts(snapshot, cached.counts);
+    }
+
+    const gameStart = source - clock * 1_000;
+    const latestProbe = Math.min(clock - 10, GRUB_PHASE_FINAL_SECONDS);
+    const probeSeconds = [...new Set(
+      [...GRUB_PROBE_SECONDS, latestProbe]
+        .filter(seconds => seconds >= GRUB_PHASE_START_SECONDS && seconds <= latestProbe)
+        .map(seconds => Math.floor(seconds / 10) * 10)
+    )];
+
+    const payloads = await Promise.all(probeSeconds.map(async seconds => {
+      const url = new URL(`${LIVE_BASE}/window/${encodeURIComponent(gameId)}`);
+      url.searchParams.set('startingTime', roundedIso(gameStart + seconds * 1_000));
+      return requestJson(fetcher, url, apiKey).catch(() => null);
+    }));
+
+    let recovered = cached?.counts ?? { blue: null, red: null };
+    recovered = mergeGrubCounts(recovered, direct);
+    for (const payload of payloads) recovered = mergeGrubCounts(recovered, payloadGrubCounts(payload));
+
+    cache.set(gameId, {
+      counts: recovered,
+      lastProbeClock: clock,
+      final: clock >= GRUB_PHASE_FINAL_SECONDS && anyGrubCount(recovered)
+    });
+    return applyGrubCounts(snapshot, recovered);
+  };
+}
+
 export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): LolProviderClient {
   const apiKey = options.apiKey.trim();
   if (!apiKey) throw new Error('A Riot LoL Esports API key is required.');
@@ -272,6 +444,7 @@ export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): L
   const locale = options.locale ?? 'en-US';
   const now = options.now ?? (() => new Date());
   const resolved = createRiotLolResolvedProvider({ ...options, fetcher });
+  const recoverGrubs = createRiotGrubsRecovery(fetcher, apiKey);
   const recentSeries = new Map<string, LolProviderSeries>();
   const baseContextCache = new Map<string, BaseContextCacheEntry>();
   const baseContextInFlight = new Map<string, Promise<LolProviderSeriesContext>>();
@@ -335,7 +508,9 @@ export function createRiotLolHistoryProvider(options: RiotLolProviderOptions): L
     name: resolved.name,
     ...(resolved.sourceUrl ? { sourceUrl: resolved.sourceUrl } : {}),
     getSchedule,
-    getSnapshot: (gameId: string, after?: string) => resolved.getSnapshot(gameId, after),
+    getSnapshot: async (gameId: string, after?: string) => (
+      recoverGrubs(gameId, await resolved.getSnapshot(gameId, after))
+    ),
 
     async getSeriesContext(seriesId: string): Promise<LolProviderSeriesContext> {
       let series = recentSeries.get(seriesId);

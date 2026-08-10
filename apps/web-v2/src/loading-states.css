@@ -1,0 +1,57 @@
+.arena-loading-inline {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.arena-loading-state {
+  place-items: center;
+  gap: 0 !important;
+}
+
+.arena-loading-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  border-style: solid;
+  border-color: rgba(134, 234, 255, 0.14);
+  border-top-color: var(--icy-cyan);
+  border-right-color: var(--signal-red);
+  border-radius: 50%;
+  animation: arena-loading-spin 760ms linear infinite;
+  filter: drop-shadow(0 0 8px rgba(134, 234, 255, 0.18));
+}
+
+.arena-loading-icon--inline {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+.arena-loading-icon--large {
+  width: 34px;
+  height: 34px;
+  border-width: 3px;
+}
+
+.arena-loading-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes arena-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-loading-icon {
+    animation-duration: 1.8s;
+  }
+}

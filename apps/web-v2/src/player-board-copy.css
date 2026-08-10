@@ -2,27 +2,27 @@
   font-variant-numeric: tabular-nums;
 }
 
-.player-copy .player-champion {
+.player-copy .player-champion-meta {
   display: flex;
   align-items: center;
   min-width: 0;
   gap: 5px;
   overflow: hidden;
+  white-space: nowrap;
+}
+
+.player-copy .player-champion {
+  min-width: 0;
+  overflow: hidden;
   color: #7f90a7;
   font-size: 0.68rem;
   font-weight: 780;
   line-height: 1.05;
-  white-space: nowrap;
-}
-
-.player-copy .player-champion-name {
-  min-width: 0;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.player-copy.red .player-champion {
+.player-copy.red .player-champion-meta {
   justify-content: flex-end;
   text-align: right;
 }
@@ -53,8 +53,11 @@
     font-size: 0.62rem;
   }
 
-  .player-copy .player-champion {
+  .player-copy .player-champion-meta {
     gap: 4px;
+  }
+
+  .player-copy .player-champion {
     font-size: 0.54rem;
     line-height: 1;
   }

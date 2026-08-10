@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { LolProviderSeries } from './provider.ts';
-import { parseRiotSeriesHistory } from './riot-history-provider.ts';
+import type { LolProviderSeries, LolProviderSnapshot } from './provider.ts';
+import { createRiotGrubsRecovery, parseRiotSeriesHistory } from './riot-history-provider.ts';
 
 const left = {
   id: 'normalized-left',
@@ -140,4 +140,104 @@ test('keeps unknown results explicit when Riot only publishes game slots', () =>
   assert.equal(history.games[0]?.durationSeconds, null);
   assert.equal(history.games[0]?.blueTeam?.id, left.id);
   assert.equal(history.games[0]?.redTeam?.id, right.id);
+});
+
+function finalSnapshotWithoutGrubs(): LolProviderSnapshot {
+  const match = series(3);
+  return {
+    series: match,
+    game: match.games[2]!,
+    sourceTimestamp: '2026-08-10T10:31:35.000Z',
+    observedAt: '2026-08-10T10:31:36.000Z',
+    advancing: false,
+    complete: true,
+    stats: {
+      gameClockSeconds: 31 * 60 + 35,
+      patch: '26.15.1',
+      blue: {
+        id: left.id,
+        name: left.name,
+        side: 'blue',
+        gold: 55_000,
+        kills: 13,
+        objectives: {
+          towers: 8,
+          inhibitors: 1,
+          dragons: ['infernal', 'cloud', 'mountain', 'ocean'],
+          barons: 1,
+          heralds: 1,
+          grubs: null
+        },
+        players: []
+      },
+      red: {
+        id: right.id,
+        name: right.name,
+        side: 'red',
+        gold: 45_000,
+        kills: 7,
+        objectives: {
+          towers: 1,
+          inhibitors: 0,
+          dragons: ['hextech'],
+          barons: 0,
+          heralds: 0,
+          grubs: null
+        },
+        players: []
+      }
+    }
+  };
+}
+
+test('recovers final-game Grubs from earlier Riot windows and caches the result', async () => {
+  const requested: URL[] = [];
+  const recover = createRiotGrubsRecovery(async input => {
+    const url = new URL(String(input));
+    requested.push(url);
+    return new Response(JSON.stringify({
+      frames: [{
+        rfc460Timestamp: url.searchParams.get('startingTime'),
+        blueTeam: {
+          objectives: { horde: { kills: 4 } }
+        },
+        redTeam: {
+          objectiveCounts: { grubs: [{}, {}] }
+        }
+      }]
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }, 'test-key');
+
+  const snapshot = finalSnapshotWithoutGrubs();
+  const recovered = await recover('game-3', snapshot);
+
+  assert.equal(recovered.stats?.blue.objectives.grubs, 4);
+  assert.equal(recovered.stats?.red.objectives.grubs, 2);
+  assert.equal(requested.length, 4);
+  assert.ok(requested.every(url => url.pathname.endsWith('/window/game-3')));
+  assert.ok(requested.every(url => url.searchParams.has('startingTime')));
+
+  const repeated = await recover('game-3', snapshot);
+  assert.equal(repeated.stats?.blue.objectives.grubs, 4);
+  assert.equal(repeated.stats?.red.objectives.grubs, 2);
+  assert.equal(requested.length, 4);
+});
+
+test('does not issue history probes when the current Riot frame already has Grubs', async () => {
+  let requests = 0;
+  const recover = createRiotGrubsRecovery(async () => {
+    requests += 1;
+    return new Response(null, { status: 404 });
+  }, 'test-key');
+  const snapshot = finalSnapshotWithoutGrubs();
+  snapshot.stats!.blue.objectives.grubs = 3;
+  snapshot.stats!.red.objectives.grubs = 0;
+
+  const recovered = await recover('game-3', snapshot);
+  assert.equal(recovered.stats?.blue.objectives.grubs, 3);
+  assert.equal(recovered.stats?.red.objectives.grubs, 0);
+  assert.equal(requests, 0);
 });

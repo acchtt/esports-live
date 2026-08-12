@@ -60,3 +60,44 @@ test('V3 keeps the catalogue usable when the primary API has a network failure',
   expect(primaryScheduleRequests).toBeGreaterThanOrEqual(1);
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3ApiEndpoint)).toBe('fallback');
 });
+
+test('V3 uses recent last-good schedules when both network APIs are unavailable', async ({ page }) => {
+  let scheduleOnline = true;
+
+  await page.route('**/health**', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+
+  await page.route('**/v1/lol/schedule**', async route => {
+    if (!scheduleOnline) {
+      await route.abort('failed');
+      return;
+    }
+    const url = new URL(route.request().url());
+    const history = url.searchParams.get('states') === 'completed';
+    await json(route, {
+      esport: 'lol',
+      events: history ? [] : [{ series: scheduledSeries, provider, observedAt: new Date().toISOString() }]
+    });
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('[data-series-id="series-api-failover"]')).toBeVisible();
+
+  await expect.poll(() => page.evaluate(async () => {
+    const cache = await window.caches.open('arena-v3-api-last-good-v1');
+    return (await cache.keys()).length;
+  })).toBeGreaterThanOrEqual(2);
+
+  scheduleOnline = false;
+  await page.locator('#refresh-data').click();
+
+  await expect(page.locator('[data-series-id="series-api-failover"]')).toBeVisible();
+  await expect(page.locator('#catalogue-meta')).not.toContainText('Failed to fetch');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3DataSource)).toBe('cache');
+  await expect(page.locator('.connection-pill')).toHaveAttribute('aria-label', 'Cached data; reconnecting');
+});

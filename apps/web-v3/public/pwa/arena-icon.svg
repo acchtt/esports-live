@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ARENA">
+  <rect width="512" height="512" rx="112" fill="#06090D"/>
+  <g transform="translate(112 112) scale(4.5)">
+    <path d="M31 4 5 57l15-5 12-23V4Z" fill="#00E5FF"/>
+    <path d="M33 4v25l12 23 14 5L33 4Z" fill="#FF3B3B"/>
+    <path d="m32 18-12 27 10-4 2-5 2 5 10 4-12-27Z" fill="#06090D"/>
+    <path d="m13 49 9-2-4 8-13 2 8-8Z" fill="#00BBD4"/>
+    <path d="m51 49-9-2 4 8 13 2-8-8Z" fill="#D82735"/>
+  </g>
+</svg>

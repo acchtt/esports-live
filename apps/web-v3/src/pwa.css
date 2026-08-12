@@ -1,0 +1,13 @@
+html[data-v3-data-source="cache"] .connection-pill i {
+  background: var(--amber);
+  box-shadow: 0 0 12px rgba(247, 199, 74, 0.52);
+}
+
+html[data-v3-data-source="cache"] .connection-pill span {
+  font-size: 0;
+}
+
+html[data-v3-data-source="cache"] .connection-pill span::after {
+  content: "Cached";
+  font-size: 0.68rem;
+}

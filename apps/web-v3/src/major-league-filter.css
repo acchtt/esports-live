@@ -28,6 +28,8 @@
   font-size: 0.66rem;
   font-weight: 850;
   line-height: 1;
+  touch-action: manipulation;
+  white-space: nowrap;
 }
 
 .catalogue-filter-pills .filter-pill::before {

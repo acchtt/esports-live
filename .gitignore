@@ -4,6 +4,10 @@ coverage/
 .vite/
 playwright-report/
 test-results/
+apps/mobile-v3-native/android/
+apps/mobile-v3-native/ios/
+*.apk
+*.aab
 .dev.vars
 .env
 .env.*

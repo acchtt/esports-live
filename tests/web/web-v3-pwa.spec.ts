@@ -83,3 +83,22 @@ test('V3 service worker keeps the routed app shell available offline', async ({ 
   await expect(page.locator('meta[name="arena-version"]')).toHaveAttribute('content', 'v3');
   expect(new URL(page.url()).pathname).toBe('/match/offline-series/offline-game');
 });
+
+test('V3 treats a Capacitor Android bridge as native and skips the browser service worker', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as Window & { androidBridge?: Record<string, never> }).androidBridge = {};
+  });
+  await mockEmptyApi(page);
+  await page.goto('/');
+
+  await expect(page.locator('html')).toHaveAttribute('data-v3-runtime', 'android');
+  await expect(page.locator('html')).toHaveAttribute('data-v3-display-mode', 'standalone');
+  await expect(page.locator('html')).toHaveAttribute('data-v3-pwa', 'native');
+
+  const registrations = await page.evaluate(async () => (
+    'serviceWorker' in navigator
+      ? (await navigator.serviceWorker.getRegistrations()).length
+      : 0
+  ));
+  expect(registrations).toBe(0);
+});

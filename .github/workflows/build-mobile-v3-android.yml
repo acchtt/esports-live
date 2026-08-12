@@ -1,0 +1,240 @@
+name: Build Mobile V3 Android
+
+on:
+  push:
+    branches:
+      - mobile-v3
+    paths:
+      - apps/web-v3/**
+      - apps/mobile-v3-native/**
+      - packages/**
+      - tests/web/web-v3-pwa.spec.ts
+      - package.json
+      - tsconfig.json
+      - .gitignore
+      - .github/workflows/build-mobile-v3-android.yml
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-v3-android
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  statuses: write
+
+env:
+  MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
+  V3_NATIVE_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark Android build pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            fs.writeFileSync("/tmp/mobile-v3-android-status.json", JSON.stringify({
+              state: "pending",
+              context: "esports-live/mobile-v3-android",
+              description: "ARENA V3 Android build is running",
+              target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+            }));
+          '
+          curl -fsSL --retry 3 \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            --data-binary @/tmp/mobile-v3-android-status.json
+
+      - name: Check out V3 application
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Restore Android debug signing key
+        uses: actions/cache@v6
+        with:
+          path: ~/.android/debug.keystore
+          key: arena-v3-android-debug-keystore-v1
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck native and shared code
+        run: npm run typecheck
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          sdkmanager_path="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$sdkmanager_path" ]]; then
+            sdkmanager_path="$(command -v sdkmanager)"
+          fi
+          test -n "$sdkmanager_path" || { echo "Android sdkmanager is unavailable."; exit 1; }
+          yes | "$sdkmanager_path" --licenses >/dev/null || true
+          "$sdkmanager_path" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Verify native API endpoint
+        shell: bash
+        run: |
+          for attempt in {1..8}; do
+            if curl -fsSL --connect-timeout 10 --max-time 30 \
+              "$V3_NATIVE_API_URL/health?commit=$MOBILE_V3_COMMIT_SHA" \
+              > /tmp/mobile-v3-native-health.json \
+              && curl -fsSL --connect-timeout 10 --max-time 45 \
+                -D /tmp/mobile-v3-native-schedule.headers \
+                "$V3_NATIVE_API_URL/v1/lol/schedule?states=live,paused,scheduled,unknown" \
+                > /tmp/mobile-v3-native-schedule.json \
+              && node -e '
+                const fs = require("node:fs");
+                const health = JSON.parse(fs.readFileSync("/tmp/mobile-v3-native-health.json", "utf8"));
+                const schedule = JSON.parse(fs.readFileSync("/tmp/mobile-v3-native-schedule.json", "utf8"));
+                const headers = fs.readFileSync("/tmp/mobile-v3-native-schedule.headers", "utf8").toLowerCase();
+                const healthy = health.ok === true && health.service === "esports-live-api" && health.adapters?.includes("lol");
+                const scheduled = schedule.esport === "lol" && Array.isArray(schedule.events);
+                const cors = /access-control-allow-origin:\s*\*/.test(headers);
+                process.exit(healthy && scheduled && cors ? 0 : 1);
+              '; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Native API verification failed."
+          exit 1
+
+      - name: Prepare native build metadata
+        shell: bash
+        run: |
+          echo "VITE_BUILD_SHA=$MOBILE_V3_COMMIT_SHA" >> "$GITHUB_ENV"
+          echo "VITE_BUILD_SHA_SHORT=${MOBILE_V3_COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+          echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+          echo "ARENA_ANDROID_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "ARENA_ANDROID_VERSION_NAME=0.1.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Build V3 web bundle for Android
+        env:
+          VITE_API_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
+          VITE_API_FALLBACK_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
+        run: npm run build:web-v3
+
+      - name: Generate Capacitor Android project
+        shell: bash
+        run: |
+          rm -rf apps/mobile-v3-native/android
+          npm run cap:v3:android:add
+          npm run cap:v3:android:sync
+          npm run android:configure --workspace @esports-live/mobile-v3-native
+
+      - name: Ensure stable debug signing key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then
+            keytool -genkeypair \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=ARENA,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storetype JKS
+          fi
+
+      - name: Validate generated native shell
+        shell: bash
+        run: |
+          web_assets="apps/mobile-v3-native/android/app/src/main/assets/public"
+          build_gradle="apps/mobile-v3-native/android/app/build.gradle"
+          strings_xml="apps/mobile-v3-native/android/app/src/main/res/values/strings.xml"
+          test -f "$web_assets/index.html"
+          test -f "$build_gradle"
+          test -f "$strings_xml"
+          grep -q 'name="arena-version" content="v3"' "$web_assets/index.html"
+          grep -q "$MOBILE_V3_COMMIT_SHA" "$web_assets/index.html"
+          grep -R -q "$V3_NATIVE_API_URL" "$web_assets/assets"
+          grep -Eq 'applicationId[[:space:]]+"live\.esports\.arena"' "$build_gradle"
+          grep -Eq "versionCode[[:space:]]+$ARENA_ANDROID_VERSION_CODE" "$build_gradle"
+          grep -Fq "versionName \"$ARENA_ANDROID_VERSION_NAME\"" "$build_gradle"
+          grep -Fq '<string name="app_name">ARENA</string>' "$strings_xml"
+
+      - name: Build Android debug APK
+        shell: bash
+        run: |
+          chmod +x apps/mobile-v3-native/android/gradlew
+          cd apps/mobile-v3-native/android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Verify Android APK identity
+        shell: bash
+        run: |
+          apk="apps/mobile-v3-native/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          if [[ -x "$aapt" ]]; then
+            "$aapt" dump badging "$apk" > /tmp/arena-v3-apk-badging.txt
+            grep -Fq "package: name='live.esports.arena'" /tmp/arena-v3-apk-badging.txt
+            grep -Fq "application-label:'ARENA'" /tmp/arena-v3-apk-badging.txt
+          fi
+          mkdir -p artifacts
+          short_sha="${MOBILE_V3_COMMIT_SHA:0:7}"
+          cp "$apk" "artifacts/arena-v3-${short_sha}-debug.apk"
+
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: arena-v3-android-debug-${{ github.sha }}
+          path: artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish Android build status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANDROID_JOB_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          if [[ "$ANDROID_JOB_STATUS" == "success" ]]; then
+            state="success"
+            description="ARENA V3 Android debug APK built"
+          else
+            state="failure"
+            description="ARENA V3 Android build failed"
+          fi
+          STATE="$state" DESCRIPTION="$description" node -e '
+            const fs = require("node:fs");
+            fs.writeFileSync("/tmp/mobile-v3-android-status.json", JSON.stringify({
+              state: process.env.STATE,
+              context: "esports-live/mobile-v3-android",
+              description: process.env.DESCRIPTION,
+              target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+            }));
+          '
+          curl -fsSL --retry 3 \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            --data-binary @/tmp/mobile-v3-android-status.json

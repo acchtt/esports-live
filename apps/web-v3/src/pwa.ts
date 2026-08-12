@@ -1,12 +1,23 @@
+import { Capacitor } from '@capacitor/core';
+
 const BUILD_SHA = String(import.meta.env.VITE_BUILD_SHA ?? '').trim();
 
 function standaloneMode(): boolean {
+  if (Capacitor.isNativePlatform()) return true;
   const nav = navigator as Navigator & { standalone?: boolean };
   return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true;
 }
 
 export function installPwa(): void {
+  const platform = Capacitor.getPlatform();
+  const native = Capacitor.isNativePlatform();
+  document.documentElement.dataset.v3Runtime = platform;
   document.documentElement.dataset.v3DisplayMode = standaloneMode() ? 'standalone' : 'browser';
+
+  if (native) {
+    document.documentElement.dataset.v3Pwa = 'native';
+    return;
+  }
 
   window.matchMedia('(display-mode: standalone)').addEventListener('change', () => {
     document.documentElement.dataset.v3DisplayMode = standaloneMode() ? 'standalone' : 'browser';

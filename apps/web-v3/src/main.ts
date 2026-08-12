@@ -9,6 +9,7 @@ import './grubs-objective.css';
 import './arena-brand.css';
 import './lane-gold-polish.css';
 import './loading-states.css';
+import './major-league-filter.css';
 import './pwa.css';
 import { startWebV2 } from './app.ts';
 import { installApiReliability } from './api-reliability.ts';

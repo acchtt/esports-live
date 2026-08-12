@@ -105,7 +105,10 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     const cache = await caches.open(STATIC_CACHE);
-    const cached = await cache.match(request);
+    // Vite preview and Pages can attach Vary headers to immutable built assets.
+    // The precache request and the browser module request may therefore differ in
+    // incidental headers even though they address the exact same same-origin URL.
+    const cached = await cache.match(request, { ignoreVary: true });
     if (cached) return cached;
 
     const response = await fetch(request);

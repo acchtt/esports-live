@@ -1,6 +1,9 @@
 name: Build Mobile V3 Android Release
 
 on:
+  push:
+    branches:
+      - mobile-v3
   workflow_dispatch:
     inputs:
       version_name:
@@ -23,8 +26,8 @@ permissions:
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   V3_NATIVE_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
-  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name }}
-  ARENA_ANDROID_VERSION_CODE: ${{ inputs.version_code }}
+  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name || format('0.2.{0}', github.run_number) }}
+  ARENA_ANDROID_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
   ARENA_ANDROID_RELEASE_KEYSTORE_B64: ${{ secrets.ARENA_ANDROID_RELEASE_KEYSTORE_B64 }}
   ARENA_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ARENA_ANDROID_RELEASE_STORE_PASSWORD }}
   ARENA_ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ARENA_ANDROID_RELEASE_KEY_ALIAS }}
@@ -32,6 +35,7 @@ env:
 
 jobs:
   build-release-aab:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[android-release]')
     runs-on: ubuntu-latest
     steps:
       - name: Mark Android release pending
@@ -178,7 +182,7 @@ jobs:
       - name: Upload signed Play AAB
         uses: actions/upload-artifact@v7
         with:
-          name: arena-v3-android-release-${{ inputs.version_name }}-${{ github.sha }}
+          name: arena-v3-android-release-${{ env.ARENA_ANDROID_VERSION_NAME }}-${{ github.sha }}
           path: |
             artifacts/*.aab
             artifacts/SHA256SUMS.txt

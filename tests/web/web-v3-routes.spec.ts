@@ -143,6 +143,31 @@ test('V3 opens a deep match URL directly, including the /v3 compatibility base',
   await expect(page).toHaveURL(/\/v3\/match\/series-routed\/game-routed-2$/);
 });
 
+test('V3 match scrolling stops at the bottom of the scoreboard', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 420 });
+  await installFixtures(page);
+  await page.goto('/match/series-routed/game-routed-2');
+  await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+  await expect(page.locator('.mobile-nav')).toBeHidden();
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(50);
+
+  const boundary = await page.locator('#scoreboard').evaluate(scoreboard => {
+    const root = document.scrollingElement ?? document.documentElement;
+    const box = scoreboard.getBoundingClientRect();
+    return {
+      scoreboardBottom: box.bottom + window.scrollY,
+      documentBottom: root.scrollHeight,
+      scrollY: window.scrollY,
+      maxScrollY: Math.max(0, root.scrollHeight - window.innerHeight)
+    };
+  });
+
+  expect(Math.abs(boundary.documentBottom - boundary.scoreboardBottom)).toBeLessThanOrEqual(2);
+  expect(Math.abs(boundary.maxScrollY - boundary.scrollY)).toBeLessThanOrEqual(2);
+});
+
 test('V3 match routes preserve foreground schedule and snapshot refreshes', async ({ page }) => {
   let scheduleRequests = 0;
   let snapshotRequests = 0;

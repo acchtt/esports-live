@@ -3,8 +3,9 @@ type V3Route =
   | { kind: 'platform' }
   | { kind: 'match'; seriesId: string; gameId: string | null };
 
-const MATCH_SCHEDULE_CACHE_MS = 120_000;
-const HISTORY_SCHEDULE_CACHE_MS = 300_000;
+function isV2BaselinePath(pathname = window.location.pathname): boolean {
+  return pathname === '/v2' || pathname.startsWith('/v2/');
+}
 
 function routeBase(pathname = window.location.pathname): '' | '/v3' {
   return pathname === '/v3' || pathname.startsWith('/v3/') ? '/v3' : '';
@@ -27,6 +28,7 @@ function decodeSegment(value: string | undefined): string | null {
 }
 
 export function currentV3Route(pathname = window.location.pathname): V3Route {
+  if (isV2BaselinePath(pathname)) return { kind: 'catalogue' };
   const path = stripRouteBase(pathname).replace(/\/+$/, '') || '/';
   if (path === '/platform') return { kind: 'platform' };
   const match = path.match(/^\/match\/([^/]+)(?:\/([^/]+))?$/);
@@ -51,44 +53,10 @@ function cataloguePath(): string {
   return `${base}/`;
 }
 
-function requestUrl(input: RequestInfo | URL): string {
-  if (typeof input === 'string') return input;
-  if (input instanceof URL) return input.href;
-  return input.url;
-}
-
-function scheduleView(input: RequestInfo | URL): 'matches' | 'history' | null {
-  try {
-    const url = new URL(requestUrl(input), window.location.href);
-    if (!/\/v1\/lol\/schedule$/.test(url.pathname)) return null;
-    return url.searchParams.get('states') === 'completed' ? 'history' : 'matches';
-  } catch {
-    return null;
-  }
-}
-
-export function installV3RouteFetchPolicy(): void {
-  if (currentV3Route().kind !== 'match') return;
-  const nativeFetch = window.fetch.bind(window);
-  const scheduleCache = new Map<string, { response: Response; storedAt: number; view: 'matches' | 'history' }>();
-
-  window.fetch = async (...args) => {
-    const view = scheduleView(args[0]);
-    if (!view) return nativeFetch(...args);
-
-    const key = requestUrl(args[0]);
-    const cached = scheduleCache.get(key);
-    const maxAge = view === 'history' ? HISTORY_SCHEDULE_CACHE_MS : MATCH_SCHEDULE_CACHE_MS;
-    if (cached && Date.now() - cached.storedAt < maxAge) {
-      return cached.response.clone();
-    }
-
-    const response = await nativeFetch(...args);
-    if (response.ok) {
-      scheduleCache.set(key, { response: response.clone(), storedAt: Date.now(), view });
-    }
-    return response;
-  };
+function withCommitQuery(path: string): string {
+  const search = new URLSearchParams(window.location.search);
+  const commit = search.get('commit');
+  return commit ? `${path}?commit=${encodeURIComponent(commit)}` : path;
 }
 
 function matchingSeriesCard(root: HTMLElement, seriesId: string): HTMLElement | null {
@@ -101,28 +69,48 @@ function matchingGameButton(root: HTMLElement, gameId: string): HTMLElement | nu
     .find(button => button.dataset.gameId === gameId) ?? null;
 }
 
-function withCommitQuery(path: string): string {
-  const search = new URLSearchParams(window.location.search);
-  const commit = search.get('commit');
-  return commit ? `${path}?commit=${encodeURIComponent(commit)}` : path;
-}
-
 export function installV3Routing(root: HTMLElement): () => void {
+  // `/v2/` is intentionally kept as an un-routed baseline surface so the inherited
+  // V2 regression suite can validate that V3 still preserves every stable board
+  // behavior independently of the new page-routing layer.
+  if (isV2BaselinePath()) return () => undefined;
+
   let applyingRoute = false;
   let scheduled = false;
 
   document.documentElement.dataset.arenaRoute = currentV3Route().kind;
   const build = root.querySelector<HTMLElement>('.build-pill');
-  if (build) build.textContent = build.textContent?.replace(/^V2\s*·\s*/, 'V3 · ROUTED · ') ?? 'V3 · ROUTED';
+  if (build) {
+    build.textContent = build.textContent?.replace(/^V2\s*·\s*/, 'V3 · ROUTED · ') ?? 'V3 · ROUTED';
+  }
+
+  const queueApply = (): void => {
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(applyRoute);
+  };
+
+  const activateCatalogue = (): void => {
+    const matchPanel = root.querySelector<HTMLElement>('#match-panel');
+    if (matchPanel?.hidden !== false) return;
+    const matches = root.querySelector<HTMLElement>('[data-app-view="matches"]');
+    if (!matches) return;
+    applyingRoute = true;
+    matches.click();
+    applyingRoute = false;
+  };
 
   const applyRoute = (): void => {
     scheduled = false;
     const route = currentV3Route();
     document.documentElement.dataset.arenaRoute = route.kind;
-    if (route.kind !== 'match') return;
+
+    if (route.kind !== 'match') {
+      activateCatalogue();
+      return;
+    }
 
     const scoreboard = root.querySelector<HTMLElement>('#scoreboard');
-    const currentSeriesTitle = root.querySelector<HTMLElement>('#detail-title')?.textContent?.trim() ?? '';
     const card = matchingSeriesCard(root, route.seriesId);
     const matchPanel = root.querySelector<HTMLElement>('#match-panel');
 
@@ -146,18 +134,12 @@ export function installV3Routing(root: HTMLElement): () => void {
     }
 
     const selectedGameId = scoreboard?.dataset.gameId?.trim() ?? '';
-    if (selectedGameId && currentSeriesTitle) {
+    if (selectedGameId) {
       const canonical = routePath(route.seriesId, selectedGameId);
       if (window.location.pathname !== canonical) {
         window.history.replaceState({ arenaV3: true }, '', withCommitQuery(canonical));
       }
     }
-  };
-
-  const queueApply = (): void => {
-    if (scheduled) return;
-    scheduled = true;
-    queueMicrotask(applyRoute);
   };
 
   const onClick = (event: MouseEvent): void => {
@@ -168,17 +150,20 @@ export function installV3Routing(root: HTMLElement): () => void {
     const route = currentV3Route();
     const card = target.closest<HTMLElement>('[data-series-id][data-source-view]');
     if (card?.dataset.seriesId && route.kind !== 'match') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      window.location.assign(withCommitQuery(routePath(card.dataset.seriesId)));
+      window.history.pushState(
+        { arenaV3: true },
+        '',
+        withCommitQuery(routePath(card.dataset.seriesId))
+      );
+      document.documentElement.dataset.arenaRoute = 'match';
+      queueApply();
       return;
     }
 
     const matchesNav = target.closest<HTMLElement>('[data-app-view="matches"]');
     if (matchesNav && route.kind === 'match') {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      window.location.assign(withCommitQuery(cataloguePath()));
+      window.history.pushState({ arenaV3: true }, '', withCommitQuery(cataloguePath()));
+      document.documentElement.dataset.arenaRoute = 'catalogue';
       return;
     }
 

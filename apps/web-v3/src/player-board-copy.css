@@ -1,0 +1,72 @@
+.player-copy .player-statline {
+  font-variant-numeric: tabular-nums;
+}
+
+.player-copy .player-champion-meta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.player-copy .player-champion {
+  min-width: 0;
+  overflow: hidden;
+  color: #7f90a7;
+  font-size: 0.68rem;
+  font-weight: 780;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-copy.red .player-champion-meta {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.player-copy .champion-level {
+  display: inline-grid;
+  flex: 0 0 auto;
+  min-width: 29px;
+  height: 17px;
+  place-items: center;
+  padding: 0 4px;
+  border: 1px solid rgba(148, 209, 240, 0.48);
+  border-radius: 5px;
+  color: #dcefff;
+  background: rgba(12, 31, 49, 0.86);
+  font-size: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 950;
+  line-height: 1;
+}
+
+@media (max-width: 760px) {
+  .player-copy {
+    gap: 3px;
+  }
+
+  .player-copy .player-statline {
+    font-size: 0.62rem;
+  }
+
+  .player-copy .player-champion-meta {
+    gap: 4px;
+  }
+
+  .player-copy .player-champion {
+    font-size: 0.54rem;
+    line-height: 1;
+  }
+
+  .player-copy .champion-level {
+    min-width: 26px;
+    height: 14px;
+    padding-inline: 3px;
+    border-radius: 4px;
+    font-size: 0.44rem;
+  }
+}

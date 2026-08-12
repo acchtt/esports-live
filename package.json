@@ -12,9 +12,11 @@
     "dev:web": "vite apps/web",
     "dev:web-mobile": "vite apps/web-mobile",
     "dev:web-v2": "vite apps/web-v2",
+    "dev:web-v3": "vite apps/web-v3",
     "build:web": "npm run build --workspace @esports-live/web",
     "build:web-mobile": "npm run build --workspace @esports-live/web-mobile",
     "build:web-v2": "npm run build --workspace @esports-live/web-v2",
+    "build:web-v3": "npm run build --workspace @esports-live/web-v3",
     "deploy:api": "wrangler deploy",
     "deploy:web": "npm run build:web && wrangler pages deploy apps/web/dist --project-name esports-live",
     "typecheck": "tsc --noEmit",
@@ -22,6 +24,7 @@
     "test:web": "npm run build:web && playwright test",
     "test:web-mobile": "npm run build:web-mobile && WEB_APP_ROOT=apps/web-mobile playwright test tests/web/mobile- tests/web/completed-board-merge.spec.ts tests/web/live-telemetry-pending.spec.ts",
     "test:web-v2": "npm run build:web-v2 && WEB_APP_ROOT=apps/web-v2 playwright test tests/web/web-v2-",
+    "test:web-v3": "npm run build:web-v3 && WEB_APP_ROOT=apps/web-v3 playwright test tests/web/web-v2- tests/web/web-v3-",
     "check": "npm run typecheck && npm test"
   },
   "devDependencies": {

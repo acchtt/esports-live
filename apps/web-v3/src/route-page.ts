@@ -59,7 +59,7 @@ function withCommitQuery(path: string): string {
   return commit ? `${path}?commit=${encodeURIComponent(commit)}` : path;
 }
 
-function matchingSeriesCard(root: HTMLElement, seriesId: string): HTMLElement | null {
+function matchingSeriesCard(root: ParentNode, seriesId: string): HTMLElement | null {
   return [...root.querySelectorAll<HTMLElement>('[data-series-id][data-source-view]')]
     .find(card => card.dataset.seriesId === seriesId) ?? null;
 }
@@ -77,6 +77,19 @@ export function installV3Routing(root: HTMLElement): () => void {
 
   let applyingRoute = false;
   let scheduled = false;
+  const cataloguePanel = root.querySelector<HTMLElement>('#catalogue-panel');
+  const matchPanel = root.querySelector<HTMLElement>('#match-panel');
+
+  const restoreCatalogue = (): void => {
+    if (!cataloguePanel || cataloguePanel.isConnected) return;
+    const parent = matchPanel?.parentNode;
+    if (parent) parent.insertBefore(cataloguePanel, matchPanel);
+  };
+
+  const detachCatalogue = (): void => {
+    if (!cataloguePanel?.isConnected) return;
+    cataloguePanel.remove();
+  };
 
   document.documentElement.dataset.arenaRoute = currentV3Route().kind;
   const build = root.querySelector<HTMLElement>('.build-pill');
@@ -91,7 +104,7 @@ export function installV3Routing(root: HTMLElement): () => void {
   };
 
   const activateCatalogue = (): void => {
-    const matchPanel = root.querySelector<HTMLElement>('#match-panel');
+    restoreCatalogue();
     if (matchPanel?.hidden !== false) return;
     const matches = root.querySelector<HTMLElement>('[data-app-view="matches"]');
     if (!matches) return;
@@ -110,9 +123,13 @@ export function installV3Routing(root: HTMLElement): () => void {
       return;
     }
 
+    // A direct match URL starts with the cached catalogue long enough to resolve
+    // the series, then removes that entire hidden subtree from the live document.
+    // This keeps catalogue state available for Back without making its DOM and
+    // observers participate in 2-second live-board updates.
+    restoreCatalogue();
     const scoreboard = root.querySelector<HTMLElement>('#scoreboard');
-    const card = matchingSeriesCard(root, route.seriesId);
-    const matchPanel = root.querySelector<HTMLElement>('#match-panel');
+    const card = cataloguePanel ? matchingSeriesCard(cataloguePanel, route.seriesId) : null;
 
     if (card && matchPanel?.hidden !== false) {
       applyingRoute = true;
@@ -139,6 +156,7 @@ export function installV3Routing(root: HTMLElement): () => void {
       if (window.location.pathname !== canonical) {
         window.history.replaceState({ arenaV3: true }, '', withCommitQuery(canonical));
       }
+      detachCatalogue();
     }
   };
 
@@ -162,6 +180,7 @@ export function installV3Routing(root: HTMLElement): () => void {
 
     const matchesNav = target.closest<HTMLElement>('[data-app-view="matches"]');
     if (matchesNav && route.kind === 'match') {
+      restoreCatalogue();
       window.history.pushState({ arenaV3: true }, '', withCommitQuery(cataloguePath()));
       document.documentElement.dataset.arenaRoute = 'catalogue';
       return;
@@ -189,6 +208,7 @@ export function installV3Routing(root: HTMLElement): () => void {
   queueApply();
 
   return () => {
+    restoreCatalogue();
     observer.disconnect();
     root.removeEventListener('click', onClick, true);
     window.removeEventListener('popstate', onPopState);

@@ -19,7 +19,7 @@ import { installGrubsObjective } from './grubs-objective.ts';
 import { installLiveLifecycle } from './live-lifecycle.ts';
 import { installLoadingStates } from './loading-states.ts';
 import { installPlayerBoardCopy } from './player-board-copy.ts';
-import { currentV3Route, installV3RouteFetchPolicy, installV3Routing } from './route-page.ts';
+import { currentV3Route, installV3Routing } from './route-page.ts';
 import { installTeamSideIdentity } from './team-side-identity.ts';
 import { installWinnerDeclaration } from './winner-declaration.ts';
 
@@ -27,7 +27,6 @@ const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Missing #app root.');
 
 const initialRoute = currentV3Route();
-installV3RouteFetchPolicy();
 if (initialRoute.kind !== 'match') {
   installCatalogueFinality();
   installCatalogueTeamLogos(root);

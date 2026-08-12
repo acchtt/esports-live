@@ -20,14 +20,16 @@ export function isMajorLeagueCompetition(value: string): boolean {
   const name = normalizedCompetitionName(value);
   if (!name) return false;
   if (MINOR_LEAGUE_MARKERS.some(marker => name.includes(marker))) return false;
+  if (/^lck\s+cl(?:\s|$)/.test(name)) return false;
 
-  if (/^(lpl|lck|lec|lcs|lcp)$/.test(name)) return true;
-  if (/^lta(?: north| south)?$/.test(name)) return true;
+  if (/^(lpl|lck|lec|lcs|lcp)(?:\s|$)/.test(name)) return true;
+  if (/^lta(?:\s+(?:north|south))?(?:\s|$)/.test(name)) return true;
 
   return name.includes('league of legends pro league')
     || name.includes('league of legends champions korea')
     || name.includes('league of legends emea championship')
     || name === 'league championship series'
+    || name.includes('league of legends championship of the americas')
     || name.includes('league of the americas')
     || name.includes('league of legends championship pacific');
 }
@@ -39,6 +41,7 @@ function competitionName(card: HTMLElement): string {
 export function installMajorLeagueFilter(root: ParentNode): () => void {
   const filters = root.querySelector<HTMLElement>('.match-filters');
   const grid = root.querySelector<HTMLElement>('#catalogue-grid');
+  const meta = root.querySelector<HTMLElement>('#catalogue-meta');
   if (!filters || !grid) return () => undefined;
 
   let button = filters.querySelector<HTMLButtonElement>('[data-major-leagues-filter]');
@@ -56,9 +59,15 @@ export function installMajorLeagueFilter(root: ParentNode): () => void {
 
   let majorOnly = false;
   let syncQueued = false;
+  let baseMetaText = meta?.textContent ?? '';
 
   const sync = (): void => {
     syncQueued = false;
+    const currentMetaText = meta?.textContent ?? '';
+    if (currentMetaText && !currentMetaText.endsWith(' · Majors')) {
+      baseMetaText = currentMetaText;
+    }
+
     const cards = [...grid.querySelectorAll<HTMLElement>('.match-card')];
     let shown = 0;
 
@@ -84,6 +93,17 @@ export function installMajorLeagueFilter(root: ParentNode): () => void {
       copy.textContent = 'Try another status filter or turn Majors off.';
       empty.append(title, copy);
       grid.append(empty);
+    }
+
+    if (meta) {
+      if (majorOnly) {
+        const counts = baseMetaText.match(/^(\d+) matches · \d+ shown$/);
+        meta.textContent = counts
+          ? `${counts[1]} matches · ${shown} shown · Majors`
+          : baseMetaText;
+      } else if (meta.textContent?.endsWith(' · Majors')) {
+        meta.textContent = baseMetaText;
+      }
     }
   };
 

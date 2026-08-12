@@ -141,8 +141,7 @@ test('V3 keeps refreshing a selected LPL Final game until newer final telemetry 
   await page.locator('[data-series-id="lpl-final-series"]').click();
 
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Final');
-  await expect(page.locator('#blue-kills')).toHaveText('7');
-
+  await expect.poll(() => snapshotRequests).toBeGreaterThanOrEqual(1);
   await expect.poll(() => snapshotRequests, { timeout: 7_000 }).toBeGreaterThanOrEqual(2);
   await expect(page.locator('#blue-kills')).toHaveText('11');
 

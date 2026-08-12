@@ -157,6 +157,9 @@ test('V3 match routes preserve foreground schedule and snapshot refreshes', asyn
   await page.goto('/match/series-routed/game-routed-2');
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
 
+  // Initial navigation can itself emit focus/pageshow. Wait past the production
+  // foreground debounce before modelling a later return to the app.
+  await page.waitForTimeout(300);
   const schedulesBeforeFocus = scheduleRequests;
   const snapshotsBeforeFocus = snapshotRequests;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));

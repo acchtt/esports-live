@@ -18,7 +18,7 @@ const series = {
 };
 
 function snapshot(gameId: string) {
-  const game = series.games.find(item => item.id === gameId) ?? series.games[1];
+  const game = series.games.find(item => item.id === gameId) ?? series.games[1]!;
   const completed = game.id === 'game-routed-1';
   const now = new Date().toISOString();
   return {

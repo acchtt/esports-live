@@ -32,6 +32,7 @@ env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   MOBILE_V3_VERSION: 0.1.0
+  V3_API_FALLBACK_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
 
 jobs:
   deploy-web:
@@ -64,6 +65,7 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$V3_API_FALLBACK_URL" || { echo "Missing V3_API_FALLBACK_URL"; exit 1; }
 
       - name: Check out V3 application
         uses: actions/checkout@v6
@@ -115,11 +117,60 @@ jobs:
                 const value = JSON.parse(fs.readFileSync("/tmp/mobile-v3-health.json", "utf8"));
                 process.exit(value.ok === true && value.service === "esports-live-api" && value.adapters?.includes("lol") ? 0 : 1);
               '; then
-              exit 0
+              break
+            fi
+            if [[ "$attempt" == "12" ]]; then
+              echo "V3 API preview health verification failed."
+              exit 1
             fi
             sleep 5
           done
-          echo "V3 API preview verification failed."
+
+          # A preview-version schedule route can be intermittently unreachable even
+          # when /health is healthy. Probe it here for visibility, while the verified
+          # stable fallback below remains the release safety net.
+          if curl -fsSL --connect-timeout 10 --max-time 45 \
+            -D /tmp/mobile-v3-primary-schedule.headers \
+            "$API_BASE_URL/v1/lol/schedule?states=live,paused,scheduled,unknown" \
+            > /tmp/mobile-v3-primary-schedule.json \
+            && node -e '
+              const fs = require("node:fs");
+              const value = JSON.parse(fs.readFileSync("/tmp/mobile-v3-primary-schedule.json", "utf8"));
+              process.exit(value.esport === "lol" && Array.isArray(value.events) ? 0 : 1);
+            '; then
+            echo "V3 primary schedule probe passed."
+          else
+            echo "V3 primary schedule probe failed; browser failover will use the verified stable API."
+          fi
+
+      - name: Verify V3 stable API fallback
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if curl -fsSL --connect-timeout 10 --max-time 30 \
+              "$V3_API_FALLBACK_URL/health?commit=$MOBILE_V3_COMMIT_SHA" \
+              > /tmp/mobile-v3-fallback-health.json \
+              && curl -fsSL --connect-timeout 10 --max-time 45 \
+                -D /tmp/mobile-v3-fallback-schedule.headers \
+                "$V3_API_FALLBACK_URL/v1/lol/schedule?states=live,paused,scheduled,unknown" \
+                > /tmp/mobile-v3-fallback-schedule.json \
+              && node -e '
+                const fs = require("node:fs");
+                const health = JSON.parse(fs.readFileSync("/tmp/mobile-v3-fallback-health.json", "utf8"));
+                const schedule = JSON.parse(fs.readFileSync("/tmp/mobile-v3-fallback-schedule.json", "utf8"));
+                const headers = fs.readFileSync("/tmp/mobile-v3-fallback-schedule.headers", "utf8").toLowerCase();
+                const healthy = health.ok === true && health.service === "esports-live-api" && health.adapters?.includes("lol");
+                const scheduled = schedule.esport === "lol" && Array.isArray(schedule.events);
+                const cors = /access-control-allow-origin:\s*\*/.test(headers);
+                process.exit(healthy && scheduled && cors ? 0 : 1);
+              '; then
+              echo "V3 stable API fallback is healthy and schedule-capable."
+              exit 0
+            fi
+            echo "V3 fallback API not ready (attempt $attempt/12)."
+            sleep 5
+          done
+          echo "V3 stable API fallback verification failed."
           exit 1
 
       - name: Prepare V3 build metadata
@@ -133,18 +184,20 @@ jobs:
       - name: Build ARENA V3
         env:
           VITE_API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+          VITE_API_FALLBACK_BASE_URL: ${{ env.V3_API_FALLBACK_URL }}
         shell: bash
         run: |
           npm run build:web-v3
           mkdir -p apps/web-v3/dist/v3
           cp apps/web-v3/dist/index.html apps/web-v3/dist/v3/index.html
 
-      - name: Confirm V3 metadata and route fallback are embedded
+      - name: Confirm V3 metadata and API failover are embedded
         env:
           API_BASE_URL: ${{ steps.api-preview.outputs.url }}
         shell: bash
         run: |
           grep -R "$API_BASE_URL" apps/web-v3/dist/assets
+          grep -R "$V3_API_FALLBACK_URL" apps/web-v3/dist/assets
           grep -q "$MOBILE_V3_COMMIT_SHA" apps/web-v3/dist/index.html
           grep -q 'name="arena-version" content="v3"' apps/web-v3/dist/index.html
           grep -R 'V3 · ROUTED' apps/web-v3/dist/assets
@@ -187,6 +240,7 @@ jobs:
             if grep -q 'name="arena-version" content="v3"' <<<"$html" \
               && grep -q "$MOBILE_V3_COMMIT_SHA" <<<"$html" \
               && grep -q 'V3 · ROUTED' <<<"$script" \
+              && grep -q "$V3_API_FALLBACK_URL" <<<"$script" \
               && grep -q 'name="arena-version" content="v3"' <<<"$alias_html" \
               && grep -q 'name="arena-version" content="v3"' <<<"$match_html" \
               && grep -q 'name="arena-version" content="v3"' <<<"$alias_match_html" \

@@ -161,11 +161,56 @@ function selectionForEvents(
   };
 }
 
+function latestSnapshotForSeries(
+  snapshots: Readonly<Record<string, LiveSnapshot<LolStats>>>,
+  seriesId: string
+): LiveSnapshot<LolStats> | null {
+  let latest: LiveSnapshot<LolStats> | null = null;
+  Object.values(snapshots).forEach(snapshot => {
+    if (snapshot.series.id !== seriesId) return;
+    if (!latest) {
+      latest = snapshot;
+      return;
+    }
+
+    const snapshotTimestamp = snapshotTime(snapshot);
+    const latestTimestamp = snapshotTime(latest);
+    if (
+      snapshotTimestamp > latestTimestamp
+      || (snapshotTimestamp === latestTimestamp
+        && GAME_STATE_RANK[snapshot.game.state] > GAME_STATE_RANK[latest.game.state])
+    ) {
+      latest = snapshot;
+    }
+  });
+  return latest;
+}
+
+function isActiveSnapshot(snapshot: LiveSnapshot<LolStats> | null): snapshot is LiveSnapshot<LolStats> {
+  return snapshot?.game.state === 'live'
+    || snapshot?.game.state === 'draft'
+    || snapshot?.game.state === 'paused';
+}
+
 function mergeScheduleEvents(
   previous: readonly ScheduleEvent[],
-  incoming: readonly ScheduleEvent[]
+  incoming: readonly ScheduleEvent[],
+  snapshots: Readonly<Record<string, LiveSnapshot<LolStats>>>
 ): readonly ScheduleEvent[] {
   return incoming.map(event => {
+    const latestSnapshot = latestSnapshotForSeries(snapshots, event.series.id);
+    if (event.series.state !== 'completed' && isActiveSnapshot(latestSnapshot)) {
+      const activeSeriesState = latestSnapshot.game.state === 'paused' ? 'paused' : 'live';
+      return {
+        ...event,
+        series: {
+          ...event.series,
+          state: activeSeriesState,
+          games: latestSnapshot.series.games
+        }
+      };
+    }
+
     const existing = previous.find(item => item.series.id === event.series.id);
     if (!existing) return event;
     const incomingOnlyHasLazyGame = event.series.games.length > 0
@@ -314,7 +359,11 @@ export function reducer(state: AppState, action: AppAction): AppState {
         scheduleError: { ...state.scheduleError, [action.view]: null }
       };
     case 'schedule-loaded': {
-      const nextEvents = mergeScheduleEvents(state.events[action.view], action.events);
+      const nextEvents = mergeScheduleEvents(
+        state.events[action.view],
+        action.events,
+        state.snapshots
+      );
       const nextSelection = selectionForEvents(
         nextEvents,
         state.selections[action.view],

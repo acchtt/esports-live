@@ -10,6 +10,7 @@ import './arena-brand.css';
 import './lane-gold-polish.css';
 import './loading-states.css';
 import { startWebV2 } from './app.ts';
+import { installApiReliability } from './api-reliability.ts';
 import { installArenaBrand } from './arena-brand.ts';
 import { installCatalogueFinality } from './catalogue-finality.ts';
 import { installCatalogueTeamLogos } from './catalogue-team-logos.ts';
@@ -26,6 +27,7 @@ import { installWinnerDeclaration } from './winner-declaration.ts';
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Missing #app root.');
 
+installApiReliability();
 const initialRoute = currentV3Route();
 if (initialRoute.kind !== 'match') {
   installCatalogueFinality();

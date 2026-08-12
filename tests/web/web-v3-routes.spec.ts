@@ -114,6 +114,7 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('.build-pill')).toContainText('V3 · ROUTED');
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+  await expect(page.locator('#catalogue-panel')).toHaveCount(0);
 
   await page.locator('#game-tabs [data-game-id="game-routed-1"]').click();
   await expect(page).toHaveURL(/\/match\/series-routed\/game-routed-1(?:\?|$)/);
@@ -121,6 +122,7 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
 
   await page.locator('.back-button').click();
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('#catalogue-panel')).toBeVisible();
   await expect(page.locator('[data-series-id="series-routed"]')).toBeVisible();
 });
 
@@ -131,10 +133,35 @@ test('V3 opens a deep match URL directly, including the /v3 compatibility base',
   await page.goto('/match/series-routed/game-routed-1');
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
+  await expect(page.locator('#catalogue-panel')).toHaveCount(0);
   await expect(page).toHaveURL(/\/match\/series-routed\/game-routed-1$/);
 
   await page.goto('/v3/match/series-routed/game-routed-2');
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+  await expect(page.locator('#catalogue-panel')).toHaveCount(0);
   await expect(page).toHaveURL(/\/v3\/match\/series-routed\/game-routed-2$/);
+});
+
+test('V3 match routes preserve foreground schedule and snapshot refreshes', async ({ page }) => {
+  let scheduleRequests = 0;
+  let snapshotRequests = 0;
+  page.on('request', request => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith('/v1/lol/schedule')) scheduleRequests += 1;
+    if (/\/v1\/lol\/games\/[^/]+\/live$/.test(url.pathname)) snapshotRequests += 1;
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(page);
+  await page.goto('/match/series-routed/game-routed-2');
+  await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+
+  const schedulesBeforeFocus = scheduleRequests;
+  const snapshotsBeforeFocus = snapshotRequests;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+
+  await expect.poll(() => scheduleRequests).toBeGreaterThan(schedulesBeforeFocus);
+  await expect.poll(() => snapshotRequests).toBeGreaterThan(snapshotsBeforeFocus);
+  await expect(page.locator('#catalogue-panel')).toHaveCount(0);
 });

@@ -8,6 +8,10 @@ function sameOrigin(url) {
   return url.origin === self.location.origin;
 }
 
+function absoluteRequest(value) {
+  return new Request(new URL(value, self.location.origin).toString(), { cache: 'reload' });
+}
+
 function staticRequest(request, url) {
   return sameOrigin(url) && (
     ['script', 'style', 'image', 'font'].includes(request.destination)
@@ -16,8 +20,17 @@ function staticRequest(request, url) {
   );
 }
 
+async function cacheStaticAsset(cache, value) {
+  const request = absoluteRequest(value);
+  const response = await fetch(request);
+  if (!response.ok) {
+    throw new Error(`Static asset ${new URL(request.url).pathname} returned ${response.status}`);
+  }
+  await cache.put(request, response);
+}
+
 async function cacheShell() {
-  const response = await fetch(new Request('/', { cache: 'reload' }));
+  const response = await fetch(absoluteRequest('/'));
   if (!response.ok) throw new Error(`Shell returned ${response.status}`);
 
   const shellCache = await caches.open(SHELL_CACHE);
@@ -29,10 +42,10 @@ async function cacheShell() {
     .filter(Boolean)
     .map(value => new URL(value, self.location.origin))
     .filter(sameOrigin)
-    .map(url => `${url.pathname}${url.search}`);
+    .map(url => url.toString());
   const urls = [...new Set([...CORE_ASSETS, ...discovered])];
   const staticCache = await caches.open(STATIC_CACHE);
-  await Promise.allSettled(urls.map(url => staticCache.add(new Request(url, { cache: 'reload' }))));
+  await Promise.all(urls.map(value => cacheStaticAsset(staticCache, value)));
 }
 
 async function cleanOldCaches() {
@@ -59,7 +72,7 @@ self.addEventListener('activate', event => {
     try {
       await cacheShell();
     } catch {
-      // A previous shell can still serve the app if the activation refresh is offline.
+      // A previously installed shell can still serve the app if activation happens offline.
     }
     await self.clients.claim();
   })());

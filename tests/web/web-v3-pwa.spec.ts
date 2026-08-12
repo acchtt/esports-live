@@ -67,6 +67,15 @@ test('V3 service worker keeps the routed app shell available offline', async ({ 
   });
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
 
+  const cachedAssets = await page.evaluate(async () => {
+    const cache = await window.caches.open('arena-v3-static-pwa-test');
+    return (await cache.keys()).map(request => new URL(request.url).pathname);
+  });
+  expect(cachedAssets.some(path => path.endsWith('.js'))).toBe(true);
+  expect(cachedAssets.some(path => path.endsWith('.css'))).toBe(true);
+  expect(cachedAssets).toContain('/manifest.webmanifest');
+  expect(cachedAssets).toContain('/pwa/arena-icon.svg');
+
   await context.setOffline(true);
   await page.goto('/match/offline-series/offline-game', { waitUntil: 'domcontentloaded' });
 

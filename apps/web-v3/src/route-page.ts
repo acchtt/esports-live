@@ -123,23 +123,25 @@ export function installV3Routing(root: HTMLElement): () => void {
       return;
     }
 
-    // A direct match URL starts with the cached catalogue long enough to resolve
-    // the series, then removes that entire hidden subtree from the live document.
-    // This keeps catalogue state available for Back without making its DOM and
-    // observers participate in 2-second live-board updates.
-    restoreCatalogue();
     const scoreboard = root.querySelector<HTMLElement>('#scoreboard');
-    const card = cataloguePanel ? matchingSeriesCard(cataloguePanel, route.seriesId) : null;
+    const selectedGameId = scoreboard?.dataset.gameId?.trim() ?? '';
 
-    if (card && matchPanel?.hidden !== false) {
-      applyingRoute = true;
-      card.click();
-      applyingRoute = false;
-      queueApply();
+    // Keep the catalogue connected only while a direct match route still needs it
+    // to resolve/select the series. Once the match panel is active it stays detached
+    // until navigation returns to the catalogue, avoiding a MutationObserver loop.
+    if (matchPanel?.hidden !== false) {
+      restoreCatalogue();
+      const card = cataloguePanel ? matchingSeriesCard(cataloguePanel, route.seriesId) : null;
+      if (card) {
+        applyingRoute = true;
+        card.click();
+        applyingRoute = false;
+        queueApply();
+      }
       return;
     }
 
-    if (route.gameId && scoreboard?.dataset.gameId !== route.gameId) {
+    if (route.gameId && selectedGameId !== route.gameId) {
       const gameButton = matchingGameButton(root, route.gameId);
       if (gameButton) {
         applyingRoute = true;
@@ -150,9 +152,9 @@ export function installV3Routing(root: HTMLElement): () => void {
       }
     }
 
-    const selectedGameId = scoreboard?.dataset.gameId?.trim() ?? '';
-    if (selectedGameId) {
-      const canonical = routePath(route.seriesId, selectedGameId);
+    const currentGameId = scoreboard?.dataset.gameId?.trim() ?? '';
+    if (currentGameId) {
+      const canonical = routePath(route.seriesId, currentGameId);
       if (window.location.pathname !== canonical) {
         window.history.replaceState({ arenaV3: true }, '', withCommitQuery(canonical));
       }

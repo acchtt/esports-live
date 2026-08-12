@@ -1,3 +1,17 @@
+html[data-arena-route="match"] .v2-shell {
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+html[data-arena-route="match"] .app-main,
+html[data-arena-route="match"] .match-panel {
+  padding-bottom: 0;
+}
+
+html[data-arena-route="match"] .mobile-nav {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .app-main {
     padding: 16px 12px calc(118px + env(safe-area-inset-bottom));
@@ -5,6 +19,11 @@
 
   .match-panel {
     padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  html[data-arena-route="match"] .app-main,
+  html[data-arena-route="match"] .match-panel {
+    padding-bottom: 0;
   }
 
   .scoreboard {

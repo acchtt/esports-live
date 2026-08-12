@@ -44,17 +44,25 @@ export function installMajorLeagueFilter(root: ParentNode): () => void {
   const meta = root.querySelector<HTMLElement>('#catalogue-meta');
   if (!filters || !grid) return () => undefined;
 
-  let button = filters.querySelector<HTMLButtonElement>('[data-major-leagues-filter]');
+  let pills = root.querySelector<HTMLElement>('.catalogue-filter-pills');
+  if (!pills) {
+    pills = document.createElement('div');
+    pills.className = 'catalogue-filter-pills';
+    pills.setAttribute('role', 'group');
+    pills.setAttribute('aria-label', 'League filters');
+    filters.after(pills);
+  }
+
+  let button = pills.querySelector<HTMLButtonElement>('[data-major-leagues-filter]');
   if (!button) {
     button = document.createElement('button');
     button.type = 'button';
+    button.className = 'filter-pill';
     button.dataset.majorLeaguesFilter = 'true';
     button.textContent = 'Majors';
     button.setAttribute('aria-label', 'Show major leagues only');
     button.setAttribute('aria-pressed', 'false');
-    const allButton = filters.querySelector<HTMLElement>('[data-match-filter="all"]');
-    allButton?.after(button);
-    if (!button.isConnected) filters.prepend(button);
+    pills.append(button);
   }
 
   let majorOnly = false;
@@ -115,7 +123,7 @@ export function installMajorLeagueFilter(root: ParentNode): () => void {
 
   const toggle = (): void => {
     majorOnly = !majorOnly;
-    button?.classList.toggle('active', majorOnly);
+    button?.classList.toggle('selected', majorOnly);
     button?.setAttribute('aria-pressed', String(majorOnly));
     queueSync();
   };

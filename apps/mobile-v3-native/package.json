@@ -7,10 +7,12 @@
     "android:add": "cap add android",
     "android:sync": "cap sync android",
     "android:configure": "node scripts/configure-android.mjs",
-    "android:build:debug": "npm run android:sync && npm run android:configure && cd android && ./gradlew assembleDebug --no-daemon"
+    "android:brand": "node scripts/brand-android.mjs",
+    "android:build:debug": "npm run android:sync && npm run android:configure && npm run android:brand && cd android && ./gradlew assembleDebug bundleDebug --no-daemon"
   },
   "dependencies": {
     "@capacitor/android": "8.5.0",
+    "@capacitor/app": "8.1.1",
     "@capacitor/core": "8.5.0"
   },
   "devDependencies": {

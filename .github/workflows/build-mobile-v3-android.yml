@@ -13,6 +13,7 @@ on:
       - tsconfig.json
       - .gitignore
       - .github/workflows/build-mobile-v3-android.yml
+      - .github/workflows/build-mobile-v3-android-release.yml
   workflow_dispatch:
 
 concurrency:
@@ -41,7 +42,7 @@ jobs:
             fs.writeFileSync("/tmp/mobile-v3-android-status.json", JSON.stringify({
               state: "pending",
               context: "esports-live/mobile-v3-android",
-              description: "ARENA V3 Android build is running",
+              description: "ARENA V3 Android APK/AAB build is running",
               target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
             }));
           '
@@ -128,7 +129,7 @@ jobs:
           echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
           echo "ARENA_ANDROID_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "ARENA_ANDROID_VERSION_NAME=0.1.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "ARENA_ANDROID_VERSION_NAME=0.2.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
 
       - name: Build V3 web bundle for Android
         env:
@@ -136,13 +137,14 @@ jobs:
           VITE_API_FALLBACK_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
         run: npm run build:web-v3
 
-      - name: Generate Capacitor Android project
+      - name: Generate and brand Capacitor Android project
         shell: bash
         run: |
           rm -rf apps/mobile-v3-native/android
           npm run cap:v3:android:add
           npm run cap:v3:android:sync
           npm run android:configure --workspace @esports-live/mobile-v3-native
+          npm run android:brand --workspace @esports-live/mobile-v3-native
 
       - name: Ensure stable debug signing key
         shell: bash
@@ -164,12 +166,19 @@ jobs:
       - name: Validate generated native shell
         shell: bash
         run: |
-          web_assets="apps/mobile-v3-native/android/app/src/main/assets/public"
+          native_root="apps/mobile-v3-native/android/app/src/main"
+          web_assets="$native_root/assets/public"
           build_gradle="apps/mobile-v3-native/android/app/build.gradle"
-          strings_xml="apps/mobile-v3-native/android/app/src/main/res/values/strings.xml"
+          strings_xml="$native_root/res/values/strings.xml"
+          manifest="$native_root/AndroidManifest.xml"
+          styles="$native_root/res/values/styles.xml"
+          plugins="$native_root/assets/capacitor.plugins.json"
           test -f "$web_assets/index.html"
           test -f "$build_gradle"
           test -f "$strings_xml"
+          test -f "$manifest"
+          test -f "$styles"
+          test -f "$plugins"
           grep -q 'name="arena-version" content="v3"' "$web_assets/index.html"
           grep -q "$MOBILE_V3_COMMIT_SHA" "$web_assets/index.html"
           grep -R -q "$V3_NATIVE_API_URL" "$web_assets/assets"
@@ -177,34 +186,47 @@ jobs:
           grep -Eq "versionCode[[:space:]]+$ARENA_ANDROID_VERSION_CODE" "$build_gradle"
           grep -Fq "versionName \"$ARENA_ANDROID_VERSION_NAME\"" "$build_gradle"
           grep -Fq '<string name="app_name">ARENA</string>' "$strings_xml"
+          grep -Fq 'android:icon="@mipmap/arena_launcher"' "$manifest"
+          grep -Fq 'android:roundIcon="@mipmap/arena_launcher_round"' "$manifest"
+          grep -Fq 'windowSplashScreenBackground' "$styles"
+          grep -Fq 'arena_splash_mark' "$styles"
+          grep -Fq 'AppPlugin' "$plugins"
+          test -f "$native_root/res/mipmap-anydpi-v26/arena_launcher.xml"
+          test -f "$native_root/res/drawable/arena_splash_mark.xml"
 
-      - name: Build Android debug APK
+      - name: Build Android debug APK and AAB
         shell: bash
         run: |
           chmod +x apps/mobile-v3-native/android/gradlew
           cd apps/mobile-v3-native/android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug bundleDebug --no-daemon --stacktrace
 
-      - name: Verify Android APK identity
+      - name: Verify Android debug packages
         shell: bash
         run: |
           apk="apps/mobile-v3-native/android/app/build/outputs/apk/debug/app-debug.apk"
+          aab="apps/mobile-v3-native/android/app/build/outputs/bundle/debug/app-debug.aab"
           test -s "$apk"
+          test -s "$aab"
           aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
           if [[ -x "$aapt" ]]; then
             "$aapt" dump badging "$apk" > /tmp/arena-v3-apk-badging.txt
             grep -Fq "package: name='live.esports.arena'" /tmp/arena-v3-apk-badging.txt
             grep -Fq "application-label:'ARENA'" /tmp/arena-v3-apk-badging.txt
           fi
+          jarsigner -verify "$aab"
           mkdir -p artifacts
           short_sha="${MOBILE_V3_COMMIT_SHA:0:7}"
           cp "$apk" "artifacts/arena-v3-${short_sha}-debug.apk"
+          cp "$aab" "artifacts/arena-v3-${short_sha}-debug.aab"
 
-      - name: Upload Android debug APK
+      - name: Upload Android debug APK and AAB
         uses: actions/upload-artifact@v7
         with:
           name: arena-v3-android-debug-${{ github.sha }}
-          path: artifacts/*.apk
+          path: |
+            artifacts/*.apk
+            artifacts/*.aab
           if-no-files-found: error
           retention-days: 14
 
@@ -217,7 +239,7 @@ jobs:
         run: |
           if [[ "$ANDROID_JOB_STATUS" == "success" ]]; then
             state="success"
-            description="ARENA V3 Android debug APK built"
+            description="ARENA V3 Android debug APK/AAB built"
           else
             state="failure"
             description="ARENA V3 Android build failed"

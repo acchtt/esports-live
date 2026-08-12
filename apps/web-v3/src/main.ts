@@ -20,6 +20,7 @@ import { installCompactHeader } from './compact-header.ts';
 import { installGrubsObjective } from './grubs-objective.ts';
 import { installLiveLifecycle } from './live-lifecycle.ts';
 import { installLoadingStates } from './loading-states.ts';
+import { installNativeLifecycle } from './native-lifecycle.ts';
 import { installPlayerBoardCopy } from './player-board-copy.ts';
 import { installPwa } from './pwa.ts';
 import { currentV3Route, installV3Routing } from './route-page.ts';
@@ -36,6 +37,7 @@ if (initialRoute.kind !== 'match') {
   installCatalogueTeamLogos(root);
 }
 installLiveLifecycle(root);
+installNativeLifecycle();
 installPlayerBoardCopy(root);
 startWebV2(root);
 installV3Routing(root);

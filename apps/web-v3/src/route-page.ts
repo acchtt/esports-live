@@ -181,7 +181,7 @@ export function installV3Routing(root: HTMLElement): () => void {
     }
 
     const matchesNav = target.closest<HTMLElement>('[data-app-view="matches"]');
-    if (matchesNav && route.kind === 'match') {
+    if (matchesNav && route.kind !== 'catalogue') {
       restoreCatalogue();
       window.history.pushState({ arenaV3: true }, '', withCommitQuery(cataloguePath()));
       document.documentElement.dataset.arenaRoute = 'catalogue';

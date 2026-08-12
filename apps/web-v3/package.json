@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@capacitor/app": "8.1.1",
     "@capacitor/core": "8.5.0",
     "@esports-live/adapter-lol": "0.1.0",
     "@esports-live/core": "0.1.0"

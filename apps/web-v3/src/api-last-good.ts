@@ -2,13 +2,16 @@ const CACHE_NAME = 'arena-v3-api-last-good-v1';
 const CACHE_KEY_PREFIX = '/__arena-v3-api-last-good__';
 const SCHEDULE_MAX_AGE_MS = 2 * 60 * 60 * 1_000;
 const CONTEXT_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
+const DOTA_LIVE_MAX_AGE_MS = 10 * 60 * 1_000;
 
 function isCacheablePath(pathname: string): boolean {
   return pathname === '/v1/lol/schedule'
+    || pathname === '/v1/dota2/live'
     || (/^\/v1\/lol\/series\/[^/]+\/context$/.test(pathname));
 }
 
 function maxAgeMs(pathname: string): number {
+  if (pathname === '/v1/dota2/live') return DOTA_LIVE_MAX_AGE_MS;
   return pathname === '/v1/lol/schedule'
     ? SCHEDULE_MAX_AGE_MS
     : CONTEXT_MAX_AGE_MS;

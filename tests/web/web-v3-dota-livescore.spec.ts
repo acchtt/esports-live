@@ -97,12 +97,12 @@ async function mockApis(page: Page): Promise<void> {
     events: [],
     page: { total: 0, offset: 0, limit: 0, nextCursor: null, previousCursor: null }
   }));
-  await page.route('**/v1/dota2/schedule**', route => json(route, {
+  await page.route('**/v1/dota2/live**', route => json(route, {
     esport: 'dota2',
     events: [event],
-    page: { total: 1, offset: 0, limit: 1, nextCursor: null, previousCursor: null }
+    snapshots: [snapshot],
+    partial: false
   }));
-  await page.route('**/v1/dota2/games/game-two/live**', route => json(route, snapshot));
 }
 
 test('V3 adds Dota livescore without replacing the LoL surface', async ({ page }) => {

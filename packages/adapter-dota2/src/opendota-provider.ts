@@ -56,12 +56,50 @@ export interface OpenDotaProviderOptions {
 
 interface FeedCache {
   expiresAt: number;
+  storedAt: number;
   matches: readonly OpenDotaLiveMatch[];
 }
 
 const DEFAULT_BASE_URL = 'https://api.opendota.com/api';
 const HERO_IMAGE_ORIGIN = 'https://cdn.cloudflare.steamstatic.com';
 const ACTIVE_UPDATE_WINDOW_MS = 5 * 60 * 1_000;
+const STALE_FEED_WINDOW_MS = 5 * 60 * 1_000;
+const DEFAULT_RETRY_DELAY_MS = 30_000;
+
+interface CloudflareRequestInit extends RequestInit {
+  cf?: {
+    cacheEverything: boolean;
+    cacheTtlByStatus: Readonly<Record<string, number>>;
+  };
+}
+
+class OpenDotaHttpError extends Error {
+  readonly status: number;
+  readonly retryAfterMs: number | null;
+
+  constructor(status: number, path: string, retryAfterMs: number | null) {
+    super(`OpenDota returned ${status} for ${path}.`);
+    this.name = 'OpenDotaHttpError';
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+function retryAfterMs(response: Response, nowMs: number): number | null {
+  const value = response.headers.get('retry-after')?.trim();
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - nowMs) : null;
+}
+
+function edgeCacheTtlSeconds(path: string): number {
+  if (path === '/live') return 15;
+  if (path === '/constants/heroes') return 24 * 60 * 60;
+  if (path === '/leagues') return 60 * 60;
+  return 0;
+}
 
 function finiteNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -189,29 +227,67 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
   const cacheTtlMs = Math.max(1_000, options.cacheTtlMs ?? 8_000);
   let feedCache: FeedCache | null = null;
   let feedInFlight: Promise<readonly OpenDotaLiveMatch[]> | null = null;
+  let feedRetryAt = 0;
   let heroes: ReadonlyMap<number, OpenDotaHero> | null = null;
   let heroesInFlight: Promise<ReadonlyMap<number, OpenDotaHero>> | null = null;
   let leagues: ReadonlyMap<number, string> | null = null;
   let leaguesInFlight: Promise<ReadonlyMap<number, string>> | null = null;
 
   async function fetchJson<T>(path: string): Promise<T> {
-    const response = await fetcher(jsonUrl(baseUrl, path, apiKey), {
-      headers: { Accept: 'application/json' }
-    });
-    if (!response.ok) throw new Error(`OpenDota returned ${response.status} for ${path}.`);
+    const edgeTtl = edgeCacheTtlSeconds(path);
+    const init: CloudflareRequestInit = {
+      headers: { Accept: 'application/json' },
+      ...(edgeTtl > 0 ? {
+        // Cloudflare's subrequest cache is shared across Worker isolates, so
+        // concurrent visitors reuse one OpenDota response instead of consuming
+        // the unauthenticated quota independently.
+        cf: {
+          cacheEverything: true,
+          cacheTtlByStatus: {
+            '200-299': edgeTtl,
+            '400-599': 0
+          }
+        }
+      } : {})
+    };
+    const response = await fetcher(jsonUrl(baseUrl, path, apiKey), init);
+    if (!response.ok) {
+      throw new OpenDotaHttpError(
+        response.status,
+        path,
+        retryAfterMs(response, now().getTime())
+      );
+    }
     return await response.json() as T;
   }
 
   async function loadMatches(): Promise<readonly OpenDotaLiveMatch[]> {
     const current = now().getTime();
     if (feedCache && feedCache.expiresAt > current) return feedCache.matches;
+    if (
+      feedCache
+      && feedRetryAt > current
+      && current - feedCache.storedAt <= STALE_FEED_WINDOW_MS
+    ) return feedCache.matches;
     if (feedInFlight) return feedInFlight;
     feedInFlight = fetchJson<unknown>('/live')
       .then(value => {
         if (!Array.isArray(value)) throw new Error('OpenDota live response is not an array.');
         const matches = value as readonly OpenDotaLiveMatch[];
-        feedCache = { matches, expiresAt: now().getTime() + cacheTtlMs };
+        const storedAt = now().getTime();
+        feedCache = { matches, storedAt, expiresAt: storedAt + cacheTtlMs };
+        feedRetryAt = 0;
         return matches;
+      })
+      .catch(error => {
+        const failedAt = now().getTime();
+        const stale = feedCache;
+        if (!stale || failedAt - stale.storedAt > STALE_FEED_WINDOW_MS) throw error;
+        const requestedDelay = error instanceof OpenDotaHttpError
+          ? error.retryAfterMs
+          : null;
+        feedRetryAt = failedAt + Math.max(DEFAULT_RETRY_DELAY_MS, requestedDelay ?? 0);
+        return stale.matches;
       })
       .finally(() => { feedInFlight = null; });
     return feedInFlight;

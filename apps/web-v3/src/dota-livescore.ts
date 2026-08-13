@@ -4,19 +4,26 @@ import type {
   DotaStats,
   DotaTeamState
 } from '@esports-live/adapter-dota2';
+import {
+  readLastGoodApiResponse,
+  rememberLastGoodApiResponse
+} from './api-last-good.ts';
 
 interface HealthResponse {
   ok: boolean;
   adapters: readonly string[];
 }
 
-interface ScheduleResponse {
+interface DotaLiveResponse {
   esport: string;
   events: readonly ScheduleEvent[];
+  snapshots: readonly LiveSnapshot<DotaStats>[];
+  partial: boolean;
 }
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-const LIVE_POLL_MS = 8_000;
+const LIVE_POLL_MS = 20_000;
+const ERROR_POLL_MS = [30_000, 60_000, 120_000] as const;
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -63,6 +70,28 @@ async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
     throw new Error(body?.message ?? `API returned ${response.status}`);
   }
   return await response.json() as T;
+}
+
+async function requestDotaLive(signal: AbortSignal): Promise<{
+  payload: DotaLiveResponse;
+  cached: boolean;
+}> {
+  const source = new URL(`${API_BASE}/v1/dota2/live`, window.location.href);
+  const response = await fetch(source, { cache: 'no-store', signal });
+  if (response.ok) {
+    void rememberLastGoodApiResponse(source, response);
+    return {
+      payload: await response.json() as DotaLiveResponse,
+      cached: response.headers.get('x-arena-data-source') === 'cache'
+    };
+  }
+
+  const cached = await readLastGoodApiResponse(source);
+  if (cached) {
+    return { payload: await cached.json() as DotaLiveResponse, cached: true };
+  }
+  const body = await response.json().catch(() => null) as { message?: string } | null;
+  throw new Error(body?.message ?? `API returned ${response.status}`);
 }
 
 function leadCopy(snapshot: LiveSnapshot<DotaStats> | undefined): string {
@@ -130,6 +159,8 @@ export function installDotaLivescore(root: HTMLElement): () => void {
   let snapshots: Readonly<Record<string, LiveSnapshot<DotaStats>>> = {};
   let scheduleTimer: number | null = null;
   let controller: AbortController | null = null;
+  let feedUnavailable = false;
+  let errorCount = 0;
   let disposed = false;
 
   const clearTimers = (): void => {
@@ -273,10 +304,17 @@ export function installDotaLivescore(root: HTMLElement): () => void {
     grid.replaceChildren();
     if (!events.length) {
       const empty = element('div', 'catalogue-empty');
-      empty.append(
-        element('strong', undefined, 'No professional Dota matches are live'),
-        element('span', undefined, 'The feed will refresh automatically when a league game starts.')
-      );
+      if (feedUnavailable) {
+        empty.append(
+          element('strong', undefined, 'Dota live scores are temporarily unavailable'),
+          element('span', undefined, 'The last request was rate limited. ARENA will retry automatically.')
+        );
+      } else {
+        empty.append(
+          element('strong', undefined, 'No professional Dota matches are live'),
+          element('span', undefined, 'The feed will refresh automatically when a league game starts.')
+        );
+      }
       grid.append(empty);
       return;
     }
@@ -285,51 +323,47 @@ export function installDotaLivescore(root: HTMLElement): () => void {
     grid.append(fragment);
   };
 
-  const hydrateSnapshots = async (signal: AbortSignal): Promise<void> => {
-    const results = await Promise.allSettled(events.map(async event => {
-      const gameId = snapshotKey(event);
-      if (!gameId) return null;
-      return await requestJson<LiveSnapshot<DotaStats>>(
-        `/v1/dota2/games/${encodeURIComponent(gameId)}/live`,
-        signal
-      );
-    }));
-    if (signal.aborted) return;
-    const next = { ...snapshots };
-    results.forEach(result => {
-      if (result.status === 'fulfilled' && result.value) next[result.value.game.id] = result.value;
-    });
-    snapshots = next;
-    renderGrid();
-    renderDetail();
-  };
-
   const refreshSchedule = async (): Promise<void> => {
     if (disposed || activeEsport !== 'dota2') return;
     controller?.abort();
     controller = new AbortController();
     const signal = controller.signal;
     meta.textContent = events.length ? `${events.length} live series · Refreshing…` : 'Loading live Dota matches…';
+    let nextPollMs = LIVE_POLL_MS;
     try {
-      const payload = await requestJson<ScheduleResponse>(
-        '/v1/dota2/schedule?states=live,paused',
-        signal
-      );
+      const { payload, cached } = await requestDotaLive(signal);
       events = payload.events;
+      const nextSnapshots = { ...snapshots };
+      payload.snapshots.forEach(snapshot => { nextSnapshots[snapshot.game.id] = snapshot; });
+      snapshots = nextSnapshots;
       if (!events.some(event => event.series.id === selectedSeriesId)) {
         selectedSeriesId = events[0]?.series.id ?? null;
       }
-      meta.textContent = `${events.length} live ${events.length === 1 ? 'series' : 'series'} · OpenDota`;
+      feedUnavailable = cached;
+      if (cached) {
+        errorCount += 1;
+        nextPollMs = ERROR_POLL_MS[Math.min(errorCount - 1, ERROR_POLL_MS.length - 1)] ?? LIVE_POLL_MS;
+        meta.textContent = `${events.length} live ${events.length === 1 ? 'series' : 'series'} · Last good update · Retrying`;
+      } else {
+        errorCount = 0;
+        meta.textContent = `${events.length} live ${events.length === 1 ? 'series' : 'series'} · OpenDota${payload.partial ? ' · Scoreboard updating' : ''}`;
+      }
       renderGrid();
-      await hydrateSnapshots(signal);
+      renderDetail();
     } catch (error) {
       if (!signal.aborted) {
-        meta.textContent = error instanceof Error ? error.message : 'Dota live feed unavailable';
+        feedUnavailable = true;
+        errorCount += 1;
+        nextPollMs = ERROR_POLL_MS[Math.min(errorCount - 1, ERROR_POLL_MS.length - 1)] ?? LIVE_POLL_MS;
+        const rateLimited = error instanceof Error && error.message.includes('429');
+        meta.textContent = rateLimited
+          ? 'OpenDota is rate limiting requests · Retrying automatically'
+          : 'Dota live feed is temporarily unavailable · Retrying automatically';
         renderGrid();
       }
     }
     if (!signal.aborted && activeEsport === 'dota2' && !document.hidden) {
-      scheduleTimer = window.setTimeout(() => void refreshSchedule(), LIVE_POLL_MS);
+      scheduleTimer = window.setTimeout(() => void refreshSchedule(), nextPollMs);
     }
   };
 
@@ -351,7 +385,11 @@ export function installDotaLivescore(root: HTMLElement): () => void {
 
   const selectLol = (): void => activate('lol');
   const selectDota = (): void => activate('dota2');
-  const refreshDota = (): void => void refreshSchedule();
+  const refreshDota = (): void => {
+    errorCount = 0;
+    clearTimers();
+    void refreshSchedule();
+  };
   const visibilityChanged = (): void => {
     clearTimers();
     controller?.abort();

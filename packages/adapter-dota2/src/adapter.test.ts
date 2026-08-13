@@ -140,3 +140,33 @@ test('OpenDota snapshot normalizes Dota livescore telemetry and hero metadata', 
   assert.equal(snapshot.quality.advancing, true);
   assert.equal(snapshot.quality.safeForLiveAnalysis, true);
 });
+
+test('OpenDota reuses the last good live feed while rate limited', async () => {
+  let current = new Date(NOW);
+  let liveCalls = 0;
+  const openDota = createOpenDotaProvider({
+    now: () => new Date(current),
+    cacheTtlMs: 1_000,
+    fetcher: async input => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/constants/heroes')) return Response.json(heroesPayload);
+      if (path.endsWith('/leagues')) return Response.json(leaguesPayload);
+      liveCalls += 1;
+      if (liveCalls > 1) {
+        return new Response('rate limited', {
+          status: 429,
+          headers: { 'Retry-After': '45' }
+        });
+      }
+      return Response.json(livePayload);
+    }
+  });
+  const adapter = new DotaAdapter(openDota);
+
+  assert.equal((await adapter.getSchedule({ states: ['live'] })).length, 1);
+  current = new Date(NOW.getTime() + 2_000);
+  assert.equal((await adapter.getSchedule({ states: ['live'] })).length, 1);
+  current = new Date(NOW.getTime() + 10_000);
+  assert.equal((await adapter.getSchedule({ states: ['live'] })).length, 1);
+  assert.equal(liveCalls, 2);
+});

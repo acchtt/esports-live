@@ -128,6 +128,31 @@ export function createApiHandler(registry: AdapterRegistry) {
         return json({ esports: registry.list() });
       }
 
+      if (segments.length === 3 && segments[0] === 'v1' && segments[2] === 'live') {
+        const adapter = registry.get(segments[1] as EsportId);
+        const events = await adapter.getSchedule({ states: ['live', 'paused'] });
+        const gameIds = events.flatMap(event => {
+          const game = event.series.games.find(candidate => (
+            candidate.state === 'live'
+            || candidate.state === 'draft'
+            || candidate.state === 'paused'
+          )) ?? event.series.games.at(-1);
+          return game ? [game.id] : [];
+        });
+        const settled = await Promise.allSettled(
+          gameIds.map(gameId => adapter.getLiveSnapshot(gameId))
+        );
+        const snapshots = settled.flatMap(result => (
+          result.status === 'fulfilled' ? [result.value] : []
+        ));
+        return json({
+          esport: adapter.esport,
+          events,
+          snapshots,
+          partial: snapshots.length !== gameIds.length
+        });
+      }
+
       if (segments.length === 3 && segments[0] === 'v1' && segments[2] === 'schedule') {
         const adapter = registry.get(segments[1] as EsportId);
         const events = await adapter.getSchedule(scheduleQuery(url));

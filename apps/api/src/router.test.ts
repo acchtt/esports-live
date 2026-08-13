@@ -92,6 +92,35 @@ test('live route resolves through the esport registry', async () => {
   assert.equal(payload.quality.safeForLiveAnalysis, false);
 });
 
+test('batch live route returns schedule and snapshots in one request', async () => {
+  let scheduleCalls = 0;
+  let snapshotCalls = 0;
+  const batchAdapter: EsportAdapter = {
+    ...adapter,
+    getSchedule: async () => {
+      scheduleCalls += 1;
+      return scheduleEvents(1);
+    },
+    getLiveSnapshot: async () => {
+      snapshotCalls += 1;
+      return snapshot;
+    }
+  };
+  const response = await handler(batchAdapter)(new Request('https://example.test/v1/lol/live'));
+  const payload = await response.json() as {
+    events: ScheduleEvent[];
+    snapshots: LiveSnapshot[];
+    partial: boolean;
+  };
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.events.length, 1);
+  assert.equal(payload.snapshots.length, 1);
+  assert.equal(payload.partial, false);
+  assert.equal(scheduleCalls, 1);
+  assert.equal(snapshotCalls, 1);
+});
+
 test('schedule route uses provider-neutral cursors', async () => {
   const pagedAdapter: EsportAdapter = {
     ...adapter,

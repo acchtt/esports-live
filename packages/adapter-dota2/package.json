@@ -1,11 +1,9 @@
 {
-  "name": "@esports-live/api",
+  "name": "@esports-live/adapter-dota2",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@esports-live/adapter-dota2": "0.1.0",
-    "@esports-live/adapter-lol": "0.1.0",
     "@esports-live/core": "0.1.0"
   },
   "exports": {

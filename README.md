@@ -1,6 +1,6 @@
 # Esports Live
 
-A provider-neutral live esports platform, beginning with League of Legends.
+A provider-neutral live esports platform with League of Legends and Dota 2 live coverage.
 
 ## Current milestone
 
@@ -16,6 +16,15 @@ The functional LoL vertical slice now includes:
 - responsive schedule, pre-match context, and live analysis workspace
 - short-lived request caching and concurrent-request coalescing
 - Cloudflare Worker and Pages deployment configuration
+
+The first Dota 2 vertical slice adds:
+
+- active professional-league discovery through OpenDota
+- current game clock, kills, net-worth lead, spectators, and hero lineups
+- source-age quality classification and stale-match suppression
+- a dedicated V3 Dota livescore surface that leaves the LoL experience intact
+
+Dota coverage is intentionally live-only. The OpenDota live feed does not provide a dependable upcoming schedule or completed-series archive, so those states are not inferred.
 
 Only fresh, complete, advancing telemetry is eligible for live analysis. Partial, delayed, stale, and unavailable states remain visible but are never promoted to verified data.
 
@@ -50,6 +59,7 @@ apps/
 packages/
   core/        Shared domain contracts, quality rules, and caching
   adapter-lol/ League of Legends provider boundary and Riot implementation
+  adapter-dota2/ Dota 2 provider boundary and OpenDota implementation
 docs/
   architecture.md
   data-quality.md

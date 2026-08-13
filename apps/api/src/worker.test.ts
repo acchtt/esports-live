@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import type { LolPlayerState, LolProviderClient, LolProviderSnapshot, LolTeamState } from '@esports-live/adapter-lol';
 import { createProductionInventoryProvider, createWorkerHandler } from './worker.ts';
 
-test('Worker health disables LoL when the secret is absent', async () => {
+test('Worker health keeps Dota available and disables LoL when the Riot secret is absent', async () => {
   const response = await createWorkerHandler({})(new Request('https://example.test/health'));
   const payload = await response.json() as { adapters: string[] };
-  assert.deepEqual(payload.adapters, []);
+  assert.deepEqual(payload.adapters, ['dota2']);
 });
 
 test('Worker health enables LoL when the secret is configured', async () => {
@@ -14,7 +14,7 @@ test('Worker health enables LoL when the secret is configured', async () => {
     new Request('https://example.test/health')
   );
   const payload = await response.json() as { adapters: string[] };
-  assert.deepEqual(payload.adapters, ['lol']);
+  assert.deepEqual(payload.adapters, ['lol', 'dota2']);
 });
 
 const INVENTORY_NOW = '2026-08-04T15:00:00.000Z';

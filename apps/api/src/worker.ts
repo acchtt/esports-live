@@ -14,12 +14,14 @@ import {
   type LolProviderSnapshot,
   type RiotCurrentPlayerProviderOptions
 } from '@esports-live/adapter-lol';
+import { DotaAdapter, createOpenDotaProvider } from '@esports-live/adapter-dota2';
 import { AdapterRegistry, CachedAdapter } from '@esports-live/core';
 import { createGrubsCvProvider } from './grubs-cv-provider.ts';
 import { createApiHandler } from './router.ts';
 
 export interface WorkerEnv {
   LOL_ESPORTS_API_KEY?: string;
+  OPENDOTA_API_KEY?: string;
   GRUBS_CV_URL?: string;
   GRUBS_CV_TOKEN?: string;
   GRUBS_CV_MIN_CONFIDENCE?: string;
@@ -191,12 +193,14 @@ let cachedHandler: ApiHandler | null = null;
 
 export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const apiKey = env.LOL_ESPORTS_API_KEY?.trim() ?? '';
+  const openDotaApiKey = env.OPENDOTA_API_KEY?.trim() ?? '';
   const grubsCvUrl = env.GRUBS_CV_URL?.trim() ?? '';
   const grubsCvToken = env.GRUBS_CV_TOKEN?.trim() ?? '';
   const grubsCvMinConfidence = confidenceEnv(env.GRUBS_CV_MIN_CONFIDENCE);
   const grubsCvAllowSimulated = booleanEnv(env.GRUBS_CV_ALLOW_SIMULATED);
   const configKey = JSON.stringify([
     apiKey,
+    openDotaApiKey,
     grubsCvUrl,
     grubsCvToken,
     grubsCvMinConfidence,
@@ -242,6 +246,15 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
       seriesContextTtlMs: 10_000
     }));
   }
+
+  registry.register(new CachedAdapter(
+    new DotaAdapter(createOpenDotaProvider({ apiKey: openDotaApiKey })),
+    {
+      scheduleTtlMs: 8_000,
+      liveSnapshotTtlMs: 2_000,
+      seriesContextTtlMs: 300_000
+    }
+  ));
 
   cachedConfigKey = configKey;
   cachedHandler = createApiHandler(registry);

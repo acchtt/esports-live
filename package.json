@@ -23,7 +23,7 @@
     "deploy:api": "wrangler deploy",
     "deploy:web": "npm run build:web && wrangler pages deploy apps/web/dist --project-name esports-live",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test packages/core/src/*.test.ts packages/adapter-lol/src/*.test.ts apps/api/src/*.test.ts && node --test services/grubs-cv/*.test.mjs",
+    "test": "node --import tsx --test packages/core/src/*.test.ts packages/adapter-lol/src/*.test.ts packages/adapter-dota2/src/*.test.ts apps/api/src/*.test.ts && node --test services/grubs-cv/*.test.mjs",
     "test:web": "npm run build:web && playwright test",
     "test:web-mobile": "npm run build:web-mobile && WEB_APP_ROOT=apps/web-mobile playwright test tests/web/mobile- tests/web/completed-board-merge.spec.ts tests/web/live-telemetry-pending.spec.ts",
     "test:web-v2": "npm run build:web-v2 && WEB_APP_ROOT=apps/web-v2 playwright test tests/web/web-v2-",

@@ -30,6 +30,18 @@ Owns League of Legends concepts and provider normalization:
 
 The adapter accepts an injected provider client. Authentication, endpoint selection, caching, retries, and raw payload parsing belong to the provider implementation—not the core or UI.
 
+### `@esports-live/adapter-dota2`
+
+Owns Dota 2 live-score concepts and OpenDota normalization:
+
+- Radiant and Dire team identity
+- current game clock and kill score
+- Radiant-relative net-worth lead
+- spectators, broadcast delay, and hero lineups
+- recent-update eligibility so retained ghost games are not presented as live
+
+This milestone uses OpenDota's current live feed. It exposes active professional league games only and does not manufacture upcoming fixtures or completed history from incomplete source data.
+
 ## Applications
 
 ### `apps/api`
@@ -41,7 +53,7 @@ Exposes normalized endpoints:
 - `GET /v1/:esport/schedule`
 - `GET /v1/:esport/games/:gameId/live`
 
-### `apps/web`
+### `apps/web` and `apps/web-v3`
 
 Discovers enabled adapters from `/health` and renders normalized responses. It must not call game-provider endpoints directly.
 

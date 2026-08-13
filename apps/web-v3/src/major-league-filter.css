@@ -3,9 +3,11 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
+  max-width: 100%;
   margin: -8px 0 16px;
   padding: 0 2px;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
   scrollbar-width: none;
 }
 
@@ -60,6 +62,7 @@
 
 @media (max-width: 720px) {
   .catalogue-filter-pills {
+    gap: 6px;
     margin-top: -9px;
     margin-bottom: 14px;
   }

@@ -32,10 +32,12 @@ function scheduleEvent(
 }
 
 const events = [
-  scheduleEvent('lpl-live', 'LPL Split 3', 'live', 1),
-  scheduleEvent('lec-upcoming', 'LEC', 'scheduled', 2),
-  scheduleEvent('lck-challengers', 'LCK Challengers', 'scheduled', 3),
-  scheduleEvent('nlc-live', 'NLC', 'live', 4)
+  scheduleEvent('lck-upcoming', 'LCK', 'scheduled', 1),
+  scheduleEvent('lpl-live', 'LPL Split 3', 'live', 2),
+  scheduleEvent('lec-upcoming', 'LEC', 'scheduled', 3),
+  scheduleEvent('lcs-live', 'LCS', 'live', 4),
+  scheduleEvent('lck-challengers', 'LCK Challengers', 'scheduled', 5),
+  scheduleEvent('nlc-live', 'NLC', 'live', 6)
 ];
 
 async function json(route: Route, value: unknown): Promise<void> {
@@ -60,54 +62,71 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('V3 Majors is a filter pill that composes with status tabs', async ({ page }) => {
+test('V3 league pills are multi-select and compose with status tabs', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
   await page.goto('/');
 
   const statusTabs = page.locator('.match-filters [data-match-filter]');
   const pillGroup = page.locator('.catalogue-filter-pills');
-  const majors = pillGroup.locator('[data-major-leagues-filter]');
+  const pills = pillGroup.locator('[data-league-filter]');
+  const lck = pillGroup.locator('[data-league-filter="lck"]');
+  const lpl = pillGroup.locator('[data-league-filter="lpl"]');
+  const lec = pillGroup.locator('[data-league-filter="lec"]');
+  const lcs = pillGroup.locator('[data-league-filter="lcs"]');
 
   await expect(statusTabs).toHaveCount(4);
-  await expect(page.locator('.match-filters [data-major-leagues-filter]')).toHaveCount(0);
+  await expect(page.locator('[data-major-leagues-filter]')).toHaveCount(0);
   await expect(pillGroup).toBeVisible();
   await expect(pillGroup).toHaveAttribute('role', 'group');
   await expect(pillGroup).toHaveAttribute('aria-label', 'League filters');
-  await expect(majors).toBeVisible();
-  await expect(majors).toHaveClass(/filter-pill/);
-  await expect(majors).toHaveText('Majors');
-  await expect(majors).toHaveAttribute('aria-pressed', 'false');
+  await expect(pills).toHaveCount(4);
+  await expect(pills).toHaveText(['LCK', 'LPL', 'LEC', 'LCS']);
+  await expect(pillGroup).not.toContainText('Majors');
+
+  for (const pill of [lck, lpl, lec, lcs]) {
+    await expect(pill).toHaveClass(/filter-pill/);
+    await expect(pill).toHaveAttribute('aria-pressed', 'false');
+  }
 
   const allBox = await page.locator('[data-match-filter="all"]').boundingBox();
-  const majorsBox = await majors.boundingBox();
+  const lckBox = await lck.boundingBox();
   expect(allBox).not.toBeNull();
-  expect(majorsBox).not.toBeNull();
-  expect(majorsBox!.height).toBeLessThan(allBox!.height);
+  expect(lckBox).not.toBeNull();
+  expect(lckBox!.height).toBeLessThan(allBox!.height);
 
+  await expect(page.locator('.match-card:visible')).toHaveCount(6);
+
+  await lck.click();
+  await expect(lck).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.match-card:visible')).toHaveCount(1);
+  await expect(page.locator('[data-series-id="lck-upcoming"]')).toBeVisible();
+  await expect(page.locator('[data-series-id="lck-challengers"]')).toBeHidden();
+  await expect(page.locator('#catalogue-meta')).toHaveText('6 matches · 1 shown · LCK');
+
+  await lpl.click();
+  await lec.click();
+  await lcs.click();
   await expect(page.locator('.match-card:visible')).toHaveCount(4);
-
-  await majors.click();
-  await expect(majors).toHaveAttribute('aria-pressed', 'true');
-  await expect(majors).toHaveClass(/selected/);
-  await expect(page.locator('.match-card:visible')).toHaveCount(2);
   await expect(page.locator('[data-series-id="lpl-live"]')).toBeVisible();
   await expect(page.locator('[data-series-id="lec-upcoming"]')).toBeVisible();
-  await expect(page.locator('[data-series-id="lck-challengers"]')).toBeHidden();
+  await expect(page.locator('[data-series-id="lcs-live"]')).toBeVisible();
   await expect(page.locator('[data-series-id="nlc-live"]')).toBeHidden();
-  await expect(page.locator('#catalogue-meta')).toHaveText('4 matches · 2 shown · Majors');
+  await expect(page.locator('[data-series-id="lck-challengers"]')).toBeHidden();
+  await expect(page.locator('#catalogue-meta')).toHaveText('6 matches · 4 shown · LCK + LPL + LEC + LCS');
 
   await page.locator('[data-match-filter="upcoming"]').click();
-  await expect(page.locator('.match-card:visible')).toHaveCount(1);
+  await expect(page.locator('.match-card:visible')).toHaveCount(2);
+  await expect(page.locator('[data-series-id="lck-upcoming"]')).toBeVisible();
   await expect(page.locator('[data-series-id="lec-upcoming"]')).toBeVisible();
   await expect(page.locator('[data-series-id="lck-challengers"]')).toBeHidden();
-  await expect(page.locator('#catalogue-meta')).toHaveText('4 matches · 1 shown · Majors');
+  await expect(page.locator('#catalogue-meta')).toHaveText('6 matches · 2 shown · LCK + LPL + LEC + LCS');
 
-  await majors.click();
-  await expect(majors).toHaveAttribute('aria-pressed', 'false');
-  await expect(majors).not.toHaveClass(/selected/);
-  await expect(page.locator('.match-card:visible')).toHaveCount(2);
-  await expect(page.locator('[data-series-id="lec-upcoming"]')).toBeVisible();
+  await lck.click();
+  await lpl.click();
+  await lec.click();
+  await lcs.click();
+  await expect(page.locator('.match-card:visible')).toHaveCount(3);
   await expect(page.locator('[data-series-id="lck-challengers"]')).toBeVisible();
-  await expect(page.locator('#catalogue-meta')).toHaveText('4 matches · 2 shown');
+  await expect(page.locator('#catalogue-meta')).toHaveText('6 matches · 3 shown');
 });

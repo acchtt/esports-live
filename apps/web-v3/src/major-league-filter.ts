@@ -15,6 +15,8 @@ const LEAGUE_FILTERS = [
   { id: 'lcs', label: 'LCS' }
 ] as const;
 
+const LEAGUE_META_SUFFIX = / · (?:LCK|LPL|LEC|LCS)(?: \+ (?:LCK|LPL|LEC|LCS))*$/;
+
 type LeagueFilter = typeof LEAGUE_FILTERS[number]['id'];
 
 function normalizedCompetitionName(value: string): string {
@@ -52,6 +54,10 @@ function competitionName(card: HTMLElement): string {
 
 function baseCatalogueMeta(value: string): string | null {
   return value.match(/^(\d+ matches · \d+ shown)(?: · .+)?$/)?.[1] ?? null;
+}
+
+function hasLeagueMetaSuffix(value: string): boolean {
+  return LEAGUE_META_SUFFIX.test(value);
 }
 
 export function installLeagueFilters(root: ParentNode): () => void {
@@ -93,8 +99,9 @@ export function installLeagueFilters(root: ParentNode): () => void {
 
   const sync = (): void => {
     syncQueued = false;
-    const currentBase = baseCatalogueMeta(meta?.textContent ?? '');
-    if (currentBase) baseMetaText = currentBase;
+    const currentMetaText = meta?.textContent ?? '';
+    const currentBase = baseCatalogueMeta(currentMetaText);
+    if (currentBase && !hasLeagueMetaSuffix(currentMetaText)) baseMetaText = currentBase;
 
     const cards = [...grid.querySelectorAll<HTMLElement>('.match-card')];
     let shown = 0;

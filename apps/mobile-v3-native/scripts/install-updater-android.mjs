@@ -11,18 +11,14 @@ const pluginPath = path.join(javaRoot, 'ArenaUpdaterPlugin.java');
 
 const plugin = `package live.esports.arena;
 
-import android.app.DownloadManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
+import android.content.ClipData;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Environment;
-import android.os.ParcelFileDescriptor;
 import android.provider.Settings;
+
+import androidx.core.content.FileProvider;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -34,7 +30,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -51,10 +47,8 @@ public class ArenaUpdaterPlugin extends Plugin {
     private static final String ALLOWED_APK_PREFIX =
         "https://github.com/acchtt/esports-live/releases/download/arena-v3-android-latest/";
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private DownloadManager downloadManager;
-    private long activeDownloadId = -1L;
-    private String activeSha256 = "";
-    private BroadcastReceiver downloadReceiver;
+    private final Object downloadLock = new Object();
+    private boolean activeDownload = false;
 
     @PluginMethod
     public void checkForUpdate(PluginCall call) {
@@ -151,96 +145,118 @@ public class ArenaUpdaterPlugin extends Plugin {
     }
 
     private void startDownload(String apkUrl, String sha256) {
-        if (activeDownloadId != -1L) {
-            emitState("downloading", "An ARENA update is already downloading.");
-            return;
-        }
-        downloadManager = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
-        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(apkUrl));
-        request.setTitle("ARENA update");
-        request.setDescription("Downloading the latest verified ARENA build");
-        request.setMimeType("application/vnd.android.package-archive");
-        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        request.setAllowedOverMetered(true);
-        request.setAllowedOverRoaming(false);
-        File destination = new File(
-            getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-            "arena-v3-update.apk"
-        );
-        if (destination.exists() && !destination.delete()) {
-            throw new IllegalStateException("The previous update file could not be replaced.");
-        }
-        request.setDestinationInExternalFilesDir(
-            getContext(),
-            Environment.DIRECTORY_DOWNLOADS,
-            "arena-v3-update.apk"
-        );
-        activeSha256 = sha256;
-        registerDownloadReceiver();
-        activeDownloadId = downloadManager.enqueue(request);
-        emitState("downloading", "Downloading the verified ARENA update…");
-    }
-
-    private void registerDownloadReceiver() {
-        if (downloadReceiver != null) return;
-        downloadReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                long completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
-                if (completedId != activeDownloadId) return;
-                executor.execute(() -> finishDownload(completedId));
+        synchronized (downloadLock) {
+            if (activeDownload) {
+                emitState("downloading", "An ARENA update is already downloading.");
+                return;
             }
-        };
-        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            getContext().registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            getContext().registerReceiver(downloadReceiver, filter);
+            activeDownload = true;
         }
+        emitDownloadState(0L, -1L);
+        executor.execute(() -> downloadAndInstall(apkUrl, sha256));
     }
 
-    private void finishDownload(long downloadId) {
+    private void downloadAndInstall(String apkUrl, String expectedSha256) {
+        HttpURLConnection connection = null;
+        File partial = null;
         try {
-            DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
-            try (Cursor cursor = downloadManager.query(query)) {
-                if (!cursor.moveToFirst()) throw new IllegalStateException("The completed download was not found.");
-                int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-                if (status != DownloadManager.STATUS_SUCCESSFUL) {
-                    int reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON));
-                    throw new IllegalStateException("Android download failed (" + reason + ").");
-                }
+            File updateRoot = new File(getContext().getCacheDir(), "arena-updates");
+            if (!updateRoot.exists() && !updateRoot.mkdirs()) {
+                throw new IllegalStateException("The secure update folder could not be created.");
             }
-            String actualSha = checksum(downloadId);
-            if (!activeSha256.equalsIgnoreCase(actualSha)) {
-                downloadManager.remove(downloadId);
+            File destination = new File(updateRoot, "arena-v3-update.apk");
+            partial = new File(updateRoot, "arena-v3-update.apk.part");
+            if (partial.exists() && !partial.delete()) {
+                throw new IllegalStateException("The previous partial update could not be replaced.");
+            }
+            if (destination.exists() && !destination.delete()) {
+                throw new IllegalStateException("The previous update could not be replaced.");
+            }
+
+            connection = (HttpURLConnection) new URL(apkUrl).openConnection();
+            connection.setConnectTimeout(15_000);
+            connection.setReadTimeout(45_000);
+            connection.setUseCaches(false);
+            connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("Accept", "application/vnd.android.package-archive");
+            connection.setRequestProperty("User-Agent", "ARENA-Android-Updater/" + currentVersionName());
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new IllegalStateException("Update download returned " + status + ".");
+            }
+
+            long total = connection.getContentLengthLong();
+            long downloaded = 0L;
+            long lastProgressAt = 0L;
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = connection.getInputStream();
+                 FileOutputStream output = new FileOutputStream(partial)) {
+                byte[] buffer = new byte[32 * 1024];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                    digest.update(buffer, 0, count);
+                    downloaded += count;
+                    long now = System.currentTimeMillis();
+                    if (now - lastProgressAt >= 350L) {
+                        emitDownloadState(downloaded, total);
+                        lastProgressAt = now;
+                    }
+                }
+                output.getFD().sync();
+            }
+
+            StringBuilder actualSha = new StringBuilder();
+            for (byte item : digest.digest()) {
+                actualSha.append(String.format(Locale.ROOT, "%02x", item));
+            }
+            if (!expectedSha256.equalsIgnoreCase(actualSha.toString())) {
                 throw new SecurityException("The downloaded APK did not pass verification.");
             }
-            Uri apk = downloadManager.getUriForDownloadedFile(downloadId);
-            if (apk == null) throw new IllegalStateException("Android could not open the downloaded APK.");
-            emitState("installing", "Download verified. Opening the Android installer…");
-            Intent install = new Intent(Intent.ACTION_VIEW);
-            install.setDataAndType(apk, "application/vnd.android.package-archive");
-            install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            getContext().startActivity(install);
+            if (!partial.renameTo(destination)) {
+                throw new IllegalStateException("The verified update could not be finalized.");
+            }
+
+            emitDownloadState(downloaded, downloaded);
+            openInstaller(destination);
         } catch (Exception error) {
+            if (partial != null && partial.exists()) partial.delete();
             emitState("failed", "Update failed: " + safeMessage(error));
         } finally {
-            activeDownloadId = -1L;
-            activeSha256 = "";
+            if (connection != null) connection.disconnect();
+            synchronized (downloadLock) {
+                activeDownload = false;
+            }
         }
     }
 
-    private String checksum(long downloadId) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (ParcelFileDescriptor descriptor = downloadManager.openDownloadedFile(downloadId);
-             FileInputStream stream = new FileInputStream(descriptor.getFileDescriptor())) {
-            byte[] buffer = new byte[8192];
-            int count;
-            while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count);
+    private void openInstaller(File apkFile) {
+        Uri apk = FileProvider.getUriForFile(
+            getContext(),
+            getContext().getPackageName() + ".fileprovider",
+            apkFile
+        );
+        emitState("installing", "Download verified. Opening the Android installer…");
+        Intent install = new Intent(Intent.ACTION_VIEW);
+        install.setDataAndType(apk, "application/vnd.android.package-archive");
+        install.setClipData(ClipData.newRawUri("ARENA update", apk));
+        install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        getContext().startActivity(install);
+    }
+
+    private void emitDownloadState(long downloaded, long total) {
+        JSObject event = new JSObject();
+        event.put("state", "downloading");
+        event.put("downloadedBytes", downloaded);
+        event.put("totalBytes", total);
+        if (total > 0L) {
+            int progress = (int) Math.min(100L, Math.round(downloaded * 100.0d / total));
+            event.put("progress", progress);
+            event.put("message", "Downloading verified update… " + progress + "%");
+        } else {
+            event.put("message", "Downloading the verified ARENA update…");
         }
-        StringBuilder value = new StringBuilder();
-        for (byte item : digest.digest()) value.append(String.format(Locale.ROOT, "%02x", item));
-        return value.toString();
+        notifyListeners("updateState", event, true);
     }
 
     private String readUtf8(InputStream stream) throws Exception {
@@ -279,14 +295,6 @@ public class ArenaUpdaterPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
-        if (downloadReceiver != null) {
-            try {
-                getContext().unregisterReceiver(downloadReceiver);
-            } catch (IllegalArgumentException ignored) {
-                // Receiver was already removed by Android.
-            }
-            downloadReceiver = null;
-        }
         executor.shutdownNow();
         super.handleOnDestroy();
     }
@@ -317,6 +325,9 @@ if (!configuredActivity.includes('registerPlugin(ArenaUpdaterPlugin.class)')) {
 const manifest = await readFile(manifestPath, 'utf8');
 if (!manifest.includes('<uses-permission android:name="android.permission.INTERNET" />')) {
   throw new Error('Capacitor AndroidManifest no longer declares the expected internet permission.');
+}
+if (!manifest.includes('androidx.core.content.FileProvider') || !manifest.includes('${applicationId}.fileprovider')) {
+  throw new Error('Capacitor AndroidManifest no longer exposes the expected secure FileProvider.');
 }
 const configuredManifest = manifest.replace(
   '<uses-permission android:name="android.permission.INTERNET" />',

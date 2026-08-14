@@ -21,6 +21,9 @@ interface InstallResult {
 interface UpdateState {
   state: 'downloading' | 'installing' | 'failed';
   message?: string;
+  progress?: number;
+  downloadedBytes?: number;
+  totalBytes?: number;
 }
 
 type ListenerHandle = { remove: () => Promise<void> };
@@ -176,7 +179,9 @@ export function installAppUpdater(root: HTMLElement): () => void {
 
   const updateStateListener = ArenaUpdater.addListener('updateState', event => {
     if (disposed) return;
-    badge.textContent = event.state === 'installing' ? 'INSTALLING' : event.state.toUpperCase();
+    badge.textContent = event.state === 'downloading' && typeof event.progress === 'number'
+      ? `${Math.max(0, Math.min(100, Math.round(event.progress)))}%`
+      : event.state === 'installing' ? 'INSTALLING' : event.state.toUpperCase();
     badge.dataset.state = event.state === 'failed' ? 'failed' : 'checking';
     copy.textContent = event.message || (event.state === 'installing'
       ? 'Android is opening the installer.'

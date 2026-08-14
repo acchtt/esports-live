@@ -195,6 +195,9 @@ jobs:
           grep -Fq 'AppPlugin' "$plugins"
           grep -Fq 'ArenaUpdaterPlugin' "$native_root/java/live/esports/arena/MainActivity.java"
           grep -Fq 'REQUEST_INSTALL_PACKAGES' "$manifest"
+          grep -Fq 'FileProvider.getUriForFile' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
+          grep -Fq 'emitDownloadState' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
+          ! grep -Fq 'DownloadManager' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
           test -f "$native_root/res/mipmap-anydpi-v26/arena_launcher.xml"
           test -f "$native_root/res/drawable/arena_splash_mark.xml"
 

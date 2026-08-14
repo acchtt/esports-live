@@ -4,7 +4,7 @@ The Android wrapper is generated from Capacitor at build time; generated `androi
 
 ## In-app updates
 
-Every successful `Build Mobile V3 Android` run publishes `arena-v3-latest.apk`, its SHA-256 checksum, and `arena-v3-latest.json` to the permanent `arena-v3-android-latest` GitHub Release. The Android app checks that manifest on launch and from the Platform screen. When a higher version code is available, it downloads the APK through Android Download Manager, verifies the checksum, and opens Android's package installer.
+Every successful `Build Mobile V3 Android` run publishes `arena-v3-latest.apk`, its SHA-256 checksum, and `arena-v3-latest.json` to the permanent `arena-v3-android-latest` GitHub Release. The Android app checks that manifest on launch and from the Platform screen. When a higher version code is available, ARENA streams the APK into its private cache with visible progress, verifies the checksum, and shares the verified file with Android's package installer through a secure `FileProvider` URI.
 
 The sideload updater is enabled only for the debug APK channel. The Play AAB intentionally omits the updater bridge and `REQUEST_INSTALL_PACKAGES` permission so a future store build can use Google Play's own in-app update flow.
 

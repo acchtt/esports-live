@@ -76,6 +76,27 @@ jobs:
           path: ~/.android/debug.keystore
           key: arena-v3-android-debug-keystore-v1
 
+      - name: Ensure stable debug signing key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then
+            keytool -genkeypair \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=ARENA,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storetype JKS
+          fi
+          echo "ARENA_ANDROID_DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
+          echo "ARENA_ANDROID_DEBUG_STORE_PASSWORD=android" >> "$GITHUB_ENV"
+          echo "ARENA_ANDROID_DEBUG_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
+          echo "ARENA_ANDROID_DEBUG_KEY_PASSWORD=android" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: npm install
 
@@ -148,23 +169,6 @@ jobs:
           npm run android:brand --workspace @esports-live/mobile-v3-native
           npm run android:updater --workspace @esports-live/mobile-v3-native
 
-      - name: Ensure stable debug signing key
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.android"
-          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then
-            keytool -genkeypair \
-              -keystore "$HOME/.android/debug.keystore" \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -dname "CN=Android Debug,O=ARENA,C=US" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storetype JKS
-          fi
-
       - name: Validate generated native shell
         shell: bash
         run: |
@@ -190,6 +194,8 @@ jobs:
           grep -Eq 'applicationId[[:space:]]+"live\.esports\.arena"' "$build_gradle"
           grep -Eq "versionCode[[:space:]]+$ARENA_ANDROID_VERSION_CODE" "$build_gradle"
           grep -Fq "versionName \"$ARENA_ANDROID_VERSION_NAME\"" "$build_gradle"
+          grep -Fq 'arenaDebug {' "$build_gradle"
+          grep -Fq 'signingConfig signingConfigs.arenaDebug' "$build_gradle"
           grep -Fq '<string name="app_name">ARENA</string>' "$strings_xml"
           grep -Fq 'android:icon="@mipmap/arena_launcher"' "$manifest"
           grep -Fq 'android:roundIcon="@mipmap/arena_launcher_round"' "$manifest"
@@ -230,6 +236,12 @@ jobs:
             grep -Fq "package: name='live.esports.arena'" /tmp/arena-v3-apk-badging.txt
             grep -Fq "application-label:'ARENA'" /tmp/arena-v3-apk-badging.txt
           fi
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -x "$apksigner"
+          "$apksigner" verify --print-certs "$apk" | tee /tmp/arena-v3-apk-signing.txt
+          signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/arena-v3-apk-signing.txt)"
+          test -n "$signer_sha256"
+          echo "ARENA_ANDROID_SIGNER_SHA256=$signer_sha256" >> "$GITHUB_ENV"
           jarsigner -verify "$aab"
           mkdir -p artifacts
           short_sha="${MOBILE_V3_COMMIT_SHA:0:7}"
@@ -255,6 +267,7 @@ jobs:
             versionName: process.env.ARENA_ANDROID_VERSION_NAME,
             apkUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/arena-v3-android-latest/arena-v3-latest.apk?versionCode=${process.env.ARENA_ANDROID_VERSION_CODE}`,
             sha256: process.env.APK_SHA,
+            signerSha256: process.env.ARENA_ANDROID_SIGNER_SHA256,
             sizeBytes: Number(process.env.APK_SIZE),
             releaseNotes: 'Latest ARENA V3 live-score improvements and fixes.',
             publishedAt: process.env.PUBLISHED_AT,

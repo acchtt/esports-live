@@ -19,7 +19,7 @@ function players(side: 'blue' | 'red') {
     assists: 6 + index,
     creepScore: 180 + index * 12,
     totalGold: side === 'blue' ? 10_400 + index * 420 : 9_700 + index * 310,
-    items: ['1001', '2003']
+    items: ['1001', '2003', '3006', '3078', '3157', '3363']
   }));
 }
 
@@ -108,6 +108,11 @@ async function installFixtures(page: Page): Promise<void> {
     contentType: 'image/svg+xml',
     body: squareIcon
   }));
+  await page.route('https://ddragon.leagueoflegends.com/cdn/**/img/item/*.png', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: squareIcon
+  }));
   await page.route('**/health', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -176,16 +181,26 @@ test('V2 mobile statboard matches the compact legacy density and clears the nav'
   }));
   expect(levelsOverlapPortraits).toBe(false);
 
+  const itemSlots = page.locator('.player-item-slot');
+  await expect(itemSlots).toHaveCount(60);
+  await expect(page.locator('.player-item-slot.image-loaded')).toHaveCount(60);
+  await expect(itemSlots.first().locator('img')).toHaveAttribute('src', /\/cdn\/16\.15\.1\/img\/item\/1001\.png$/);
+
   const teamBanner = await page.locator('.team-banner').boundingBox();
   const objectiveCard = await page.locator('.objective-grid article').first().boundingBox();
   const firstRow = await rows.first().boundingBox();
   const portrait = await page.locator('.champion-portrait').first().boundingBox();
   expect(teamBanner?.height).toBeLessThanOrEqual(86);
-  // The custom ARENA objective icons intentionally add a few pixels over the
-  // pre-icon card. Keep the accepted compact treatment bounded below 74px.
-  expect(objectiveCard?.height).toBeLessThanOrEqual(74);
-  expect(firstRow?.height).toBeLessThanOrEqual(78);
+  expect(objectiveCard?.height).toBeLessThanOrEqual(58);
+  expect(firstRow?.height).toBeLessThanOrEqual(94);
   expect(portrait?.height).toBeLessThanOrEqual(42);
+
+  const objectiveHeader = page.locator('.objective-grid article > span').first();
+  const headerLayout = await objectiveHeader.evaluate(element => ({
+    display: getComputedStyle(element).display,
+    alignItems: getComputedStyle(element).alignItems
+  }));
+  expect(headerLayout).toEqual({ display: 'flex', alignItems: 'center' });
 
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.waitForTimeout(50);

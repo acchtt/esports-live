@@ -391,9 +391,11 @@ a:focus-visible {
 
 .match-card-teams em {
   color: #52657c;
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   font-style: normal;
   font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .match-card-bottom strong {
@@ -488,6 +490,21 @@ a:focus-visible {
 
 .game-tabs button.active strong {
   color: #f4fbff;
+}
+
+@media (max-width: 760px) {
+  .game-tabs {
+    display: grid;
+    grid-template-columns: repeat(var(--game-tab-count, 3), minmax(0, 1fr));
+    gap: 4px;
+    overflow: hidden;
+  }
+
+  .game-tabs button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: clamp(7px, 3.2vw, 13px);
+  }
 }
 
 .scoreboard {
@@ -771,6 +788,54 @@ a:focus-visible {
 
 .red-player {
   grid-template-columns: minmax(0, 1fr) 70px;
+}
+
+.player-items {
+  display: flex;
+  grid-column: 1 / -1;
+  min-width: 0;
+  gap: 4px;
+}
+
+.player-items.red {
+  justify-content: flex-end;
+}
+
+.player-items[hidden] {
+  display: none;
+}
+
+.player-item-slot {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid rgba(118, 151, 188, 0.32);
+  border-radius: 6px;
+  color: #70839a;
+  background: rgba(8, 21, 35, 0.94);
+  font-size: 0.42rem;
+  font-weight: 900;
+}
+
+.player-item-slot img {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player-item-slot img[hidden] {
+  display: none;
+}
+
+.player-item-slot.image-loaded .player-item-fallback {
+  visibility: hidden;
 }
 
 .champion-portrait {

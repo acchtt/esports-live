@@ -7,6 +7,18 @@ function normalized(value: string | null | undefined): string {
   return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
+function secureAssetUrl(value: string | null | undefined): string {
+  const source = String(value ?? '').trim();
+  if (!source) return '';
+  try {
+    const url = new URL(source, window.location.href);
+    if (url.protocol === 'http:') url.protocol = 'https:';
+    return url.href;
+  } catch {
+    return source;
+  }
+}
+
 function requestUrl(input: RequestInfo | URL): URL {
   if (typeof input === 'string') return new URL(input, window.location.href);
   if (input instanceof URL) return new URL(input.href);
@@ -52,7 +64,7 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
   };
 
   const rememberTeam = (team: TeamRef): void => {
-    const imageUrl = team.imageUrl?.trim();
+    const imageUrl = secureAssetUrl(team.imageUrl);
     if (!imageUrl) return;
     const value = { name: team.name, imageUrl };
     teamKeys(team).forEach(key => logos.set(key, value));
@@ -64,7 +76,7 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
     payload.events?.forEach((event, eventIndex) => {
       event.series?.teams?.forEach(team => {
         rememberTeam(team);
-        const imageUrl = team.imageUrl?.trim();
+        const imageUrl = secureAssetUrl(team.imageUrl);
         if (imageUrl && eventIndex < PREWARM_EVENT_COUNT) {
           prewarmLogo(imageUrl, eventIndex < EAGER_CARD_COUNT);
         }
@@ -87,6 +99,8 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
       side.classList.remove('has-team-logo');
       if (image) {
         image.hidden = true;
+        delete image.dataset.loadedSrc;
+        delete image.dataset.requestedSrc;
         image.removeAttribute('src');
       }
       return;
@@ -98,8 +112,17 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
       image.alt = '';
       image.setAttribute('aria-hidden', 'true');
       image.decoding = 'async';
+      image.hidden = true;
+      image.addEventListener('load', () => {
+        const source = image!.getAttribute('src') ?? '';
+        image!.dataset.loadedSrc = source;
+        if (image!.dataset.requestedSrc !== source) return;
+        image!.hidden = false;
+        side.classList.add('has-team-logo');
+      });
       image.addEventListener('error', () => {
         image!.hidden = true;
+        delete image!.dataset.loadedSrc;
         side.classList.remove('has-team-logo');
       });
       side.prepend(image);
@@ -108,9 +131,15 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
     image.loading = eager ? 'eager' : 'lazy';
     image.setAttribute('fetchpriority', eager ? 'high' : 'auto');
     if (eager) prewarmLogo(logo.imageUrl, true);
-    if (image.getAttribute('src') !== logo.imageUrl) image.src = logo.imageUrl;
-    image.hidden = false;
-    side.classList.add('has-team-logo');
+    image.dataset.requestedSrc = logo.imageUrl;
+    if (image.getAttribute('src') !== logo.imageUrl) {
+      image.hidden = true;
+      side.classList.remove('has-team-logo');
+      image.src = logo.imageUrl;
+    }
+    const loaded = image.dataset.loadedSrc === logo.imageUrl;
+    image.hidden = !loaded;
+    side.classList.toggle('has-team-logo', loaded);
   };
 
   const sync = (): void => {

@@ -24,6 +24,7 @@ export interface LolProviderSeries {
   state: SeriesState;
   scheduledStart: string;
   games: readonly LolProviderGame[];
+  score?: readonly [number, number];
 }
 
 export interface LolProviderScheduleEntry {

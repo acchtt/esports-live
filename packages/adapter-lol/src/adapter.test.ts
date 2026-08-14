@@ -14,7 +14,8 @@ const series: LolProviderSeries = {
   bestOf: 3,
   state: 'live',
   scheduledStart: '2026-07-31T08:00:00.000Z',
-  games: [{ id: 'game-1', number: 1, state: 'live' }]
+  games: [{ id: 'game-1', number: 1, state: 'live' }],
+  score: [1, 0]
 };
 
 const stats: LolStats = {
@@ -66,6 +67,7 @@ test('LoL adapter emits normalized fresh snapshots', async () => {
   assert.equal(snapshot.game.id, 'game-1');
   assert.equal(snapshot.quality.freshness, 'fresh');
   assert.equal(snapshot.quality.safeForLiveAnalysis, true);
+  assert.deepEqual(snapshot.series.score?.map(entry => entry.wins), [1, 0]);
 });
 
 test('LoL adapter rejects incomplete snapshots for live analysis', async () => {

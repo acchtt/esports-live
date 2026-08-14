@@ -11,6 +11,7 @@
 .team-side.blue > .team-logo { justify-self: start; }
 .team-side.red > .team-logo { justify-self: end; }
 .team-side > .team-logo[hidden] { display: none; }
+.team-side.has-team-logo > span { display: none; }
 
 .match-card-teams > strong.has-team-logo {
   grid-template-columns: 30px minmax(0, 1fr);

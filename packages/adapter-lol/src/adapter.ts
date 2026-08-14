@@ -28,7 +28,13 @@ function seriesRef(series: LolProviderSeries): SeriesRef {
     bestOf: series.bestOf,
     state: series.state,
     scheduledStart: series.scheduledStart,
-    games: series.games
+    games: series.games,
+    ...(series.score ? {
+      score: [
+        { team: series.teams[0], wins: series.score[0] },
+        { team: series.teams[1], wins: series.score[1] }
+      ]
+    } : {})
   };
 }
 

@@ -5,13 +5,13 @@ const hle = {
   id: 'hle-challengers',
   name: 'HLE Challengers',
   code: 'HLE',
-  imageUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%23f97316%22/%3E%3C/svg%3E'
+  imageUrl: 'http://static.lolesports.com/teams/hle-test.svg'
 };
 const krx = {
   id: 'krx-challengers',
   name: 'KRX Challengers',
   code: 'KRX',
-  imageUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230ea5e9%22/%3E%3C/svg%3E'
+  imageUrl: 'http://static.lolesports.com/teams/krx-test.svg'
 };
 
 const series = {
@@ -25,7 +25,8 @@ const series = {
   games: [
     { id: 'challengers-game-1', number: 1, state: 'completed' },
     { id: 'challengers-game-2', number: 2, state: 'live' }
-  ]
+  ],
+  score: [{ team: hle, wins: 1 }, { team: krx, wins: 0 }]
 };
 
 const roles = ['top', 'jungle', 'mid', 'bottom', 'support'];
@@ -156,6 +157,11 @@ async function json(route: Route, value: unknown): Promise<void> {
 
 async function installCommon(page: Page, gameContext = context('live')): Promise<void> {
   await page.route('https://ddragon.leagueoflegends.com/**', route => route.abort());
+  await page.route('https://static.lolesports.com/teams/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="14" fill="#22d3ee"/></svg>'
+  }));
   await page.route('**/health', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -182,8 +188,9 @@ test('web v2 resolves side identity, team logos and champion-board copy', async 
   await expect(card).toBeVisible();
   const catalogueLogos = card.locator('.match-team-logo');
   await expect(catalogueLogos).toHaveCount(2);
-  await expect(catalogueLogos.nth(0)).toHaveAttribute('src', hle.imageUrl);
-  await expect(catalogueLogos.nth(1)).toHaveAttribute('src', krx.imageUrl);
+  await expect(catalogueLogos.nth(0)).toHaveAttribute('src', hle.imageUrl.replace('http:', 'https:'));
+  await expect(catalogueLogos.nth(1)).toHaveAttribute('src', krx.imageUrl.replace('http:', 'https:'));
+  await expect(card.locator('.match-series-score')).toHaveText('1 – 0');
   await expect(catalogueLogos.nth(0)).toHaveAttribute('loading', 'eager');
   await expect(catalogueLogos.nth(0)).toHaveAttribute('fetchpriority', 'high');
   await card.click();
@@ -195,8 +202,8 @@ test('web v2 resolves side identity, team logos and champion-board copy', async 
   await expect(page.locator('.team-side.red')).not.toContainText('RED SIDE');
   await expect(page.locator('#blue-logo')).toBeVisible();
   await expect(page.locator('#red-logo')).toBeVisible();
-  await expect(page.locator('#blue-logo')).toHaveAttribute('src', krx.imageUrl);
-  await expect(page.locator('#red-logo')).toHaveAttribute('src', hle.imageUrl);
+  await expect(page.locator('#blue-logo')).toHaveAttribute('src', krx.imageUrl.replace('http:', 'https:'));
+  await expect(page.locator('#red-logo')).toHaveAttribute('src', hle.imageUrl.replace('http:', 'https:'));
 
   const blueNames = page.locator('.blue-player .player-copy strong');
   const redNames = page.locator('.red-player .player-copy strong');

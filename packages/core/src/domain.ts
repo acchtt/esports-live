@@ -82,6 +82,7 @@ export interface SeriesRef {
   state: SeriesState;
   scheduledStart: string;
   games: readonly SeriesGameRef[];
+  score?: readonly [SeriesScoreRef, SeriesScoreRef];
 }
 
 export interface ScheduleEvent {

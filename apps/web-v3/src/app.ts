@@ -182,6 +182,22 @@ function championImage(championId: string | null): string | null {
     : null;
 }
 
+function itemImage(itemId: string, patch: string | null): string | null {
+  const id = itemId.replace(/[^0-9]/g, '');
+  if (!id) return null;
+  const rawPatch = String(patch ?? '').trim();
+  const reportedVersion = /^\d+\.\d+\.\d+$/.test(rawPatch)
+    ? rawPatch
+    : /^\d+\.\d+$/.test(rawPatch)
+      ? `${rawPatch}.1`
+      : '16.15.1';
+  const versionParts = reportedVersion.split('.');
+  const reportedMajor = Number(versionParts[0]);
+  if (reportedMajor >= 25) versionParts[0] = String(reportedMajor - 10);
+  const version = versionParts.join('.');
+  return `https://ddragon.leagueoflegends.com/cdn/${encodeURIComponent(version)}/img/item/${id}.png`;
+}
+
 function initials(value: string): string {
   return value
     .split(/\s+/)
@@ -687,6 +703,7 @@ export class WebV2App {
         event.series.scheduledStart,
         event.series.teams[0].name,
         event.series.teams[1].name,
+        event.series.score?.map(entry => entry.wins).join(':') ?? '',
         event.series.games.map(game => `${game.id}:${game.state}`).join('|')
       ])
     });
@@ -713,6 +730,9 @@ export class WebV2App {
     button.type = 'button';
     button.dataset.seriesId = event.series.id;
     button.dataset.sourceView = view;
+    button.dataset.seriesState = event.series.state;
+    button.dataset.seriesScoreReady = String(Boolean(event.series.score));
+    button.dataset.seriesScoreSource = event.series.score ? 'schedule' : 'default';
 
     const top = element('span', 'match-card-top');
     top.append(
@@ -731,7 +751,11 @@ export class WebV2App {
       element('i', undefined, event.series.teams[1].code ?? teamTag(event.series.teams[1].name, null)),
       element('span', undefined, event.series.teams[1].name)
     );
-    teams.append(blue, element('em', undefined, 'VS'), red);
+    const blueWins = event.series.score?.[0].wins ?? 0;
+    const redWins = event.series.score?.[1].wins ?? 0;
+    const score = element('em', 'match-series-score', `${blueWins} – ${redWins}`);
+    score.setAttribute('aria-label', `Series score ${blueWins} to ${redWins}`);
+    teams.append(blue, score, red);
 
     const bottom = element('span', 'match-card-bottom');
     bottom.append(
@@ -843,6 +867,7 @@ export class WebV2App {
       this.#gameTabs.replaceChildren(fragment);
     }
     this.#gameTabs.hidden = games.length <= 1;
+    this.#gameTabs.style.setProperty('--game-tab-count', String(Math.max(1, games.length)));
     this.#gameTabs.querySelectorAll<HTMLButtonElement>('[data-game-id]').forEach(button => {
       const active = button.dataset.gameId === selection.gameId;
       button.classList.toggle('active', active);
@@ -877,18 +902,19 @@ export class WebV2App {
     const blueTag = sideTeamTag(event, stats?.blue ?? null, 0, 'Blue');
     const redTag = sideTeamTag(event, stats?.red ?? null, 1, 'Red');
     const fragment = document.createDocumentFragment();
-    pairs.forEach(pair => fragment.append(this.#playerRow(pair, blueTag, redTag)));
+    pairs.forEach(pair => fragment.append(this.#playerRow(pair, blueTag, redTag, stats?.patch ?? null)));
     this.#playerBoard.replaceChildren(fragment);
   }
 
-  #playerRow(pair: PlayerPair, blueTag: string, redTag: string): HTMLElement {
+  #playerRow(pair: PlayerPair, blueTag: string, redTag: string, patch: string | null): HTMLElement {
     const row = element('article', 'player-row');
     row.dataset.role = pair.role;
 
     const blue = element('div', 'player-side blue-player');
     blue.append(
       this.#championPortrait(pair.blue),
-      this.#playerCopy(pair.blue, blueTag, 'blue')
+      this.#playerCopy(pair.blue, blueTag, 'blue'),
+      this.#playerItems(pair.blue, patch, 'blue')
     );
 
     const difference = laneGoldDifference(pair.blue, pair.red);
@@ -900,7 +926,8 @@ export class WebV2App {
     const red = element('div', 'player-side red-player');
     red.append(
       this.#playerCopy(pair.red, redTag, 'red'),
-      this.#championPortrait(pair.red)
+      this.#championPortrait(pair.red),
+      this.#playerItems(pair.red, patch, 'red')
     );
 
     row.append(blue, lead, red);
@@ -914,6 +941,43 @@ export class WebV2App {
       element('span', undefined, formatKda(player))
     );
     return copy;
+  }
+
+  #playerItems(player: LolPlayerState | null, patch: string | null, side: 'blue' | 'red'): HTMLElement {
+    const row = element('div', `player-items ${side}`);
+    row.setAttribute('aria-label', `${player?.handle ?? 'Player'} items`);
+    const items = (player?.items ?? []).filter(Boolean).slice(0, 7);
+    if (!items.length) {
+      row.hidden = true;
+      return row;
+    }
+
+    items.forEach(itemId => {
+      const slot = element('span', 'player-item-slot');
+      const fallback = element('span', 'player-item-fallback', itemId.slice(-2));
+      fallback.setAttribute('aria-hidden', 'true');
+      const source = itemImage(itemId, patch);
+      if (source) {
+        const image = element('img');
+        image.alt = `Item ${itemId}`;
+        image.decoding = 'async';
+        image.loading = 'lazy';
+        image.hidden = true;
+        image.addEventListener('load', () => {
+          image.hidden = false;
+          slot.classList.add('image-loaded');
+        }, { once: true });
+        image.addEventListener('error', () => {
+          image.hidden = true;
+          slot.classList.remove('image-loaded');
+        }, { once: true });
+        image.src = source;
+        slot.append(image);
+      }
+      slot.append(fallback);
+      row.append(slot);
+    });
+    return row;
   }
 
   #championPortrait(player: LolPlayerState | null): HTMLElement {

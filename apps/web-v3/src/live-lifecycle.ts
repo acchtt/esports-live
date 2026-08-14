@@ -21,6 +21,18 @@ function normalized(value: string | null | undefined): string {
   return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
+function secureAssetUrl(value: string | null | undefined): string {
+  const source = String(value ?? '').trim();
+  if (!source) return '';
+  try {
+    const url = new URL(source, window.location.href);
+    if (url.protocol === 'http:') url.protocol = 'https:';
+    return url.href;
+  } catch {
+    return source;
+  }
+}
+
 function requestUrl(input: RequestInfo | URL): URL {
   if (typeof input === 'string') return new URL(input, window.location.href);
   if (input instanceof URL) return new URL(input.href);
@@ -166,7 +178,7 @@ function teamKeys(team: TeamRef): readonly string[] {
 export function installLiveLifecycle(root: HTMLElement): () => void {
   const nativeFetch = window.fetch.bind(window);
   const contexts = new Map<string, CachedContext>();
-  const teamLogos = new Map<string, { name: string; imageUrl: string }>();
+  const teamLogos = new Map<string, { name: string; code: string; imageUrl: string }>();
   let forceFreshSnapshot = false;
   let lastForegroundSignalAt = 0;
   let logoSyncQueued = false;
@@ -181,9 +193,9 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
   };
 
   const rememberTeam = (team: TeamRef): void => {
-    const imageUrl = team.imageUrl?.trim();
+    const imageUrl = secureAssetUrl(team.imageUrl);
     if (!imageUrl) return;
-    const value = { name: team.name, imageUrl };
+    const value = { name: team.name, code: team.code?.trim() ?? '', imageUrl };
     teamKeys(team).forEach(key => teamLogos.set(key, value));
   };
 
@@ -198,7 +210,7 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
     queueLogoSync();
   };
 
-  const logoForName = (name: string): { name: string; imageUrl: string } | null => {
+  const logoForName = (name: string): { name: string; code: string; imageUrl: string } | null => {
     const key = normalized(name);
     return key ? teamLogos.get(key) ?? null : null;
   };
@@ -217,8 +229,17 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
     image.loading = 'eager';
     image.decoding = 'async';
     image.hidden = true;
+    image.addEventListener('load', () => {
+      const source = image!.getAttribute('src') ?? '';
+      image!.dataset.loadedSrc = source;
+      if (image!.dataset.requestedSrc !== source) return;
+      image!.hidden = false;
+      article.classList.add('has-team-logo');
+    });
     image.addEventListener('error', () => {
       image!.hidden = true;
+      delete image!.dataset.loadedSrc;
+      article.classList.remove('has-team-logo');
     });
 
     const sideLabel = [...article.children].find(child => (
@@ -226,7 +247,7 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
       && child.tagName === 'SPAN'
       && /^(BLUE|RED) SIDE$/i.test(child.textContent?.trim() ?? '')
     ));
-    if (sideLabel) sideLabel.replaceWith(image);
+    if (sideLabel) article.insertBefore(image, sideLabel);
     else article.prepend(image);
     return image;
   };
@@ -236,16 +257,30 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
       const name = root.querySelector<HTMLElement>(`#${side}-name`)?.textContent?.trim() ?? '';
       const image = ensureLogo(side);
       if (!image) return;
+      const article = image.closest<HTMLElement>('.team-side');
+      const fallback = article?.querySelector<HTMLElement>(':scope > span') ?? null;
       const logo = logoForName(name);
       if (!logo) {
         image.hidden = true;
+        delete image.dataset.loadedSrc;
+        delete image.dataset.requestedSrc;
         image.removeAttribute('src');
         image.alt = '';
+        article?.classList.remove('has-team-logo');
+        if (fallback) fallback.textContent = `${side.toUpperCase()} SIDE`;
         return;
       }
-      if (image.getAttribute('src') !== logo.imageUrl) image.src = logo.imageUrl;
+      if (fallback) fallback.textContent = logo.code || logo.name.split(/\s+/).map(part => part[0]).join('').slice(0, 4).toUpperCase();
+      image.dataset.requestedSrc = logo.imageUrl;
+      if (image.getAttribute('src') !== logo.imageUrl) {
+        image.hidden = true;
+        article?.classList.remove('has-team-logo');
+        image.src = logo.imageUrl;
+      }
       image.alt = `${logo.name} logo`;
-      image.hidden = false;
+      const loaded = image.dataset.loadedSrc === logo.imageUrl;
+      image.hidden = !loaded;
+      article?.classList.toggle('has-team-logo', loaded);
     });
   };
 

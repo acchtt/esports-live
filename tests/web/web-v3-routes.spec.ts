@@ -13,7 +13,8 @@ const series = {
   scheduledStart: new Date(Date.now() - 30 * 60_000).toISOString(),
   games: [
     { id: 'game-routed-1', number: 1, state: 'completed' },
-    { id: 'game-routed-2', number: 2, state: 'live' }
+    { id: 'game-routed-2', number: 2, state: 'live' },
+    { id: 'game-routed-3', number: 3, state: 'unstarted' }
   ]
 };
 
@@ -118,6 +119,14 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#quality-text')).toHaveText('LIVE DATA · Updated just now');
   await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'live');
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
+
+  const tabsFit = await page.locator('#game-tabs').evaluate(tabs => {
+    const last = tabs.querySelector<HTMLElement>('[data-game-id]:last-child');
+    const outer = tabs.getBoundingClientRect();
+    const inner = last?.getBoundingClientRect();
+    return inner ? inner.right <= outer.right - 3 && inner.left >= outer.left + 3 : false;
+  });
+  expect(tabsFit).toBe(true);
 
   await page.locator('#game-tabs [data-game-id="game-routed-1"]').click();
   await expect(page).toHaveURL(/\/match\/series-routed\/game-routed-1(?:\?|$)/);

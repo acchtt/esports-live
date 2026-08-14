@@ -1,6 +1,7 @@
 .objective-grid article > span {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 5px;
   white-space: nowrap;
 }
@@ -40,14 +41,15 @@
   }
 
   .objective-grid article > span::before {
-    width: 22px;
-    height: 22px;
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
   }
 }
 
 @media (max-width: 400px) {
   .objective-grid article > span::before {
-    width: 20px;
-    height: 20px;
+    width: 15px;
+    height: 15px;
   }
 }

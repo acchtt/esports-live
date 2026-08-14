@@ -217,6 +217,7 @@ test('Riot provider treats a non-clinching partial score as live when the schedu
 
   const schedule = await provider.getSchedule();
   assert.equal(schedule[0]?.series.state, 'live');
+  assert.deepEqual(schedule[0]?.series.score, [0, 1]);
 });
 
 test('Riot provider does not infer live after a team has clinched the series', async () => {

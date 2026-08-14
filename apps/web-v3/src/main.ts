@@ -18,6 +18,7 @@ import { startWebV2 } from './app.ts';
 import { installApiReliability } from './api-reliability.ts';
 import { installArenaBrand } from './arena-brand.ts';
 import { installCatalogueFinality } from './catalogue-finality.ts';
+import { installCatalogueSeriesScores } from './catalogue-series-scores.ts';
 import { installCatalogueTeamLogos } from './catalogue-team-logos.ts';
 import { installChampionPortraitAssets } from './champion-portrait-assets.ts';
 import { installCompactHeader } from './compact-header.ts';
@@ -44,6 +45,7 @@ const initialRoute = currentV3Route();
 if (initialRoute.kind !== 'match') {
   installCatalogueFinality();
   installCatalogueTeamLogos(root);
+  installCatalogueSeriesScores(root);
 }
 installLiveLifecycle(root);
 installNativeLifecycle();

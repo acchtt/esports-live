@@ -508,10 +508,13 @@ export function loadHealth(signal?: AbortSignal): Promise<HealthResponse> {
 
 export async function loadSeriesContext(
   seriesId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  maxAgeMs = CONTEXT_CACHE_MS
 ): Promise<SeriesContext> {
   const cached = contextCache.get(seriesId);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const now = Date.now();
+  const cachedAt = cached ? cached.expiresAt - CONTEXT_CACHE_MS : 0;
+  if (cached && cached.expiresAt > now && now - cachedAt < maxAgeMs) return cached.value;
   const value = await requestJson<SeriesContext>(
     `/v1/lol/series/${encodeURIComponent(seriesId)}/context?final=${Date.now()}`,
     signal

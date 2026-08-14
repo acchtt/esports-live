@@ -102,15 +102,15 @@ html[data-arena-route="match"] .mobile-nav {
   }
 
   .objective-grid {
-    gap: 6px;
-    padding: 10px 8px;
+    gap: 4px;
+    padding: 7px 7px;
   }
 
   .objective-grid article {
-    min-height: 62px;
-    gap: 6px;
-    padding: 7px 2px;
-    border-radius: 12px;
+    min-height: 50px;
+    gap: 3px;
+    padding: 5px 1px;
+    border-radius: 10px;
   }
 
   .objective-grid article > span {
@@ -126,7 +126,7 @@ html[data-arena-route="match"] .mobile-nav {
   .player-row {
     grid-template-columns: minmax(0, 1fr) 66px minmax(0, 1fr);
     gap: 6px;
-    min-height: 76px;
+    min-height: 88px;
     padding: 8px 9px;
   }
 
@@ -147,6 +147,20 @@ html[data-arena-route="match"] .mobile-nav {
     height: 42px;
     border-width: 1px;
     border-radius: 10px;
+  }
+
+  .player-side {
+    row-gap: 5px;
+  }
+
+  .player-item-slot {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+  }
+
+  .player-items {
+    gap: 3px;
   }
 
   .player-copy {
@@ -200,17 +214,17 @@ html[data-arena-route="match"] .mobile-nav {
   }
 
   .objective-grid {
-    gap: 5px;
-    padding-inline: 7px;
+    gap: 3px;
+    padding-inline: 6px;
   }
 
   .objective-grid article {
-    min-height: 60px;
+    min-height: 48px;
   }
 
   .player-row {
     grid-template-columns: minmax(0, 1fr) 60px minmax(0, 1fr);
-    min-height: 72px;
+    min-height: 86px;
     padding: 7px;
   }
 
@@ -225,5 +239,10 @@ html[data-arena-route="match"] .mobile-nav {
   .champion-portrait {
     width: 39px;
     height: 39px;
+  }
+
+  .player-item-slot {
+    width: 19px;
+    height: 19px;
   }
 }

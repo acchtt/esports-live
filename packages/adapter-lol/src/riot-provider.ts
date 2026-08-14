@@ -214,16 +214,25 @@ export function normalizeRiotSeries(
     games.push({ id: fallbackGameId, number: games.length + 1, state: 'live' });
   }
   const strategy = object(match.strategy);
+  const normalizedTeams: readonly [TeamRef, TeamRef] = [
+    teamRef(teams[0], 'team-1', 'Team 1'),
+    teamRef(teams[1], 'team-2', 'Team 2')
+  ];
+  const score: readonly [number, number] = [
+    firstNumber(object(object(teams[0]).result), ['gameWins', 'wins']) ?? 0,
+    firstNumber(object(object(teams[1]).result), ['gameWins', 'wins']) ?? 0
+  ];
   return {
     id: firstString(match, ['id'])
       ?? firstString(event, ['id'])
       ?? `unknown-series-${fallbackGameId ?? 'schedule'}`,
     competition: competition(event),
-    teams: [teamRef(teams[0], 'team-1', 'Team 1'), teamRef(teams[1], 'team-2', 'Team 2')],
+    teams: normalizedTeams,
     bestOf: firstNumber(strategy, ['count']) ?? Math.max(games.length, 1),
     state: inferredSeriesState(event, match),
     scheduledStart: firstString(event, ['startTime', 'scheduledStart']) ?? observedAt,
-    games
+    games,
+    score
   };
 }
 

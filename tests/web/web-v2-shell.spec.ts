@@ -35,7 +35,8 @@ const activeSeries = {
   games: [
     { id: 'game-v2-1', number: 1, state: 'completed' },
     { id: 'game-v2-2', number: 2, state: 'live' }
-  ]
+  ],
+  score: [{ team: alpha, wins: 1 }, { team: bravo, wins: 0 }]
 };
 
 const unknownLiveLplSeries = {
@@ -48,7 +49,8 @@ const unknownLiveLplSeries = {
   scheduledStart: iso(-20 * 60 * 1_000),
   games: [
     { id: 'game-v2-lpl-live-1', number: 1, state: 'live' }
-  ]
+  ],
+  score: [{ team: lplBlue, wins: 0 }, { team: lplRed, wins: 0 }]
 };
 
 const staleCompletedLiveLplSeries = {
@@ -66,7 +68,8 @@ const backgroundRecoveryLplSeries = {
   scheduledStart: iso(-25 * 60 * 1_000),
   games: [
     { id: 'game-v2-lpl-background-1', number: 1, state: 'completed' }
-  ]
+  ],
+  score: [{ team: lplBlue, wins: 1 }, { team: lplRed, wins: 0 }]
 };
 
 const futureLplSeries = {
@@ -79,7 +82,8 @@ const futureLplSeries = {
   scheduledStart: iso(4 * 60 * 60 * 1_000),
   games: [
     { id: 'game-v2-lpl-future-1', number: 1, state: 'unstarted' }
-  ]
+  ],
+  score: [{ team: future, wins: 0 }, { team: nova, wins: 0 }]
 };
 
 const misclassifiedFutureLplSeries = {
@@ -98,7 +102,8 @@ const historySeries = {
   bestOf: 3,
   state: 'completed',
   scheduledStart: iso(-2 * 60 * 60 * 1_000),
-  games: []
+  games: [],
+  score: [{ team: delta, wins: 2 }, { team: echo, wins: 0 }]
 };
 
 const canonicalHistorySeries = {

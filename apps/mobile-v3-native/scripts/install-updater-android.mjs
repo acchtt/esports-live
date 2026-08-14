@@ -16,6 +16,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -60,14 +61,16 @@ public class ArenaUpdaterPlugin extends Plugin {
         executor.execute(() -> {
             HttpURLConnection connection = null;
             try {
-                URL url = new URL(MANIFEST_URL + "?installed=" + BuildConfig.VERSION_CODE + "&t=" + System.currentTimeMillis());
+                long currentVersionCode = currentVersionCode();
+                String currentVersionName = currentVersionName();
+                URL url = new URL(MANIFEST_URL + "?installed=" + currentVersionCode + "&t=" + System.currentTimeMillis());
                 connection = (HttpURLConnection) url.openConnection();
                 connection.setConnectTimeout(12_000);
                 connection.setReadTimeout(18_000);
                 connection.setUseCaches(false);
                 connection.setInstanceFollowRedirects(true);
                 connection.setRequestProperty("Accept", "application/json");
-                connection.setRequestProperty("User-Agent", "ARENA-Android/" + BuildConfig.VERSION_NAME);
+                connection.setRequestProperty("User-Agent", "ARENA-Android/" + currentVersionName);
                 int status = connection.getResponseCode();
                 if (status < 200 || status >= 300) {
                     throw new IllegalStateException("Update server returned " + status + ".");
@@ -87,9 +90,9 @@ public class ArenaUpdaterPlugin extends Plugin {
                 validateApk(apkUrl, sha256);
 
                 JSObject result = new JSObject();
-                result.put("available", latestCode > BuildConfig.VERSION_CODE);
-                result.put("currentVersionCode", BuildConfig.VERSION_CODE);
-                result.put("currentVersionName", BuildConfig.VERSION_NAME);
+                result.put("available", latestCode > currentVersionCode);
+                result.put("currentVersionCode", currentVersionCode);
+                result.put("currentVersionName", currentVersionName);
                 result.put("latestVersionCode", latestCode);
                 result.put("latestVersionName", latestName);
                 result.put("apkUrl", apkUrl);
@@ -246,6 +249,20 @@ public class ArenaUpdaterPlugin extends Plugin {
         int count;
         while ((count = stream.read(buffer)) != -1) output.write(buffer, 0, count);
         return new String(output.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private PackageInfo packageInfo() throws Exception {
+        return getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+    }
+
+    private long currentVersionCode() throws Exception {
+        PackageInfo info = packageInfo();
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? info.getLongVersionCode() : info.versionCode;
+    }
+
+    private String currentVersionName() throws Exception {
+        String value = packageInfo().versionName;
+        return value == null || value.trim().isEmpty() ? "unknown" : value;
     }
 
     private void emitState(String state, String message) {

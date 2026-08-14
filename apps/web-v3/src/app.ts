@@ -4,6 +4,7 @@ import { loadHealth, loadSchedule, loadSnapshot } from './api.ts';
 import { readScheduleCache, writeScheduleCache } from './schedule-cache.ts';
 import { readSnapshotCache, writeSnapshotCache } from './snapshot-cache.ts';
 import { freshnessCopy } from './freshness-copy.ts';
+import { seriesTeamForSide } from './side-team-resolution.ts';
 import {
   AppStore,
   catalogueEntries,
@@ -27,8 +28,6 @@ const ROLE_ORDER = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
 
 type ObjectiveKey = typeof OBJECTIVES[number];
 type RoleKey = typeof ROLE_ORDER[number];
-type SeriesTeamRef = ScheduleEvent['series']['teams'][number];
-
 interface PlayerPair {
   role: RoleKey | 'player';
   blue: LolPlayerState | null;
@@ -200,43 +199,6 @@ function teamTag(name: string, code: string | null | undefined): string {
   return words.length > 1
     ? words.map(word => word[0]?.toUpperCase() ?? '').join('').slice(0, 4)
     : name.slice(0, 4).toUpperCase();
-}
-
-function normalizedTeamIdentity(value: string | null | undefined): string {
-  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function seriesTeamForSide(
-  event: ScheduleEvent | null,
-  statsTeam: LolTeamState | null,
-  fallbackIndex: 0 | 1
-): SeriesTeamRef | null {
-  if (!event) return null;
-  if (!statsTeam) return event.series.teams[fallbackIndex] ?? null;
-
-  const statsId = normalizedTeamIdentity(statsTeam.id);
-  if (statsId) {
-    const byId = event.series.teams.find(team => normalizedTeamIdentity(team.id) === statsId);
-    if (byId) return byId;
-  }
-
-  const statsName = normalizedTeamIdentity(statsTeam.name);
-  if (statsName) {
-    const byName = event.series.teams.find(team => normalizedTeamIdentity(team.name) === statsName);
-    if (byName) return byName;
-
-    const byCode = event.series.teams.find(team => {
-      const code = normalizedTeamIdentity(team.code);
-      return Boolean(code) && (
-        statsName === code
-        || statsName.startsWith(code)
-        || statsName.endsWith(code)
-      );
-    });
-    if (byCode) return byCode;
-  }
-
-  return null;
 }
 
 function sideTeamName(

@@ -86,8 +86,8 @@ function snapshotAt(blueKills = 19, sourceTimestamp = new Date().toISOString()) 
     stats: {
       gameClockSeconds: 2_252,
       patch: '26.15.1',
-      blue: statsTeam(krx, 'blue', 'KRX', blueKills),
-      red: statsTeam(hle, 'red', 'HLE', 27)
+      blue: { ...statsTeam(krx, 'blue', 'Blue team', blueKills), id: 'team-1' },
+      red: { ...statsTeam(hle, 'red', 'Red team', 27), id: 'team-2' }
     },
     quality: {
       freshness: 'fresh',

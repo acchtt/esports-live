@@ -233,6 +233,7 @@ jobs:
       - name: Boot Android emulator and verify rendered ARENA UI
         shell: bash
         run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           apk="apps/mobile-v3-native/android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$apk"
           mkdir -p artifacts

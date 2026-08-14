@@ -5,11 +5,14 @@ const config: CapacitorConfig = {
   appName: 'ARENA',
   webDir: '../web-v3/dist',
   server: {
-    // Capacitor recommends keeping the Android asset origin on localhost. The
-    // generated MainActivity clears legacy WebView state once per APK version
-    // before this origin is loaded, so old PWA workers cannot serve stale files.
+    // Keep Capacitor's supported secure Android asset origin. MainActivity
+    // retries this bundled page after startup if the WebView never mounts it.
     hostname: 'localhost',
-    androidScheme: 'https'
+    androidScheme: 'https',
+    errorPath: 'native-error.html'
+  },
+  android: {
+    backgroundColor: '#06090d'
   },
   plugins: {
     SystemBars: {

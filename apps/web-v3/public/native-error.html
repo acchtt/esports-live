@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>ARENA startup recovery</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { min-height: 100%; margin: 0; background: #06090d; color: #f4f7fb; }
+      body { display: grid; place-items: center; padding: 32px 24px; font: 600 16px/1.5 system-ui, sans-serif; }
+      main { width: min(100%, 32rem); }
+      span { color: #00e5ff; font-size: 12px; letter-spacing: .14em; }
+      h1 { margin: 10px 0 8px; font-size: 24px; }
+      p { margin: 0 0 22px; color: #9da9bc; font-weight: 500; }
+      button { width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: #00e5ff; color: #041014; font: inherit; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span>STARTUP RECOVERY</span>
+      <h1>ARENA could not load its bundled interface</h1>
+      <p>Tap retry to reload the app. If this page returns, send a screenshot so the startup failure is visible instead of a blank screen.</p>
+      <button type="button" onclick="window.location.replace('/')">Retry ARENA</button>
+    </main>
+  </body>
+</html>

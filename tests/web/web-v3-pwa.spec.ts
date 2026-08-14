@@ -133,7 +133,7 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
   ]);
 });
 
-test('V3 Android startup uses localhost and clears legacy WebView state before Capacitor loads', async () => {
+test('V3 Android startup keeps localhost and retries the bundled page without deleting WebView data', async () => {
   const [config, installer] = await Promise.all([
     readFile('apps/mobile-v3-native/capacitor.config.ts', 'utf8'),
     readFile('apps/mobile-v3-native/scripts/install-updater-android.mjs', 'utf8')
@@ -141,9 +141,11 @@ test('V3 Android startup uses localhost and clears legacy WebView state before C
 
   expect(config).toContain("hostname: 'localhost'");
   expect(config).not.toContain("hostname: 'arena.localhost'");
-  expect(installer).toContain('recoverLegacyWebViewState();');
-  expect(installer).toContain('getDir("webview", Context.MODE_PRIVATE)');
-  expect(installer.indexOf('recoverLegacyWebViewState();')).toBeLessThan(
-    installer.indexOf('super.onCreate(savedInstanceState);')
+  expect(config).toContain("errorPath: 'native-error.html'");
+  expect(installer).toContain('scheduleBundledAppRecovery();');
+  expect(installer).toContain('webView.loadUrl(getBridge().getAppUrl());');
+  expect(installer).not.toContain('getDir("webview"');
+  expect(installer.indexOf('super.onCreate(savedInstanceState);')).toBeLessThan(
+    installer.indexOf('scheduleBundledAppRecovery();')
   );
 });

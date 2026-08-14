@@ -16,7 +16,6 @@ const topLivePayload = {
       delay: 120,
       league_id: 19719,
       match_id: 'valve-game-one',
-      server_steam_id: '90270000000000001',
       series_id: 1200444,
       game_time: 1_085,
       last_update_time: SOURCE_SECONDS,
@@ -59,23 +58,6 @@ const heroesPayload = {
   }
 };
 
-const realtimePayload = {
-  match: {
-    server_steam_id: '90270000000000001',
-    matchId: 'valve-game-one',
-    timestamp: Date.parse('2026-08-14T08:00:08.000Z') / 1_000,
-    game_time: 1_092,
-    league_id: 19719
-  },
-  teams: [
-    { team_number: 2, team_id: 10, team_name: 'Team Falcons', score: 12 },
-    { team_number: 3, team_id: 20, team_name: 'LGD Gaming', score: 8 }
-  ],
-  buildings: [],
-  graph_data: { graph_gold: [4_250, 4_800, 5_120] },
-  delta_frame: false
-};
-
 function provider(requests: URL[]) {
   return createSteamDotaProvider({
     apiKey: 'private-steam-key',
@@ -83,11 +65,7 @@ function provider(requests: URL[]) {
     fetcher: async input => {
       const url = new URL(String(input));
       requests.push(url);
-      const payload = url.pathname.includes('GetHeroes')
-        ? heroesPayload
-        : url.pathname.includes('GetRealtimeStats')
-          ? realtimePayload
-          : topLivePayload;
+      const payload = url.pathname.includes('GetHeroes') ? heroesPayload : topLivePayload;
       return Response.json(payload);
     }
   });
@@ -112,7 +90,7 @@ test('Valve schedule exposes only active professional Dota games', async () => {
   assert.equal(requests[0]?.searchParams.get('partner'), '1');
 });
 
-test('Valve snapshot prefers newer realtime scores, clock, and gold lead', async () => {
+test('Valve snapshot normalizes scores, clock, gold lead, spectators, and heroes', async () => {
   const requests: URL[] = [];
   const adapter = new DotaAdapter(provider(requests));
   const snapshot = await adapter.getLiveSnapshot(
@@ -120,45 +98,18 @@ test('Valve snapshot prefers newer realtime scores, clock, and gold lead', async
     '2026-08-14T07:59:50.000Z'
   );
 
-  assert.equal(snapshot.stats?.gameClockSeconds, 1_092);
-  assert.equal(snapshot.stats?.radiant.kills, 12);
-  assert.equal(snapshot.stats?.dire.kills, 8);
-  assert.equal(snapshot.stats?.radiantNetWorthLead, 5_120);
+  assert.equal(snapshot.stats?.gameClockSeconds, 1_085);
+  assert.equal(snapshot.stats?.radiant.kills, 11);
+  assert.equal(snapshot.stats?.dire.kills, 7);
+  assert.equal(snapshot.stats?.radiantNetWorthLead, 4_250);
   assert.equal(snapshot.stats?.spectators, 7_001);
   assert.equal(snapshot.stats?.radiant.players[0]?.heroName, 'Anti-Mage');
   assert.equal(snapshot.stats?.dire.players[0]?.heroName, 'Axe');
   assert.match(snapshot.stats?.radiant.players[0]?.heroImageUrl ?? '', /antimage\.png$/);
   assert.equal(snapshot.quality.freshness, 'fresh');
   assert.equal(snapshot.quality.safeForLiveAnalysis, true);
-  assert.ok(snapshot.quality.reasons.some(reason => reason.code === 'realtime_stats_provider'));
   assert.equal(requests.filter(url => url.pathname.includes('GetTopLiveGame')).length, 1);
   assert.equal(requests.filter(url => url.pathname.includes('GetHeroes')).length, 1);
-  const realtimeRequest = requests.find(url => url.pathname.includes('GetRealtimeStats'));
-  assert.equal(realtimeRequest?.searchParams.get('server_steam_id'), '90270000000000001');
-});
-
-test('Valve snapshot keeps top-live telemetry when realtime access is rejected', async () => {
-  const valve = createSteamDotaProvider({
-    apiKey: 'private-steam-key',
-    now: () => new Date(NOW),
-    fetcher: async input => {
-      const path = new URL(String(input)).pathname;
-      if (path.includes('GetHeroes')) return Response.json(heroesPayload);
-      if (path.includes('GetRealtimeStats')) {
-        return new Response('forbidden', { status: 403 });
-      }
-      return Response.json(topLivePayload);
-    }
-  });
-  const snapshot = await new DotaAdapter(valve).getLiveSnapshot('valve-game-one');
-
-  assert.equal(snapshot.stats?.gameClockSeconds, 1_085);
-  assert.equal(snapshot.stats?.radiant.kills, 11);
-  assert.equal(snapshot.stats?.dire.kills, 7);
-  assert.ok(snapshot.quality.reasons.some(reason => (
-    reason.code === 'realtime_stats_unavailable'
-    && reason.message.includes('403')
-  )));
 });
 
 test('fallback is used on failure but not for a valid empty Valve feed', async () => {

@@ -208,8 +208,10 @@ jobs:
           grep -Fq '"backgroundColor": "#06090d"' "$capacitor_config"
           grep -Fq 'ArenaUpdaterPlugin' "$native_root/java/live/esports/arena/MainActivity.java"
           grep -Fq 'scheduleBundledAppRecovery' "$native_root/java/live/esports/arena/MainActivity.java"
+          grep -Fq 'setLayerType(View.LAYER_TYPE_SOFTWARE, null)' "$native_root/java/live/esports/arena/MainActivity.java"
           grep -Fq 'webView.loadUrl(getBridge().getAppUrl())' "$native_root/java/live/esports/arena/MainActivity.java"
           ! grep -Fq 'getDir("webview"' "$native_root/java/live/esports/arena/MainActivity.java"
+          grep -Fq 'android:hardwareAccelerated="false"' "$manifest"
           grep -Fq 'REQUEST_INSTALL_PACKAGES' "$manifest"
           grep -Fq 'FileProvider.getUriForFile' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
           grep -Fq 'emitDownloadState' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
@@ -237,7 +239,7 @@ jobs:
       - name: Boot Android emulator and verify rendered ARENA UI
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
-          api-level: 35
+          api-level: 36
           target: google_apis
           arch: x86_64
           profile: pixel_7

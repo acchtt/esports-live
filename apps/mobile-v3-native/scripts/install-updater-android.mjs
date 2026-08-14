@@ -310,6 +310,7 @@ const configuredActivity = activity
   .replace(
     'import com.getcapacitor.BridgeActivity;',
     `import android.os.Bundle;
+import android.view.View;
 import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
@@ -322,11 +323,12 @@ import com.getcapacitor.BridgeActivity;
   public void onCreate(Bundle savedInstanceState) {
     registerPlugin(ArenaUpdaterPlugin.class);
     super.onCreate(savedInstanceState);
-    scheduleBundledAppRecovery();
+    WebView webView = getBridge().getWebView();
+    webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+    scheduleBundledAppRecovery(webView);
   }
 
-  private void scheduleBundledAppRecovery() {
-    WebView webView = getBridge().getWebView();
+  private void scheduleBundledAppRecovery(WebView webView) {
     webView.postDelayed(() -> checkBundledApp(webView, true), 2500L);
     webView.postDelayed(() -> checkBundledApp(webView, false), 8000L);
   }
@@ -352,8 +354,11 @@ import com.getcapacitor.BridgeActivity;
 if (!configuredActivity.includes('registerPlugin(ArenaUpdaterPlugin.class)')) {
   throw new Error('Could not register ArenaUpdaterPlugin in MainActivity.');
 }
-if (!configuredActivity.includes('scheduleBundledAppRecovery()')) {
+if (!configuredActivity.includes('scheduleBundledAppRecovery(webView)')) {
   throw new Error('Could not install ARENA WebView startup watchdog in MainActivity.');
+}
+if (!configuredActivity.includes('setLayerType(View.LAYER_TYPE_SOFTWARE, null)')) {
+  throw new Error('Could not enable software rendering for the ARENA WebView.');
 }
 
 const manifest = await readFile(manifestPath, 'utf8');
@@ -366,7 +371,13 @@ if (!manifest.includes('androidx.core.content.FileProvider') || !manifest.includ
 const configuredManifest = manifest.replace(
   '<uses-permission android:name="android.permission.INTERNET" />',
   '<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+).replace(
+  'android:exported="true">',
+  'android:exported="true"\n            android:hardwareAccelerated="false">'
 );
+if (!configuredManifest.includes('android:hardwareAccelerated="false"')) {
+  throw new Error('Could not disable hardware acceleration for the ARENA activity.');
+}
 
 await Promise.all([
   writeFile(pluginPath, plugin),

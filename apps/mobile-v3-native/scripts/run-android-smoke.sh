@@ -22,8 +22,6 @@ smoke_status=$?
 set -e
 
 adb exec-out screencap -p > artifacts/android-smoke-screen.png
-adb shell uiautomator dump /sdcard/arena-window.xml >/dev/null 2>&1 || true
-adb pull /sdcard/arena-window.xml artifacts/android-smoke-window.xml >/dev/null 2>&1 || true
-adb shell dumpsys activity activities > artifacts/android-smoke-activity.txt
-adb logcat -d > artifacts/android-smoke-logcat.txt
+adb logcat -d > artifacts/android-smoke-logcat.txt || true
+adb forward --remove tcp:9222 || true
 exit "$smoke_status"

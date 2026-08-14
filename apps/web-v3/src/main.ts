@@ -12,6 +12,7 @@ import './loading-states.css';
 import './major-league-filter.css';
 import './dota-livescore.css';
 import './pwa.css';
+import './native-insets.css';
 import { startWebV2 } from './app.ts';
 import { installApiReliability } from './api-reliability.ts';
 import { installArenaBrand } from './arena-brand.ts';

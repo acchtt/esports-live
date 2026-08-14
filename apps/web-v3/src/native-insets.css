@@ -1,0 +1,22 @@
+:root {
+  --arena-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+}
+
+html[data-v3-runtime="android"] .app-header {
+  min-height: calc(74px + var(--arena-safe-top));
+  max-height: calc(96px + var(--arena-safe-top));
+  padding-top: calc(13px + var(--arena-safe-top));
+}
+
+html[data-v3-runtime="android"] .app-header[data-compact="true"] {
+  min-height: 0;
+  max-height: 0;
+  padding-top: 0;
+}
+
+@media (max-width: 760px) {
+  html[data-v3-runtime="android"] .app-header {
+    min-height: calc(72px + var(--arena-safe-top));
+    padding-top: calc(11px + var(--arena-safe-top));
+  }
+}

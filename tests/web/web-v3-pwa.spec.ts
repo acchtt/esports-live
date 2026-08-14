@@ -85,8 +85,10 @@ test('V3 service worker keeps the routed app shell available offline', async ({ 
 });
 
 test('V3 treats a Capacitor Android bridge as native and skips the browser service worker', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     (window as Window & { androidBridge?: Record<string, never> }).androidBridge = {};
+    document.documentElement.style.setProperty('--safe-area-inset-top', '31px');
   });
   await mockEmptyApi(page);
   await page.goto('/');
@@ -94,6 +96,19 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
   await expect(page.locator('html')).toHaveAttribute('data-v3-runtime', 'android');
   await expect(page.locator('html')).toHaveAttribute('data-v3-display-mode', 'standalone');
   await expect(page.locator('html')).toHaveAttribute('data-v3-pwa', 'native');
+
+  const headerInsets = await page.locator('.app-header').evaluate(header => {
+    const brand = header.querySelector<HTMLElement>('.brand-lockup');
+    const headerStyle = getComputedStyle(header);
+    return {
+      paddingTop: Number.parseFloat(headerStyle.paddingTop),
+      headerHeight: header.getBoundingClientRect().height,
+      brandTop: brand?.getBoundingClientRect().top ?? 0
+    };
+  });
+  expect(headerInsets.paddingTop).toBe(42);
+  expect(headerInsets.headerHeight).toBeGreaterThanOrEqual(103);
+  expect(headerInsets.brandTop).toBeGreaterThanOrEqual(31);
 
   const registrations = await page.evaluate(async () => (
     'serviceWorker' in navigator

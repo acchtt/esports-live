@@ -27,6 +27,7 @@ permissions:
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   V3_NATIVE_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
+  ARENA_ANDROID_EXPECTED_SIGNER_SHA256: 0c1eef0be39008076ed3d5549412690eb58d143f91e6fe57f9d525a28faaa37c
 
 jobs:
   build-android:
@@ -241,6 +242,10 @@ jobs:
           "$apksigner" verify --print-certs "$apk" | tee /tmp/arena-v3-apk-signing.txt
           signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/arena-v3-apk-signing.txt)"
           test -n "$signer_sha256"
+          if [[ "$signer_sha256" != "$ARENA_ANDROID_EXPECTED_SIGNER_SHA256" ]]; then
+            echo "Unexpected ARENA Android signer: $signer_sha256"
+            exit 1
+          fi
           echo "ARENA_ANDROID_SIGNER_SHA256=$signer_sha256" >> "$GITHUB_ENV"
           jarsigner -verify "$aab"
           mkdir -p artifacts

@@ -2,6 +2,14 @@
 
 The Android wrapper is generated from Capacitor at build time; generated `android/` files are intentionally not committed.
 
+## In-app updates
+
+Every successful `Build Mobile V3 Android` run publishes `arena-v3-latest.apk`, its SHA-256 checksum, and `arena-v3-latest.json` to the permanent `arena-v3-android-latest` GitHub Release. The Android app checks that manifest on launch and from the Platform screen. When a higher version code is available, it downloads the APK through Android Download Manager, verifies the checksum, and opens Android's package installer.
+
+The sideload updater is enabled only for the debug APK channel. The Play AAB intentionally omits the updater bridge and `REQUEST_INSTALL_PACKAGES` permission so a future store build can use Google Play's own in-app update flow.
+
+Android requires the user to approve installs from ARENA and confirm each sideloaded update. Updates also require the APK package ID and signing certificate to match the installed build. Preserve the `arena-v3-android-debug-keystore-v1` Actions cache until all sideloaded users migrate to a permanent release-signing key.
+
 ## Release signing secrets
 
 The signed Play build requires these GitHub Actions secrets:

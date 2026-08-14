@@ -388,6 +388,7 @@ export class WebV2App {
               <article><strong>All matches</strong><span>Live, upcoming and completed series share one searchable index.</span></article>
               <article><strong>Stable live stats</strong><span>Game changes update the mounted board without rebuilding the page.</span></article>
             </div>
+            <section id="arena-updater" class="app-update-card" aria-live="polite"></section>
           </section>
         </main>
 

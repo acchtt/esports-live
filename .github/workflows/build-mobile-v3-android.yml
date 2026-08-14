@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 env:
@@ -135,6 +135,7 @@ jobs:
         env:
           VITE_API_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
           VITE_API_FALLBACK_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
+          VITE_ENABLE_APK_UPDATER: 'true'
         run: npm run build:web-v3
 
       - name: Generate and brand Capacitor Android project
@@ -145,6 +146,7 @@ jobs:
           npm run cap:v3:android:sync
           npm run android:configure --workspace @esports-live/mobile-v3-native
           npm run android:brand --workspace @esports-live/mobile-v3-native
+          npm run android:updater --workspace @esports-live/mobile-v3-native
 
       - name: Ensure stable debug signing key
         shell: bash
@@ -191,6 +193,8 @@ jobs:
           grep -Fq 'windowSplashScreenBackground' "$styles"
           grep -Fq 'arena_splash_mark' "$styles"
           grep -Fq 'AppPlugin' "$plugins"
+          grep -Fq 'ArenaUpdaterPlugin' "$native_root/java/live/esports/arena/MainActivity.java"
+          grep -Fq 'REQUEST_INSTALL_PACKAGES' "$manifest"
           test -f "$native_root/res/mipmap-anydpi-v26/arena_launcher.xml"
           test -f "$native_root/res/drawable/arena_splash_mark.xml"
 
@@ -219,6 +223,52 @@ jobs:
           short_sha="${MOBILE_V3_COMMIT_SHA:0:7}"
           cp "$apk" "artifacts/arena-v3-${short_sha}-debug.apk"
           cp "$aab" "artifacts/arena-v3-${short_sha}-debug.aab"
+
+      - name: Prepare public in-app update files
+        shell: bash
+        run: |
+          apk="apps/mobile-v3-native/android/app/build/outputs/apk/debug/app-debug.apk"
+          public_apk="artifacts/arena-v3-latest.apk"
+          cp "$apk" "$public_apk"
+          apk_sha="$(sha256sum "$public_apk" | awk '{print $1}')"
+          apk_size="$(stat -c '%s' "$public_apk")"
+          published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          printf '%s  %s\n' "$apk_sha" "arena-v3-latest.apk" > artifacts/arena-v3-SHA256SUMS.txt
+          APK_SHA="$apk_sha" APK_SIZE="$apk_size" PUBLISHED_AT="$published_at" node - <<'NODE'
+          const fs = require('node:fs');
+          const manifest = {
+            schemaVersion: 1,
+            packageId: 'live.esports.arena',
+            versionCode: Number(process.env.ARENA_ANDROID_VERSION_CODE),
+            versionName: process.env.ARENA_ANDROID_VERSION_NAME,
+            apkUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/arena-v3-android-latest/arena-v3-latest.apk?versionCode=${process.env.ARENA_ANDROID_VERSION_CODE}`,
+            sha256: process.env.APK_SHA,
+            sizeBytes: Number(process.env.APK_SIZE),
+            releaseNotes: 'Latest ARENA V3 live-score improvements and fixes.',
+            publishedAt: process.env.PUBLISHED_AT,
+            commit: process.env.MOBILE_V3_COMMIT_SHA
+          };
+          fs.writeFileSync('artifacts/arena-v3-latest.json', `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+      - name: Publish public Android update channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="arena-v3-android-latest"
+          title="ARENA Android ${ARENA_ANDROID_VERSION_NAME}"
+          notes="Public ARENA Android update channel. The APK is signed with the existing V3 debug key so it can update compatible installed builds."
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$title" --notes "$notes"
+          fi
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber \
+            artifacts/arena-v3-latest.apk \
+            artifacts/arena-v3-SHA256SUMS.txt
+          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber \
+            artifacts/arena-v3-latest.json
 
       - name: Upload Android debug APK and AAB
         uses: actions/upload-artifact@v7

@@ -88,10 +88,12 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     (window as Window & { androidBridge?: Record<string, never> }).androidBridge = {};
-    document.documentElement.style.setProperty('--safe-area-inset-top', '31px');
   });
   await mockEmptyApi(page);
   await page.goto('/');
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--safe-area-inset-top', '31px');
+  });
 
   await expect(page.locator('html')).toHaveAttribute('data-v3-runtime', 'android');
   await expect(page.locator('html')).toHaveAttribute('data-v3-display-mode', 'standalone');

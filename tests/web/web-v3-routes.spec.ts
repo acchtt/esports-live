@@ -114,11 +114,16 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('.build-pill')).toContainText('V3 · ROUTED');
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+  await expect(page.locator('#quality-text')).toBeVisible();
+  await expect(page.locator('#quality-text')).toHaveText('LIVE DATA · Updated just now');
+  await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'live');
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
 
   await page.locator('#game-tabs [data-game-id="game-routed-1"]').click();
   await expect(page).toHaveURL(/\/match\/series-routed\/game-routed-1(?:\?|$)/);
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
+  await expect(page.locator('#quality-text')).toHaveText('FINAL DATA · Complete snapshot');
+  await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'final');
 
   await page.locator('.back-button').click();
   await expect(page).toHaveURL(/\/$/);

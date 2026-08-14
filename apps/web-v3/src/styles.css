@@ -522,6 +522,72 @@ a:focus-visible {
   text-align: right;
 }
 
+.telemetry-freshness {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 20px;
+  border-bottom: 1px solid var(--line);
+  color: #9cabbc;
+  background: rgba(5, 15, 26, 0.94);
+  font-size: 0.61rem;
+  font-weight: 950;
+  letter-spacing: 0.075em;
+}
+
+.telemetry-freshness::before {
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #708096;
+  box-shadow: 0 0 10px rgba(112, 128, 150, 0.35);
+  content: '';
+}
+
+.telemetry-freshness[data-status="live"] {
+  color: #c7ff43;
+  background: rgba(17, 34, 24, 0.94);
+}
+
+.telemetry-freshness[data-status="live"]::before {
+  background: #9cff20;
+  box-shadow: 0 0 12px rgba(156, 255, 32, 0.65);
+}
+
+.telemetry-freshness[data-status="partial"],
+.telemetry-freshness[data-status="final"] {
+  color: #86eaff;
+}
+
+.telemetry-freshness[data-status="partial"]::before,
+.telemetry-freshness[data-status="final"]::before {
+  background: #52d8f4;
+  box-shadow: 0 0 12px rgba(82, 216, 244, 0.5);
+}
+
+.telemetry-freshness[data-status="delayed"],
+.telemetry-freshness[data-status="paused"] {
+  color: #ffd36a;
+  background: rgba(42, 31, 12, 0.94);
+}
+
+.telemetry-freshness[data-status="delayed"]::before,
+.telemetry-freshness[data-status="paused"]::before {
+  background: #ffbd38;
+  box-shadow: 0 0 12px rgba(255, 189, 56, 0.55);
+}
+
+.telemetry-freshness[data-status="stale"] {
+  color: #ff8fa2;
+  background: rgba(43, 17, 24, 0.94);
+}
+
+.telemetry-freshness[data-status="stale"]::before {
+  background: #ff5368;
+  box-shadow: 0 0 12px rgba(255, 83, 104, 0.58);
+}
+
 .team-banner {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(132px, 190px) minmax(0, 1fr);
@@ -795,11 +861,6 @@ a:focus-visible {
   color: #8291a5;
   background: rgba(4, 12, 22, 0.84);
   font-size: 0.66rem;
-}
-
-.scoreboard-footer small {
-  flex: 0 0 auto;
-  color: #64758a;
 }
 
 .platform-panel {

@@ -41,6 +41,13 @@ html[data-arena-route="match"] .mobile-nav {
     font-size: clamp(1.14rem, 6vw, 1.55rem);
   }
 
+  .telemetry-freshness {
+    min-height: 30px;
+    padding: 6px 12px;
+    font-size: clamp(0.5rem, 2.35vw, 0.6rem);
+    letter-spacing: 0.055em;
+  }
+
   .team-banner {
     grid-template-columns: minmax(0, 1fr) 94px minmax(0, 1fr);
     min-height: 84px;

@@ -3,6 +3,7 @@ import type { LolPlayerState, LolStats, LolTeamState } from '@esports-live/adapt
 import { loadHealth, loadSchedule, loadSnapshot } from './api.ts';
 import { readScheduleCache, writeScheduleCache } from './schedule-cache.ts';
 import { readSnapshotCache, writeSnapshotCache } from './snapshot-cache.ts';
+import { freshnessCopy } from './freshness-copy.ts';
 import {
   AppStore,
   catalogueEntries,
@@ -381,6 +382,10 @@ export class WebV2App {
                 <span id="game-label">No game selected</span>
               </header>
 
+              <div id="quality-text" class="telemetry-freshness" data-status="empty" role="status" aria-live="polite">
+                WAITING FOR TELEMETRY
+              </div>
+
               <section class="team-banner" aria-label="Team summary">
                 <article class="team-side blue">
                   <span>BLUE SIDE</span>
@@ -409,7 +414,6 @@ export class WebV2App {
 
               <footer class="scoreboard-footer">
                 <span id="scoreboard-notice">Choose a match from the list.</span>
-                <small id="quality-text">No telemetry</small>
               </footer>
             </article>
           </section>
@@ -836,9 +840,10 @@ export class WebV2App {
     });
 
     this.#renderPlayers(event, stats);
-    this.#qualityText.textContent = snapshot
-      ? `${snapshot.quality.freshness} · ${snapshot.quality.complete ? 'complete' : 'partial'}`
-      : 'No telemetry';
+    const freshness = freshnessCopy(snapshot?.quality ?? null, effectiveState);
+    this.#qualityText.textContent = freshness.text;
+    this.#qualityText.dataset.status = freshness.status;
+    this.#qualityText.title = freshness.title;
     this.#scoreboardNotice.textContent = !event
       ? 'Choose a match from the list.'
       : error

@@ -113,7 +113,12 @@ jobs:
           fi
           test -n "$sdkmanager_path" || { echo "Android sdkmanager is unavailable."; exit 1; }
           yes | "$sdkmanager_path" --licenses >/dev/null || true
-          "$sdkmanager_path" "platforms;android-36" "build-tools;36.0.0"
+          "$sdkmanager_path" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "emulator" \
+            "platform-tools" \
+            "system-images;android-35;google_apis;x86_64"
 
       - name: Verify native API endpoint
         shell: bash
@@ -216,6 +221,7 @@ jobs:
           ! grep -Fq 'DownloadManager' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
           test -f "$native_root/res/mipmap-anydpi-v26/arena_launcher.xml"
           test -f "$native_root/res/drawable/arena_splash_mark.xml"
+          test -f "apps/mobile-v3-native/scripts/verify-android-webview.mjs"
 
       - name: Build Android debug APK and AAB
         shell: bash
@@ -223,6 +229,63 @@ jobs:
           chmod +x apps/mobile-v3-native/android/gradlew
           cd apps/mobile-v3-native/android
           ./gradlew assembleDebug bundleDebug --no-daemon --stacktrace
+
+      - name: Boot Android emulator and verify rendered ARENA UI
+        shell: bash
+        run: |
+          apk="apps/mobile-v3-native/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          mkdir -p artifacts
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            --force \
+            --name arena-ci \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_7"
+          sudo chmod 666 /dev/kvm || true
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            -avd arena-ci \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -gpu swiftshader_indirect \
+            -camera-back none \
+            -camera-front none \
+            > artifacts/android-smoke-emulator.log 2>&1 &
+          adb wait-for-device
+          timeout 300 bash -c 'until [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == "1" ]]; do sleep 3; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb install -r "$apk"
+          adb logcat -c
+          adb shell am force-stop live.esports.arena
+          adb shell monkey -p live.esports.arena -c android.intent.category.LAUNCHER 1
+          sleep 8
+          pid="$(adb shell pidof live.esports.arena | tr -d '\r')"
+          test -n "$pid"
+          adb forward tcp:9222 "localabstract:webview_devtools_remote_$pid"
+
+          set +e
+          ARENA_ANDROID_WEBVIEW_REPORT="artifacts/android-smoke-webview.json" \
+            node apps/mobile-v3-native/scripts/verify-android-webview.mjs
+          smoke_status=$?
+          set -e
+
+          adb exec-out screencap -p > artifacts/android-smoke-screen.png
+          adb shell uiautomator dump /sdcard/arena-window.xml >/dev/null 2>&1 || true
+          adb pull /sdcard/arena-window.xml artifacts/android-smoke-window.xml >/dev/null 2>&1 || true
+          adb shell dumpsys activity activities > artifacts/android-smoke-activity.txt
+          adb logcat -d > artifacts/android-smoke-logcat.txt
+          exit "$smoke_status"
+
+      - name: Upload Android smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: arena-v3-android-smoke-${{ github.sha }}
+          path: artifacts/android-smoke-*
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Verify Android debug packages
         shell: bash

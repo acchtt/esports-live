@@ -1,4 +1,5 @@
 import { expect, test, type Route } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({
@@ -130,4 +131,19 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
   await expect.poll(async () => page.evaluate(async () => await window.caches.keys())).toEqual([
     'arena-v3-api-last-good-v1'
   ]);
+});
+
+test('V3 Android startup uses localhost and clears legacy WebView state before Capacitor loads', async () => {
+  const [config, installer] = await Promise.all([
+    readFile('apps/mobile-v3-native/capacitor.config.ts', 'utf8'),
+    readFile('apps/mobile-v3-native/scripts/install-updater-android.mjs', 'utf8')
+  ]);
+
+  expect(config).toContain("hostname: 'localhost'");
+  expect(config).not.toContain("hostname: 'arena.localhost'");
+  expect(installer).toContain('recoverLegacyWebViewState();');
+  expect(installer).toContain('getDir("webview", Context.MODE_PRIVATE)');
+  expect(installer.indexOf('recoverLegacyWebViewState();')).toBeLessThan(
+    installer.indexOf('super.onCreate(savedInstanceState);')
+  );
 });

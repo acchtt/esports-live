@@ -5,10 +5,10 @@ const config: CapacitorConfig = {
   appName: 'ARENA',
   webDir: '../web-v3/dist',
   server: {
-    // Keep the native shell on its own secure origin. Older ARENA builds briefly
-    // registered the PWA service worker on https://localhost; that worker can
-    // survive an APK upgrade and serve an obsolete index with missing assets.
-    hostname: 'arena.localhost',
+    // Capacitor recommends keeping the Android asset origin on localhost. The
+    // generated MainActivity clears legacy WebView state once per APK version
+    // before this origin is loaded, so old PWA workers cannot serve stale files.
+    hostname: 'localhost',
     androidScheme: 'https'
   },
   plugins: {

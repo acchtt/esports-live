@@ -307,19 +307,77 @@ if (!activity.includes('public class MainActivity extends BridgeActivity')) {
   throw new Error('Capacitor MainActivity no longer uses the expected BridgeActivity structure.');
 }
 const configuredActivity = activity
-  .replace('import com.getcapacitor.BridgeActivity;', 'import android.os.Bundle;\n\nimport com.getcapacitor.BridgeActivity;')
+  .replace(
+    'import com.getcapacitor.BridgeActivity;',
+    `import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.os.Build;
+import android.os.Bundle;
+
+import com.getcapacitor.BridgeActivity;
+
+import java.io.File;`
+  )
   .replace(
     'public class MainActivity extends BridgeActivity {}',
     `public class MainActivity extends BridgeActivity {
+  private static final String ARENA_STARTUP_PREFS = "arena-native-startup";
+  private static final String ARENA_WEBVIEW_RECOVERY = "webview-recovery-version";
+
   @Override
   public void onCreate(Bundle savedInstanceState) {
+    recoverLegacyWebViewState();
     registerPlugin(ArenaUpdaterPlugin.class);
     super.onCreate(savedInstanceState);
+  }
+
+  private void recoverLegacyWebViewState() {
+    try {
+      long versionCode = installedVersionCode();
+      SharedPreferences preferences = getSharedPreferences(ARENA_STARTUP_PREFS, Context.MODE_PRIVATE);
+      if (preferences.getLong(ARENA_WEBVIEW_RECOVERY, -1L) == versionCode) return;
+
+      // ARENA browser builds once registered a PWA worker on https://localhost.
+      // Android preserves that worker and Cache Storage across APK upgrades, so
+      // clear the WebView profile before Capacitor creates its first WebView.
+      boolean profileCleared = clearDirectory(getDir("webview", Context.MODE_PRIVATE));
+      clearDirectory(new File(getCacheDir(), "WebView"));
+      clearDirectory(new File(getCodeCacheDir(), "WebView"));
+      if (profileCleared) {
+        preferences.edit().putLong(ARENA_WEBVIEW_RECOVERY, versionCode).commit();
+      }
+    } catch (Exception ignored) {
+      // Capacitor can still attempt a normal startup if recovery is unavailable.
+    }
+  }
+
+  private long installedVersionCode() throws Exception {
+    PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? info.getLongVersionCode() : info.versionCode;
+  }
+
+  private boolean clearDirectory(File directory) {
+    File[] children = directory.listFiles();
+    if (children == null) return !directory.exists() || directory.isDirectory();
+    boolean cleared = true;
+    for (File child : children) {
+      cleared = deleteRecursively(child) && cleared;
+    }
+    return cleared;
+  }
+
+  private boolean deleteRecursively(File target) {
+    if (target.isDirectory() && !clearDirectory(target)) return false;
+    return !target.exists() || target.delete();
   }
 }`
   );
 if (!configuredActivity.includes('registerPlugin(ArenaUpdaterPlugin.class)')) {
   throw new Error('Could not register ArenaUpdaterPlugin in MainActivity.');
+}
+if (!configuredActivity.includes('recoverLegacyWebViewState()')) {
+  throw new Error('Could not install ARENA WebView startup recovery in MainActivity.');
 }
 
 const manifest = await readFile(manifestPath, 'utf8');

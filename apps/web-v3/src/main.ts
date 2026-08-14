@@ -34,6 +34,7 @@ import { installWinnerDeclaration } from './winner-declaration.ts';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Missing #app root.');
+const dota2Enabled = String(import.meta.env.VITE_ENABLE_DOTA2 ?? '').toLowerCase() === 'true';
 
 installApiReliability();
 const initialRoute = currentV3Route();
@@ -45,7 +46,7 @@ installLiveLifecycle(root);
 installNativeLifecycle();
 installPlayerBoardCopy(root);
 startWebV2(root);
-installDotaLivescore(root);
+if (dota2Enabled) installDotaLivescore(root);
 installLeagueFilters(root);
 installFinalSnapshotPolling(root);
 installV3Routing(root);

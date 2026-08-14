@@ -2,6 +2,20 @@ import { Capacitor } from '@capacitor/core';
 
 const BUILD_SHA = String(import.meta.env.VITE_BUILD_SHA ?? '').trim();
 
+async function removeNativePwaState(): Promise<void> {
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map(registration => registration.unregister()));
+  }
+
+  if ('caches' in window) {
+    const names = await window.caches.keys();
+    await Promise.all(names
+      .filter(name => name.startsWith('arena-v3-shell-') || name.startsWith('arena-v3-static-'))
+      .map(name => window.caches.delete(name)));
+  }
+}
+
 function standaloneMode(): boolean {
   if (Capacitor.isNativePlatform()) return true;
   const nav = navigator as Navigator & { standalone?: boolean };
@@ -16,6 +30,7 @@ export function installPwa(): void {
 
   if (native) {
     document.documentElement.dataset.v3Pwa = 'native';
+    void removeNativePwaState().catch(() => undefined);
     return;
   }
 

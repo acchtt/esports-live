@@ -48,6 +48,9 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
   expect(manifest.scope).toBe('/');
   expect(manifest.display).toBe('standalone');
   expect(manifest.icons.some(icon => icon.src === '/pwa/arena-icon.svg' && icon.type === 'image/svg+xml')).toBe(true);
+
+  await expect(page.locator('#arena-startup-fallback')).toBeHidden();
+  await expect(page.locator('head style').first()).toContainText('background: #06090d');
 });
 
 test('V3 service worker keeps the routed app shell available offline', async ({ page, context }) => {
@@ -116,4 +119,15 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
       : 0
   ));
   expect(registrations).toBe(0);
+
+  await page.evaluate(async () => {
+    await window.caches.open('arena-v3-shell-stale-native-build');
+    await window.caches.open('arena-v3-static-stale-native-build');
+    await window.caches.open('arena-v3-api-last-good-v1');
+  });
+  await page.reload();
+
+  await expect.poll(async () => page.evaluate(async () => await window.caches.keys())).toEqual([
+    'arena-v3-api-last-good-v1'
+  ]);
 });

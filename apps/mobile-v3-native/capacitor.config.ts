@@ -5,6 +5,10 @@ const config: CapacitorConfig = {
   appName: 'ARENA',
   webDir: '../web-v3/dist',
   server: {
+    // Keep the native shell on its own secure origin. Older ARENA builds briefly
+    // registered the PWA service worker on https://localhost; that worker can
+    // survive an APK upgrade and serve an obsolete index with missing assets.
+    hostname: 'arena.localhost',
     androidScheme: 'https'
   },
   plugins: {

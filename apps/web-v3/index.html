@@ -16,9 +16,26 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/pwa/arena-icon.svg" />
     <title>ARENA</title>
+    <style>
+      html, body { min-height: 100%; margin: 0; background: #06090d; color: #f4f7fb; }
+      #arena-startup-fallback { display: none; box-sizing: border-box; min-height: 100vh; padding: 96px 24px 32px; font: 600 16px/1.5 system-ui, sans-serif; }
+      #arena-startup-fallback strong { display: block; margin-bottom: 8px; color: #00e5ff; font-size: 22px; }
+      #arena-startup-fallback p { max-width: 34rem; margin: 0; color: #9da9bc; }
+    </style>
   </head>
   <body>
     <div id="app"></div>
+    <section id="arena-startup-fallback" role="alert">
+      <strong>ARENA could not start</strong>
+      <p>Please close and reopen the app. If this message remains, clear ARENA's app storage and install the latest update again.</p>
+    </section>
+    <script>
+      window.setTimeout(function () {
+        var app = document.getElementById('app');
+        var fallback = document.getElementById('arena-startup-fallback');
+        if (app && fallback && app.childElementCount === 0) fallback.style.display = 'block';
+      }, 6000);
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

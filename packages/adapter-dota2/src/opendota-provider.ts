@@ -51,7 +51,12 @@ export interface OpenDotaProviderOptions {
   baseUrl?: string;
   cacheTtlMs?: number;
   fetcher?: typeof fetch;
+  idPrefix?: string;
+  liveOnlyMessage?: string;
   now?: () => Date;
+  providerId?: string;
+  providerName?: string;
+  sourceUrl?: string;
 }
 
 interface FeedCache {
@@ -77,8 +82,13 @@ class OpenDotaHttpError extends Error {
   readonly status: number;
   readonly retryAfterMs: number | null;
 
-  constructor(status: number, path: string, retryAfterMs: number | null) {
-    super(`OpenDota returned ${status} for ${path}.`);
+  constructor(
+    providerName: string,
+    status: number,
+    path: string,
+    retryAfterMs: number | null
+  ) {
+    super(`${providerName} returned ${status} for ${path}.`);
     this.name = 'OpenDotaHttpError';
     this.status = status;
     this.retryAfterMs = retryAfterMs;
@@ -138,23 +148,32 @@ function isCurrentActive(match: OpenDotaLiveMatch, nowMs: number): boolean {
     && updated <= nowMs + ACTIVE_UPDATE_WINDOW_MS;
 }
 
-function seriesKey(match: OpenDotaLiveMatch): string {
+function seriesKey(match: OpenDotaLiveMatch, idPrefix: string): string {
   const id = finiteNumber(match.series_id);
-  return `opendota-series:${id > 0 ? id : matchId(match)}`;
+  return `${idPrefix}-series:${id > 0 ? id : matchId(match)}`;
 }
 
-function teamId(value: unknown, name: string, side: 'radiant' | 'dire'): string {
+function teamId(
+  value: unknown,
+  name: string,
+  side: 'radiant' | 'dire',
+  idPrefix: string
+): string {
   const id = finiteNumber(value);
-  if (id > 0) return `opendota-team:${id}`;
+  if (id > 0) return `${idPrefix}-team:${id}`;
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `opendota-team:${slug || side}`;
+  return `${idPrefix}-team:${slug || side}`;
 }
 
-function teamRef(match: OpenDotaLiveMatch, side: 'radiant' | 'dire'): TeamRef {
+function teamRef(
+  match: OpenDotaLiveMatch,
+  side: 'radiant' | 'dire',
+  idPrefix: string
+): TeamRef {
   const name = cleanName(side === 'radiant' ? match.team_name_radiant : match.team_name_dire);
   const id = side === 'radiant' ? match.team_id_radiant : match.team_id_dire;
   return {
-    id: teamId(id, name, side),
+    id: teamId(id, name, side, idPrefix),
     name: name || (side === 'radiant' ? 'Radiant' : 'Dire')
   };
 }
@@ -182,20 +201,21 @@ function activeMatch(matches: readonly OpenDotaLiveMatch[]): OpenDotaLiveMatch |
 
 function createSeries(
   matches: readonly OpenDotaLiveMatch[],
-  leagueNames: ReadonlyMap<number, string>
+  leagueNames: ReadonlyMap<number, string>,
+  idPrefix: string
 ): DotaProviderSeries {
   const active = activeMatch(matches) ?? orderedMatches(matches).at(-1);
-  if (!active) throw new Error('OpenDota series has no games.');
+  if (!active) throw new Error('Dota live series has no games.');
   const start = epochIso(orderedMatches(matches)[0]?.activate_time) ?? new Date(0).toISOString();
   return {
-    id: seriesKey(active),
+    id: seriesKey(active, idPrefix),
     competition: {
-      id: `opendota-league:${finiteNumber(active.league_id)}`,
+      id: `${idPrefix}-league:${finiteNumber(active.league_id)}`,
       name: leagueNames.get(finiteNumber(active.league_id))
         ?? `Dota 2 League ${finiteNumber(active.league_id)}`,
       stage: 'Live series'
     },
-    teams: [teamRef(active, 'radiant'), teamRef(active, 'dire')],
+    teams: [teamRef(active, 'radiant', idPrefix), teamRef(active, 'dire', idPrefix)],
     bestOf: 1,
     state: isActive(active) ? 'live' : 'completed',
     scheduledStart: start,
@@ -225,6 +245,12 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? (() => new Date());
   const cacheTtlMs = Math.max(1_000, options.cacheTtlMs ?? 8_000);
+  const idPrefix = options.idPrefix?.trim() || 'opendota';
+  const providerId = options.providerId?.trim() || 'opendota-live';
+  const providerName = options.providerName?.trim() || 'OpenDota Live';
+  const sourceUrl = options.sourceUrl?.trim() || 'https://docs.opendota.com/';
+  const liveOnlyMessage = options.liveOnlyMessage?.trim()
+    || 'OpenDota supplies current league games; upcoming fixtures and final history are outside this live feed.';
   let feedCache: FeedCache | null = null;
   let feedInFlight: Promise<readonly OpenDotaLiveMatch[]> | null = null;
   let feedRetryAt = 0;
@@ -253,6 +279,7 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
     const response = await fetcher(jsonUrl(baseUrl, path, apiKey), init);
     if (!response.ok) {
       throw new OpenDotaHttpError(
+        providerName,
         response.status,
         path,
         retryAfterMs(response, now().getTime())
@@ -272,7 +299,9 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
     if (feedInFlight) return feedInFlight;
     feedInFlight = fetchJson<unknown>('/live')
       .then(value => {
-        if (!Array.isArray(value)) throw new Error('OpenDota live response is not an array.');
+        if (!Array.isArray(value)) {
+          throw new Error(`${providerName} live response is not an array.`);
+        }
         const matches = value as readonly OpenDotaLiveMatch[];
         const storedAt = now().getTime();
         feedCache = { matches, storedAt, expiresAt: storedAt + cacheTtlMs };
@@ -336,7 +365,7 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
   function groups(matches: readonly OpenDotaLiveMatch[]): ReadonlyMap<string, readonly OpenDotaLiveMatch[]> {
     const result = new Map<string, OpenDotaLiveMatch[]>();
     matches.filter(isLeagueMatch).forEach(match => {
-      const key = seriesKey(match);
+      const key = seriesKey(match, idPrefix);
       const values = result.get(key) ?? [];
       values.push(match);
       result.set(key, values);
@@ -363,9 +392,9 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
   }
 
   return {
-    id: 'opendota-live',
-    name: 'OpenDota Live',
-    sourceUrl: 'https://docs.opendota.com/',
+    id: providerId,
+    name: providerName,
+    sourceUrl,
 
     async getSchedule(): Promise<readonly DotaProviderScheduleEntry[]> {
       const observedAt = now().toISOString();
@@ -373,7 +402,10 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
       const grouped = groups(matches);
       return [...grouped.values()]
         .filter(seriesMatches => seriesMatches.some(match => isCurrentActive(match, now().getTime())))
-        .map(seriesMatches => ({ series: createSeries(seriesMatches, leagueNames), observedAt }))
+        .map(seriesMatches => ({
+          series: createSeries(seriesMatches, leagueNames, idPrefix),
+          observedAt
+        }))
         .sort((left, right) => left.series.scheduledStart.localeCompare(right.series.scheduledStart));
     },
 
@@ -384,19 +416,19 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
         && isLeagueMatch(entry)
         && isCurrentActive(entry, now().getTime())
       ));
-      if (!match) throw new Error(`OpenDota live game not found: ${gameId}`);
-      const seriesMatches = groups(matches).get(seriesKey(match)) ?? [match];
-      const series = createSeries(seriesMatches, leagueNames);
+      if (!match) throw new Error(`${providerName} live game not found: ${gameId}`);
+      const seriesMatches = groups(matches).get(seriesKey(match, idPrefix)) ?? [match];
+      const series = createSeries(seriesMatches, leagueNames, idPrefix);
       const game = series.games.find(entry => entry.id === gameId);
-      if (!game) throw new Error(`OpenDota series game not found: ${gameId}`);
+      if (!game) throw new Error(`${providerName} series game not found: ${gameId}`);
       const heroMap = await loadHeroes();
       const players = (match.players ?? []).map((player, index) => playerState(player, index, heroMap));
       const radiantPlayers = players.filter(player => player.side === 'radiant');
       const direPlayers = players.filter(player => player.side === 'dire');
       const sourceTimestamp = epochIso(match.last_update_time);
       const observedAt = now().toISOString();
-      const radiantTeam = teamRef(match, 'radiant');
-      const direTeam = teamRef(match, 'dire');
+      const radiantTeam = teamRef(match, 'radiant', idPrefix);
+      const direTeam = teamRef(match, 'dire', idPrefix);
       const radiant: DotaTeamState = {
         ...radiantTeam,
         side: 'radiant',
@@ -437,7 +469,7 @@ export function createOpenDotaProvider(options: OpenDotaProviderOptions = {}): D
         reasons: [
           {
             code: 'live_only_provider',
-            message: 'OpenDota supplies current league games; upcoming fixtures and final history are outside this live feed.'
+            message: liveOnlyMessage
           }
         ]
       };

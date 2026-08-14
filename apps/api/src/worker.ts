@@ -14,7 +14,12 @@ import {
   type LolProviderSnapshot,
   type RiotCurrentPlayerProviderOptions
 } from '@esports-live/adapter-lol';
-import { DotaAdapter, createOpenDotaProvider } from '@esports-live/adapter-dota2';
+import {
+  DotaAdapter,
+  createFallbackDotaProvider,
+  createOpenDotaProvider,
+  createSteamDotaProvider
+} from '@esports-live/adapter-dota2';
 import { AdapterRegistry, CachedAdapter } from '@esports-live/core';
 import { createGrubsCvProvider } from './grubs-cv-provider.ts';
 import { createApiHandler } from './router.ts';
@@ -22,6 +27,7 @@ import { createApiHandler } from './router.ts';
 export interface WorkerEnv {
   LOL_ESPORTS_API_KEY?: string;
   OPENDOTA_API_KEY?: string;
+  STEAM_API_KEY?: string;
   GRUBS_CV_URL?: string;
   GRUBS_CV_TOKEN?: string;
   GRUBS_CV_MIN_CONFIDENCE?: string;
@@ -194,6 +200,7 @@ let cachedHandler: ApiHandler | null = null;
 export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const apiKey = env.LOL_ESPORTS_API_KEY?.trim() ?? '';
   const openDotaApiKey = env.OPENDOTA_API_KEY?.trim() ?? '';
+  const steamApiKey = env.STEAM_API_KEY?.trim() ?? '';
   const grubsCvUrl = env.GRUBS_CV_URL?.trim() ?? '';
   const grubsCvToken = env.GRUBS_CV_TOKEN?.trim() ?? '';
   const grubsCvMinConfidence = confidenceEnv(env.GRUBS_CV_MIN_CONFIDENCE);
@@ -201,6 +208,7 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   const configKey = JSON.stringify([
     apiKey,
     openDotaApiKey,
+    steamApiKey,
     grubsCvUrl,
     grubsCvToken,
     grubsCvMinConfidence,
@@ -247,8 +255,16 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
     }));
   }
 
+  const openDotaProvider = createOpenDotaProvider({ apiKey: openDotaApiKey });
+  const dotaProvider = steamApiKey
+    ? createFallbackDotaProvider(
+        createSteamDotaProvider({ apiKey: steamApiKey }),
+        openDotaProvider,
+        { id: 'dota-live', name: 'Dota Live' }
+      )
+    : openDotaProvider;
   registry.register(new CachedAdapter(
-    new DotaAdapter(createOpenDotaProvider({ apiKey: openDotaApiKey })),
+    new DotaAdapter(dotaProvider),
     {
       scheduleTtlMs: 8_000,
       liveSnapshotTtlMs: 2_000,

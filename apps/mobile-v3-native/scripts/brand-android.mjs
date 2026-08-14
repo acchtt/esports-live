@@ -7,15 +7,36 @@ const androidRoot = path.join(packageRoot, 'android', 'app', 'src', 'main');
 const resRoot = path.join(androidRoot, 'res');
 const manifestPath = path.join(androidRoot, 'AndroidManifest.xml');
 
+const arenaMarkPaths = `
+    <path android:fillColor="#00E5FF" android:pathData="M31,4 L5,57 L20,52 L32,29 L32,4 Z" />
+    <path android:fillColor="#FF3B3B" android:pathData="M33,4 L33,29 L45,52 L59,57 L33,4 Z" />
+    <path android:fillColor="#06090D" android:pathData="M32,18 L20,45 L30,41 L32,36 L34,41 L44,45 L32,18 Z" />
+    <path android:fillColor="#00BBD4" android:pathData="M13,49 L22,47 L18,55 L5,57 L13,49 Z" />
+    <path android:fillColor="#D82735" android:pathData="M51,49 L42,47 L46,55 L59,57 L51,49 Z" />`;
+
 const foregroundVector = `<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:fillColor="#00E5FF" android:pathData="M52,14 L20,88 L39,81 L54,45 L54,14 Z" />
-    <path android:fillColor="#FF3B3B" android:pathData="M56,14 L54,45 L69,81 L88,88 L56,14 Z" />
-    <path android:fillColor="#06090D" android:pathData="M54,38 L40,76 L52,71 L54,65 L56,71 L68,76 Z" />
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <group
+        android:pivotX="32"
+        android:pivotY="32"
+        android:scaleX="0.70"
+        android:scaleY="0.70">
+${arenaMarkPaths}
+    </group>
+</vector>
+`;
+
+const splashVector = `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+${arenaMarkPaths}
 </vector>
 `;
 
@@ -23,12 +44,16 @@ const legacyLauncherVector = `<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:fillColor="#06090D" android:pathData="M0,0 H108 V108 H0 Z" />
-    <path android:fillColor="#00E5FF" android:pathData="M52,14 L20,88 L39,81 L54,45 L54,14 Z" />
-    <path android:fillColor="#FF3B3B" android:pathData="M56,14 L54,45 L69,81 L88,88 L56,14 Z" />
-    <path android:fillColor="#06090D" android:pathData="M54,38 L40,76 L52,71 L54,65 L56,71 L68,76 Z" />
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path android:fillColor="#06090D" android:pathData="M0,0 H64 V64 H0 Z" />
+    <group
+        android:pivotX="32"
+        android:pivotY="32"
+        android:scaleX="0.76"
+        android:scaleY="0.76">
+${arenaMarkPaths}
+    </group>
 </vector>
 `;
 
@@ -103,7 +128,7 @@ const mipmapV26 = await ensureDir('mipmap-anydpi-v26');
 
 await Promise.all([
   writeFile(path.join(drawable, 'arena_launcher_foreground.xml'), foregroundVector),
-  writeFile(path.join(drawable, 'arena_splash_mark.xml'), foregroundVector),
+  writeFile(path.join(drawable, 'arena_splash_mark.xml'), splashVector),
   writeFile(path.join(mipmapAny, 'arena_launcher.xml'), legacyLauncherVector),
   writeFile(path.join(mipmapAny, 'arena_launcher_round.xml'), legacyLauncherVector),
   writeFile(path.join(mipmapV26, 'arena_launcher.xml'), adaptiveLauncher),

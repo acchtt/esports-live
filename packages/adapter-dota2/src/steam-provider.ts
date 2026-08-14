@@ -76,6 +76,7 @@ async function jsonResponse(
  * upstream source for the same match shape used by OpenDota's /live service.
  */
 export function createSteamDotaProvider(options: SteamDotaProviderOptions): DotaProviderClient {
+  // Production receives this value from the encrypted STEAM_API_KEY Worker binding.
   const apiKey = options.apiKey.trim();
   if (!apiKey) throw new Error('Steam Dota provider requires an API key.');
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');

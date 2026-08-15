@@ -5,11 +5,11 @@ const config: CapacitorConfig = {
   appName: 'ARENA',
   webDir: '../web-v3/dist',
   server: {
-    // Keep Capacitor's supported secure Android asset origin. MainActivity
-    // retries this bundled page after startup if the WebView never mounts it.
-    hostname: 'localhost',
-    androidScheme: 'https',
-    errorPath: 'native-error.html'
+    // MainActivity serves the packaged bundle with AndroidX
+    // WebViewAssetLoader. The reserved HTTPS domain avoids DNS/network access
+    // and remains a secure context on current Android WebView releases.
+    url: 'https://appassets.androidplatform.net/assets/public/index.html',
+    errorPath: 'assets/public/native-error.html'
   },
   android: {
     backgroundColor: '#06090d'

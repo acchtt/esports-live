@@ -310,21 +310,38 @@ const configuredActivity = activity
   .replace(
     'import com.getcapacitor.BridgeActivity;',
     `import android.os.Bundle;
-import android.view.View;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 
+import androidx.webkit.WebViewAssetLoader;
+
+import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 `
   )
   .replace(
     'public class MainActivity extends BridgeActivity {}',
     `public class MainActivity extends BridgeActivity {
+  private static final String ARENA_ASSET_URL =
+    "https://appassets.androidplatform.net/assets/public/index.html";
+  private static final String ARENA_ERROR_URL =
+    "https://appassets.androidplatform.net/assets/public/native-error.html";
+
   @Override
   public void onCreate(Bundle savedInstanceState) {
     registerPlugin(ArenaUpdaterPlugin.class);
     super.onCreate(savedInstanceState);
-    WebView webView = getBridge().getWebView();
-    webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+    Bridge bridge = getBridge();
+    WebView webView = bridge.getWebView();
+    WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
+      .setDomain("appassets.androidplatform.net")
+      .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+      .build();
+    bridge.setWebViewClient(new ArenaAssetWebViewClient(bridge, assetLoader));
+    webView.stopLoading();
+    webView.loadUrl(ARENA_ASSET_URL);
     scheduleBundledAppRecovery(webView);
   }
 
@@ -341,13 +358,30 @@ import com.getcapacitor.BridgeActivity;
         if (retry) {
           webView.stopLoading();
           webView.clearCache(true);
-          webView.loadUrl(getBridge().getAppUrl());
+          webView.loadUrl(ARENA_ASSET_URL);
           return;
         }
-        String errorUrl = getBridge().getErrorUrl();
-        if (errorUrl != null) webView.loadUrl(errorUrl);
+        webView.loadUrl(ARENA_ERROR_URL);
       }
     );
+  }
+
+  private static final class ArenaAssetWebViewClient extends BridgeWebViewClient {
+    private final WebViewAssetLoader assetLoader;
+
+    ArenaAssetWebViewClient(Bridge bridge, WebViewAssetLoader assetLoader) {
+      super(bridge);
+      this.assetLoader = assetLoader;
+    }
+
+    @Override
+    public WebResourceResponse shouldInterceptRequest(
+      WebView view,
+      WebResourceRequest request
+    ) {
+      WebResourceResponse response = assetLoader.shouldInterceptRequest(request.getUrl());
+      return response != null ? response : super.shouldInterceptRequest(view, request);
+    }
   }
 }`
   );
@@ -357,8 +391,11 @@ if (!configuredActivity.includes('registerPlugin(ArenaUpdaterPlugin.class)')) {
 if (!configuredActivity.includes('scheduleBundledAppRecovery(webView)')) {
   throw new Error('Could not install ARENA WebView startup watchdog in MainActivity.');
 }
-if (!configuredActivity.includes('setLayerType(View.LAYER_TYPE_SOFTWARE, null)')) {
-  throw new Error('Could not enable software rendering for the ARENA WebView.');
+if (!configuredActivity.includes('new WebViewAssetLoader.AssetsPathHandler(this)')) {
+  throw new Error('Could not install Android WebViewAssetLoader for the ARENA bundle.');
+}
+if (!configuredActivity.includes('bridge.setWebViewClient(new ArenaAssetWebViewClient')) {
+  throw new Error('Could not route ARENA through the Android asset WebView client.');
 }
 
 const manifest = await readFile(manifestPath, 'utf8');
@@ -368,15 +405,19 @@ if (!manifest.includes('<uses-permission android:name="android.permission.INTERN
 if (!manifest.includes('androidx.core.content.FileProvider') || !manifest.includes('${applicationId}.fileprovider')) {
   throw new Error('Capacitor AndroidManifest no longer exposes the expected secure FileProvider.');
 }
-const configuredManifest = manifest.replace(
-  '<uses-permission android:name="android.permission.INTERNET" />',
-  '<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
-).replace(
-  'android:exported="true">',
-  'android:exported="true"\n            android:hardwareAccelerated="false">'
+let configuredManifest = manifest;
+if (!configuredManifest.includes('android.permission.REQUEST_INSTALL_PACKAGES')) {
+  configuredManifest = configuredManifest.replace(
+    '<uses-permission android:name="android.permission.INTERNET" />',
+    '<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+  );
+}
+configuredManifest = configuredManifest.replace(
+  /\n\s*android:hardwareAccelerated="false"/g,
+  ''
 );
-if (!configuredManifest.includes('android:hardwareAccelerated="false"')) {
-  throw new Error('Could not disable hardware acceleration for the ARENA activity.');
+if (configuredManifest.includes('android:hardwareAccelerated="false"')) {
+  throw new Error('ARENA must not disable Chromium WebView hardware acceleration.');
 }
 
 await Promise.all([

@@ -68,7 +68,7 @@ let lastError = null;
 while (Date.now() < deadline) {
   try {
     const pages = await targets();
-    const target = pages.find(page => page.type === 'page' && /localhost/i.test(page.url ?? ''))
+    const target = pages.find(page => page.type === 'page' && /appassets\.androidplatform\.net/i.test(page.url ?? ''))
       ?? pages.find(page => page.type === 'page');
     if (!target?.webSocketDebuggerUrl) throw new Error('No debuggable WebView page is available.');
 

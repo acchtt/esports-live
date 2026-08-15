@@ -155,6 +155,7 @@ jobs:
 
       - name: Build V3 web bundle for Android
         env:
+          ARENA_ANDROID_ASSET_BUNDLE: 'true'
           VITE_API_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
           VITE_API_FALLBACK_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
           VITE_ENABLE_APK_UPDATER: 'true'
@@ -203,15 +204,16 @@ jobs:
           grep -Fq 'windowSplashScreenBackground' "$styles"
           grep -Fq 'arena_splash_mark' "$styles"
           grep -Fq 'AppPlugin' "$plugins"
-          grep -Fq '"hostname": "localhost"' "$capacitor_config"
-          grep -Fq '"errorPath": "native-error.html"' "$capacitor_config"
+          grep -Fq '"url": "https://appassets.androidplatform.net/assets/public/index.html"' "$capacitor_config"
+          grep -Fq '"errorPath": "assets/public/native-error.html"' "$capacitor_config"
           grep -Fq '"backgroundColor": "#06090d"' "$capacitor_config"
           grep -Fq 'ArenaUpdaterPlugin' "$native_root/java/live/esports/arena/MainActivity.java"
           grep -Fq 'scheduleBundledAppRecovery' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'setLayerType(View.LAYER_TYPE_SOFTWARE, null)' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'webView.loadUrl(getBridge().getAppUrl())' "$native_root/java/live/esports/arena/MainActivity.java"
+          grep -Fq 'new WebViewAssetLoader.AssetsPathHandler(this)' "$native_root/java/live/esports/arena/MainActivity.java"
+          grep -Fq 'bridge.setWebViewClient(new ArenaAssetWebViewClient' "$native_root/java/live/esports/arena/MainActivity.java"
+          grep -Fq 'webView.loadUrl(ARENA_ASSET_URL)' "$native_root/java/live/esports/arena/MainActivity.java"
           ! grep -Fq 'getDir("webview"' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'android:hardwareAccelerated="false"' "$manifest"
+          ! grep -Fq 'android:hardwareAccelerated="false"' "$manifest"
           grep -Fq 'REQUEST_INSTALL_PACKAGES' "$manifest"
           grep -Fq 'FileProvider.getUriForFile' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
           grep -Fq 'emitDownloadState' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"

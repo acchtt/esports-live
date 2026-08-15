@@ -138,10 +138,12 @@ await Promise.all([
 ]);
 
 const manifest = await readFile(manifestPath, 'utf8');
-if (!manifest.includes('android:icon="@mipmap/ic_launcher"')) {
+if (!manifest.includes('android:icon="@mipmap/ic_launcher"')
+  && !manifest.includes('android:icon="@mipmap/arena_launcher"')) {
   throw new Error('Capacitor Android manifest no longer uses the expected launcher icon resource.');
 }
-if (!manifest.includes('android:roundIcon="@mipmap/ic_launcher_round"')) {
+if (!manifest.includes('android:roundIcon="@mipmap/ic_launcher_round"')
+  && !manifest.includes('android:roundIcon="@mipmap/arena_launcher_round"')) {
   throw new Error('Capacitor Android manifest no longer uses the expected round launcher icon resource.');
 }
 

@@ -48,14 +48,14 @@ private val V3Purple = Color(0xFFA36BFF)
 fun V3GameSelector(games: List<SeriesGame>, selectedId: String?, onGame: (SeriesGame) -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = ArenaSurface,
         border = androidx.compose.foundation.BorderStroke(1.dp, ArenaLine)
     ) {
-        Row(Modifier.fillMaxWidth().padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             games.sortedBy { it.number }.forEach { game ->
                 val selected = game.id == selectedId
-                val shape = RoundedCornerShape(12.dp)
+                val shape = RoundedCornerShape(10.dp)
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -63,11 +63,11 @@ fun V3GameSelector(games: List<SeriesGame>, selectedId: String?, onGame: (Series
                         .background(if (selected) ArenaCyan.copy(alpha = 0.12f) else Color.Transparent)
                         .border(1.dp, if (selected) ArenaCyan.copy(alpha = 0.55f) else Color.Transparent, shape)
                         .clickable { onGame(game) }
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = 3.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Game ${game.number}", color = ArenaText, fontSize = 12.sp, fontWeight = FontWeight.Black)
-                    Text(v3GameState(game.state), color = v3GameStateColor(game.state), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("Game ${game.number}", color = ArenaText, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    Text(v3GameState(game.state), color = v3GameStateColor(game.state), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -98,15 +98,15 @@ fun V3Scoreboard(series: Series, snapshot: LiveSnapshot, stats: LolStats) {
                 .background(Brush.horizontalGradient(listOf(ArenaCyan, ArenaCyan.copy(alpha = 0.15f), ArenaRed.copy(alpha = 0.15f), ArenaRed)))
         )
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(formatV3Clock(stats.gameClockSeconds), color = ArenaText, fontSize = 24.sp, fontWeight = FontWeight.Black)
+            Text(formatV3Clock(stats.gameClockSeconds), color = ArenaText, fontSize = 20.sp, fontWeight = FontWeight.Black)
             Text(
                 "Game ${snapshot.game.number} · ${v3GameState(snapshot.game.state)}",
                 color = ArenaText,
-                fontSize = 19.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Black
             )
         }
@@ -114,9 +114,9 @@ fun V3Scoreboard(series: Series, snapshot: LiveSnapshot, stats: LolStats) {
         V3TeamBanner(blueTeam, redTeam, stats)
         V3Objectives(stats)
         if (pairs.isEmpty()) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("PLAYER STATISTICS PENDING", color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                Text("Champion, KDA, CS and lane gold will appear here.", color = ArenaMuted, fontSize = 10.sp)
+            Column(Modifier.fillMaxWidth().padding(15.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("PLAYER STATISTICS PENDING", color = ArenaText, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                Text("Champion, KDA, CS and lane gold will appear here.", color = ArenaMuted, fontSize = 9.sp)
             }
         } else {
             pairs.forEachIndexed { index, pair ->
@@ -138,15 +138,15 @@ private fun V3Freshness(quality: SnapshotQuality) {
         Modifier
             .fillMaxWidth()
             .background(color.copy(alpha = if (fresh) 0.09f else 0.16f))
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(8.dp).background(color, RoundedCornerShape(4.dp)))
-        Spacer(Modifier.width(8.dp))
+        Box(Modifier.size(7.dp).background(color, RoundedCornerShape(4.dp)))
+        Spacer(Modifier.width(6.dp))
         Text(
             "$label${age?.let { " · Updated $it ago" } ?: ""}$partial",
             color = color,
-            fontSize = 9.sp,
+            fontSize = 8.sp,
             fontWeight = FontWeight.Black,
             letterSpacing = 0.3.sp
         )
@@ -160,20 +160,20 @@ private fun V3TeamBanner(blueTeam: Team, redTeam: Team, stats: LolStats) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.horizontalGradient(listOf(ArenaCyan.copy(alpha = 0.15f), V3Board, ArenaRed.copy(alpha = 0.15f))))
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         V3TeamSide(blueTeam, stats.blue, ArenaCyan, Modifier.weight(1f), Alignment.Start)
         Column(
             modifier = Modifier
-                .width(92.dp)
-                .clip(RoundedCornerShape(15.dp))
+                .width(80.dp)
+                .clip(RoundedCornerShape(13.dp))
                 .background(V3BoardDeep.copy(alpha = 0.86f))
-                .border(1.dp, ArenaCyan.copy(alpha = 0.28f), RoundedCornerShape(15.dp))
-                .padding(vertical = 8.dp, horizontal = 3.dp),
+                .border(1.dp, ArenaCyan.copy(alpha = 0.28f), RoundedCornerShape(13.dp))
+                .padding(vertical = 6.dp, horizontal = 3.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("GOLD LEAD", color = ArenaMuted, fontSize = 8.sp, fontWeight = FontWeight.Black)
+            Text("GOLD LEAD", color = ArenaMuted, fontSize = 7.sp, fontWeight = FontWeight.Black)
             Text(
                 when {
                     difference == null -> "—"
@@ -185,7 +185,7 @@ private fun V3TeamBanner(blueTeam: Team, redTeam: Team, stats: LolStats) {
                     difference > 0 -> ArenaCyan
                     else -> ArenaRed
                 },
-                fontSize = 18.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Black
             )
         }
@@ -195,13 +195,13 @@ private fun V3TeamBanner(blueTeam: Team, redTeam: Team, stats: LolStats) {
 
 @Composable
 private fun V3TeamSide(team: Team, state: TeamState, accent: Color, modifier: Modifier, alignment: Alignment.Horizontal) {
-    Column(modifier.padding(horizontal = 3.dp), horizontalAlignment = alignment) {
-        V3TeamLogo(team, accent, 28.dp)
-        Spacer(Modifier.height(3.dp))
-        Text(team.name, color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = if (alignment == Alignment.End) TextAlign.End else TextAlign.Start)
+    Column(modifier.padding(horizontal = 2.dp), horizontalAlignment = alignment) {
+        V3TeamLogo(team, accent, 24.dp)
+        Spacer(Modifier.height(2.dp))
+        Text(team.name, color = ArenaText, fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = if (alignment == Alignment.End) TextAlign.End else TextAlign.Start)
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("KILLS ", color = ArenaMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-            Text(state.kills?.toString() ?: "—", color = accent, fontSize = 20.sp, fontWeight = FontWeight.Black)
+            Text("KILLS ", color = ArenaMuted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+            Text(state.kills?.toString() ?: "—", color = accent, fontSize = 17.sp, fontWeight = FontWeight.Black)
         }
     }
 }
@@ -209,8 +209,8 @@ private fun V3TeamSide(team: Team, state: TeamState, accent: Color, modifier: Mo
 @Composable
 private fun V3Objectives(stats: LolStats) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         V3Objective("♜", "TOWERS", stats.blue.objectives.towers, stats.red.objectives.towers, ArenaCyan, Modifier.weight(1f))
         V3Objective("✦", "DRAGONS", stats.blue.objectives.dragons?.size, stats.red.objectives.dragons?.size, V3Lime, Modifier.weight(1f))
@@ -223,18 +223,18 @@ private fun V3Objectives(stats: LolStats) {
 private fun V3Objective(icon: String, label: String, blue: Int?, red: Int?, iconColor: Color, modifier: Modifier) {
     Column(
         modifier
-            .clip(RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(ArenaSurface.copy(alpha = 0.82f))
-            .border(1.dp, ArenaLine.copy(alpha = 0.8f), RoundedCornerShape(11.dp))
-            .padding(vertical = 5.dp, horizontal = 2.dp),
+            .border(1.dp, ArenaLine.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
+            .padding(vertical = 4.dp, horizontal = 1.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(icon, color = iconColor, fontSize = 15.sp, fontWeight = FontWeight.Black)
-        Text(label, color = ArenaMuted, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1)
+        Text(icon, color = iconColor, fontSize = 13.sp, fontWeight = FontWeight.Black)
+        Text(label, color = ArenaMuted, fontSize = 6.sp, fontWeight = FontWeight.Black, maxLines = 1)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(blue?.toString() ?: "—", color = ArenaCyan, fontSize = 13.sp, fontWeight = FontWeight.Black)
-            Text(" – ", color = ArenaMuted, fontSize = 10.sp)
-            Text(red?.toString() ?: "—", color = ArenaRed, fontSize = 13.sp, fontWeight = FontWeight.Black)
+            Text(blue?.toString() ?: "—", color = ArenaCyan, fontSize = 12.sp, fontWeight = FontWeight.Black)
+            Text(" – ", color = ArenaMuted, fontSize = 9.sp)
+            Text(red?.toString() ?: "—", color = ArenaRed, fontSize = 12.sp, fontWeight = FontWeight.Black)
         }
     }
 }
@@ -247,11 +247,11 @@ private fun V3PlayerPair(pair: V3PlayerPair, patch: String?) {
     val redGold = pair.red?.totalGold
     val difference = if (blueGold != null && redGold != null) blueGold - redGold else null
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         V3PlayerSide(pair.blue, ArenaCyan, false, patch, Modifier.weight(1f))
-        Column(Modifier.width(60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 when {
                     difference == null -> "—"
@@ -263,7 +263,7 @@ private fun V3PlayerPair(pair: V3PlayerPair, patch: String?) {
                     difference > 0 -> ArenaCyan
                     else -> ArenaRed
                 },
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Black,
                 textAlign = TextAlign.Center
             )
@@ -278,27 +278,27 @@ private fun V3PlayerSide(player: PlayerState?, accent: Color, reversed: Boolean,
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (!reversed) {
                 V3ChampionPortrait(player, accent, patch)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(5.dp))
             }
             Column(Modifier.weight(1f), horizontalAlignment = if (reversed) Alignment.End else Alignment.Start) {
-                Text(player?.handle ?: "Player", color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(player?.handle ?: "Player", color = ArenaText, fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     "${player?.kills ?: "—"}/${player?.deaths ?: "—"}/${player?.assists ?: "—"} · ${player?.creepScore ?: "—"} CS",
                     color = ArenaText,
-                    fontSize = 9.sp,
+                    fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
                 Text(
                     listOfNotNull(player?.championId, player?.level?.let { "Lv $it" }).joinToString(" · ").ifBlank { "—" },
                     color = ArenaMuted,
-                    fontSize = 8.sp,
+                    fontSize = 7.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             if (reversed) {
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(5.dp))
                 V3ChampionPortrait(player, accent, patch)
             }
         }
@@ -311,13 +311,13 @@ private fun V3ChampionPortrait(player: PlayerState?, accent: Color, patch: Strin
     val url = championImageUrl(player?.championId, patch)
     Box(
         Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(9.dp))
+            .size(36.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(accent.copy(alpha = 0.12f))
-            .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(9.dp)),
+            .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center
     ) {
-        Text(player?.championId?.take(2)?.uppercase(Locale.ROOT) ?: "?", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Black)
+        Text(player?.championId?.take(2)?.uppercase(Locale.ROOT) ?: "?", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Black)
         if (url != null) AsyncImage(
             model = ImageRequest.Builder(context).data(url).diskCacheKey("arena-champion:$url").memoryCacheKey("arena-champion:$url").build(),
             imageLoader = ArenaImageLoader.get(context),
@@ -332,7 +332,7 @@ private fun V3ChampionPortrait(player: PlayerState?, accent: Color, patch: Strin
 private fun V3TeamLogo(team: Team, accent: Color, size: androidx.compose.ui.unit.Dp) {
     val context = LocalContext.current
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Text(team.code ?: team.name.take(2), color = accent, fontSize = 9.sp, fontWeight = FontWeight.Black)
+        Text(team.code ?: team.name.take(2), color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
         team.imageUrl?.let { url ->
             AsyncImage(
                 model = ImageRequest.Builder(context).data(url).diskCacheKey("arena-team:$url").memoryCacheKey("arena-team:$url").build(),

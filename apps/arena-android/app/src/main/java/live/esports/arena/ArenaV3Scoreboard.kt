@@ -255,7 +255,7 @@ private fun V3PlayerPair(pair: V3PlayerPair, patch: String?) {
     val redGold = pair.red?.totalGold
     val difference = if (blueGold != null && redGold != null) blueGold - redGold else null
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         V3PlayerSide(pair.blue, ArenaCyan, false, patch, Modifier.weight(1f))
@@ -271,8 +271,8 @@ private fun V3PlayerPair(pair: V3PlayerPair, patch: String?) {
                     difference > 0 -> ArenaCyan
                     else -> ArenaRed
                 },
-                fontSize = 11.sp,
-                lineHeight = 12.sp,
+                fontSize = 12.sp,
+                lineHeight = 13.sp,
                 fontWeight = FontWeight.Black,
                 textAlign = TextAlign.Center
             )
@@ -292,13 +292,13 @@ private fun V3PlayerSide(player: PlayerState?, accent: Color, reversed: Boolean,
             Column(
                 Modifier.weight(1f),
                 horizontalAlignment = if (reversed) Alignment.End else Alignment.Start,
-                verticalArrangement = Arrangement.spacedBy(1.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     player?.handle ?: "Player",
                     color = ArenaText,
-                    fontSize = 11.sp,
-                    lineHeight = 12.sp,
+                    fontSize = 12.sp,
+                    lineHeight = 13.sp,
                     fontWeight = FontWeight.Black,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -306,16 +306,16 @@ private fun V3PlayerSide(player: PlayerState?, accent: Color, reversed: Boolean,
                 Text(
                     "${player?.kills ?: "—"}/${player?.deaths ?: "—"}/${player?.assists ?: "—"} · ${player?.creepScore ?: "—"} CS",
                     color = ArenaText,
-                    fontSize = 9.sp,
-                    lineHeight = 10.sp,
+                    fontSize = 10.sp,
+                    lineHeight = 11.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
                 Text(
                     listOfNotNull(player?.championId, player?.level?.let { "Lv $it" }).joinToString(" · ").ifBlank { "—" },
                     color = ArenaMuted,
-                    fontSize = 8.sp,
-                    lineHeight = 9.sp,
+                    fontSize = 9.sp,
+                    lineHeight = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -337,7 +337,7 @@ private fun V3ChampionPortrait(player: PlayerState?, accent: Color, patch: Strin
     val source = if (url != null && url == loadingUrl && loadingUrl != squareUrl) "loading" else "square"
     Box(
         Modifier
-            .size(38.dp)
+            .size(44.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(accent.copy(alpha = 0.12f))
             .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp)),

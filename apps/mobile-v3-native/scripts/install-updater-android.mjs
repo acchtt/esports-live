@@ -6,6 +6,7 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const mainRoot = path.join(packageRoot, 'android', 'app', 'src', 'main');
 const javaRoot = path.join(mainRoot, 'java', 'live', 'esports', 'arena');
 const manifestPath = path.join(mainRoot, 'AndroidManifest.xml');
+const buildGradlePath = path.join(packageRoot, 'android', 'app', 'build.gradle');
 const activityPath = path.join(javaRoot, 'MainActivity.java');
 const pluginPath = path.join(javaRoot, 'ArenaUpdaterPlugin.java');
 
@@ -306,8 +307,10 @@ const activity = await readFile(activityPath, 'utf8');
 if (!activity.includes('public class MainActivity extends BridgeActivity')) {
   throw new Error('Capacitor MainActivity no longer uses the expected BridgeActivity structure.');
 }
-const configuredActivity = activity
-  .replace(
+let configuredActivity = activity;
+if (!configuredActivity.includes('class ArenaAssetWebViewClient extends BridgeWebViewClient')) {
+  configuredActivity = configuredActivity
+    .replace(
     'import com.getcapacitor.BridgeActivity;',
     `import android.os.Bundle;
 import android.webkit.WebResourceRequest;
@@ -384,7 +387,8 @@ import com.getcapacitor.BridgeWebViewClient;
     }
   }
 }`
-  );
+    );
+}
 if (!configuredActivity.includes('registerPlugin(ArenaUpdaterPlugin.class)')) {
   throw new Error('Could not register ArenaUpdaterPlugin in MainActivity.');
 }
@@ -420,10 +424,23 @@ if (configuredManifest.includes('android:hardwareAccelerated="false"')) {
   throw new Error('ARENA must not disable Chromium WebView hardware acceleration.');
 }
 
+const buildGradle = await readFile(buildGradlePath, 'utf8');
+let configuredBuildGradle = buildGradle;
+if (!configuredBuildGradle.includes('androidx.webkit:webkit')) {
+  configuredBuildGradle = configuredBuildGradle.replace(
+    `    implementation project(':capacitor-android')`,
+    `    implementation project(':capacitor-android')\n    implementation "androidx.webkit:webkit:$androidxWebkitVersion"`
+  );
+}
+if (!configuredBuildGradle.includes('implementation "androidx.webkit:webkit:$androidxWebkitVersion"')) {
+  throw new Error('Could not expose AndroidX WebKit to the ARENA app module.');
+}
+
 await Promise.all([
   writeFile(pluginPath, plugin),
   writeFile(activityPath, configuredActivity),
-  writeFile(manifestPath, configuredManifest)
+  writeFile(manifestPath, configuredManifest),
+  writeFile(buildGradlePath, configuredBuildGradle)
 ]);
 
 console.log('Installed ARENA native Android updater bridge.');

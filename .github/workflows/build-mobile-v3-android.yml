@@ -212,6 +212,7 @@ jobs:
           grep -Fq 'new WebViewAssetLoader.AssetsPathHandler(this)' "$native_root/java/live/esports/arena/MainActivity.java"
           grep -Fq 'bridge.setWebViewClient(new ArenaAssetWebViewClient' "$native_root/java/live/esports/arena/MainActivity.java"
           grep -Fq 'webView.loadUrl(ARENA_ASSET_URL)' "$native_root/java/live/esports/arena/MainActivity.java"
+          grep -Fq 'androidx.webkit:webkit:$androidxWebkitVersion' "$build_gradle"
           ! grep -Fq 'getDir("webview"' "$native_root/java/live/esports/arena/MainActivity.java"
           ! grep -Fq 'android:hardwareAccelerated="false"' "$manifest"
           grep -Fq 'REQUEST_INSTALL_PACKAGES' "$manifest"

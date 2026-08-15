@@ -1,17 +1,11 @@
-name: Build Mobile V3 Android
+name: Build Native ARENA Android
 
 on:
   push:
     branches:
       - mobile-v3
     paths:
-      - apps/web-v3/**
-      - apps/mobile-v3-native/**
-      - packages/**
-      - tests/web/web-v3-pwa.spec.ts
-      - package.json
-      - tsconfig.json
-      - .gitignore
+      - apps/arena-android/**
       - .github/workflows/build-mobile-v3-android.yml
       - .github/workflows/build-mobile-v3-android-release.yml
   workflow_dispatch:
@@ -26,44 +20,40 @@ permissions:
 
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
-  V3_NATIVE_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
+  ARENA_ANDROID_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
+  ARENA_ANDROID_VERSION_NAME: 0.3.0
+  ARENA_ANDROID_VERSION_CODE: ${{ github.run_number }}
   ARENA_ANDROID_EXPECTED_SIGNER_SHA256: 0c1eef0be39008076ed3d5549412690eb58d143f91e6fe57f9d525a28faaa37c
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
     steps:
-      - name: Mark Android build pending
+      - name: Mark native Android build pending
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           node -e '
             const fs = require("node:fs");
-            fs.writeFileSync("/tmp/mobile-v3-android-status.json", JSON.stringify({
+            fs.writeFileSync("/tmp/arena-android-status.json", JSON.stringify({
               state: "pending",
               context: "esports-live/mobile-v3-android",
-              description: "ARENA V3 Android APK/AAB build is running",
+              description: "Native ARENA Android APK/AAB build is running",
               target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
             }));
           '
-          curl -fsSL --retry 3 \
-            -X POST \
+          curl -fsSL --retry 3 -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
-            --data-binary @/tmp/mobile-v3-android-status.json
+            --data-binary @/tmp/arena-android-status.json
 
-      - name: Check out V3 application
+      - name: Check out native application
         uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -98,137 +88,58 @@ jobs:
           echo "ARENA_ANDROID_DEBUG_KEY_ALIAS=androiddebugkey" >> "$GITHUB_ENV"
           echo "ARENA_ANDROID_DEBUG_KEY_PASSWORD=android" >> "$GITHUB_ENV"
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Typecheck native and shared code
-        run: npm run typecheck
-
       - name: Install Android SDK 36
         shell: bash
         run: |
           sdkmanager_path="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [[ ! -x "$sdkmanager_path" ]]; then
-            sdkmanager_path="$(command -v sdkmanager)"
-          fi
+          if [[ ! -x "$sdkmanager_path" ]]; then sdkmanager_path="$(command -v sdkmanager)"; fi
           test -n "$sdkmanager_path" || { echo "Android sdkmanager is unavailable."; exit 1; }
           yes | "$sdkmanager_path" --licenses >/dev/null || true
           "$sdkmanager_path" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Verify native API endpoint
+      - name: Verify LoL API endpoint
         shell: bash
         run: |
           for attempt in {1..8}; do
             if curl -fsSL --connect-timeout 10 --max-time 30 \
-              "$V3_NATIVE_API_URL/health?commit=$MOBILE_V3_COMMIT_SHA" \
-              > /tmp/mobile-v3-native-health.json \
+              "$ARENA_ANDROID_API_URL/health?commit=$MOBILE_V3_COMMIT_SHA" \
+              > /tmp/arena-health.json \
               && curl -fsSL --connect-timeout 10 --max-time 45 \
-                -D /tmp/mobile-v3-native-schedule.headers \
-                "$V3_NATIVE_API_URL/v1/lol/schedule?states=live,paused,scheduled,unknown" \
-                > /tmp/mobile-v3-native-schedule.json \
+                "$ARENA_ANDROID_API_URL/v1/lol/schedule?states=live,paused,scheduled,unknown&limit=1" \
+                > /tmp/arena-schedule.json \
               && node -e '
                 const fs = require("node:fs");
-                const health = JSON.parse(fs.readFileSync("/tmp/mobile-v3-native-health.json", "utf8"));
-                const schedule = JSON.parse(fs.readFileSync("/tmp/mobile-v3-native-schedule.json", "utf8"));
-                const headers = fs.readFileSync("/tmp/mobile-v3-native-schedule.headers", "utf8").toLowerCase();
-                const healthy = health.ok === true && health.service === "esports-live-api" && health.adapters?.includes("lol");
-                const scheduled = schedule.esport === "lol" && Array.isArray(schedule.events);
-                const cors = /access-control-allow-origin:\s*\*/.test(headers);
-                process.exit(healthy && scheduled && cors ? 0 : 1);
+                const health = JSON.parse(fs.readFileSync("/tmp/arena-health.json", "utf8"));
+                const schedule = JSON.parse(fs.readFileSync("/tmp/arena-schedule.json", "utf8"));
+                const good = health.ok === true && health.adapters?.includes("lol") && schedule.esport === "lol" && Array.isArray(schedule.events);
+                process.exit(good ? 0 : 1);
               '; then
               exit 0
             fi
             sleep 5
           done
-          echo "Native API verification failed."
+          echo "LoL API verification failed."
           exit 1
 
-      - name: Prepare native build metadata
+      - name: Validate native-only Android source
         shell: bash
         run: |
-          echo "VITE_BUILD_SHA=$MOBILE_V3_COMMIT_SHA" >> "$GITHUB_ENV"
-          echo "VITE_BUILD_SHA_SHORT=${MOBILE_V3_COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
-          echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
-          echo "ARENA_ANDROID_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "ARENA_ANDROID_VERSION_NAME=0.2.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          test -f apps/arena-android/app/src/main/java/live/esports/arena/MainActivity.kt
+          test -f apps/arena-android/app/src/main/java/live/esports/arena/ArenaApp.kt
+          test -f apps/arena-android/app/src/main/java/live/esports/arena/ArenaApi.kt
+          grep -Fq 'applicationId = "live.esports.arena"' apps/arena-android/app/build.gradle.kts
+          grep -Fq 'compileSdk = 36' apps/arena-android/app/build.gradle.kts
+          grep -Fq 'Dota is intentionally not present' apps/arena-android/README.md
+          if grep -R -E 'android\.webkit\.WebView|CapacitorActivity|com\.getcapacitor' apps/arena-android/app/src/main; then
+            echo "A WebView or Capacitor dependency leaked into the native app."
+            exit 1
+          fi
 
-      - name: Build V3 web bundle for Android
-        env:
-          ARENA_ANDROID_ASSET_BUNDLE: 'true'
-          VITE_API_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
-          VITE_API_FALLBACK_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
-          VITE_ENABLE_APK_UPDATER: 'true'
-        run: npm run build:web-v3
-
-      - name: Generate and brand Capacitor Android project
+      - name: Build native Android debug APK and AAB
         shell: bash
         run: |
-          rm -rf apps/mobile-v3-native/android
-          npm run cap:v3:android:add
-          npm run cap:v3:android:sync
-          npm run android:configure --workspace @esports-live/mobile-v3-native
-          npm run android:brand --workspace @esports-live/mobile-v3-native
-          npm run android:updater --workspace @esports-live/mobile-v3-native
-
-      - name: Validate generated native shell
-        shell: bash
-        run: |
-          native_root="apps/mobile-v3-native/android/app/src/main"
-          web_assets="$native_root/assets/public"
-          build_gradle="apps/mobile-v3-native/android/app/build.gradle"
-          strings_xml="$native_root/res/values/strings.xml"
-          manifest="$native_root/AndroidManifest.xml"
-          styles="$native_root/res/values/styles.xml"
-          plugins="$native_root/assets/capacitor.plugins.json"
-          capacitor_config="$native_root/assets/capacitor.config.json"
-          test -f "$web_assets/index.html"
-          test -f "$web_assets/native-error.html"
-          test -f "$build_gradle"
-          test -f "$strings_xml"
-          test -f "$manifest"
-          test -f "$styles"
-          test -f "$plugins"
-          test -f "$capacitor_config"
-          grep -q 'name="arena-version" content="v3"' "$web_assets/index.html"
-          grep -q "$MOBILE_V3_COMMIT_SHA" "$web_assets/index.html"
-          grep -R -q "$V3_NATIVE_API_URL" "$web_assets/assets"
-          grep -Eq 'applicationId[[:space:]]+"live\.esports\.arena"' "$build_gradle"
-          grep -Eq "versionCode[[:space:]]+$ARENA_ANDROID_VERSION_CODE" "$build_gradle"
-          grep -Fq "versionName \"$ARENA_ANDROID_VERSION_NAME\"" "$build_gradle"
-          grep -Fq 'arenaDebug {' "$build_gradle"
-          grep -Fq 'signingConfig signingConfigs.arenaDebug' "$build_gradle"
-          grep -Fq '<string name="app_name">ARENA</string>' "$strings_xml"
-          grep -Fq 'android:icon="@mipmap/arena_launcher"' "$manifest"
-          grep -Fq 'android:roundIcon="@mipmap/arena_launcher_round"' "$manifest"
-          grep -Fq 'windowSplashScreenBackground' "$styles"
-          grep -Fq 'arena_splash_mark' "$styles"
-          grep -Fq 'AppPlugin' "$plugins"
-          grep -Fq '"url": "https://appassets.androidplatform.net/assets/public/index.html"' "$capacitor_config"
-          grep -Fq '"errorPath": "assets/public/native-error.html"' "$capacitor_config"
-          grep -Fq '"backgroundColor": "#06090d"' "$capacitor_config"
-          grep -Fq 'ArenaUpdaterPlugin' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'scheduleBundledAppRecovery' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'new WebViewAssetLoader.AssetsPathHandler(this)' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'bridge.setWebViewClient(new ArenaAssetWebViewClient' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'webView.loadUrl(ARENA_ASSET_URL)' "$native_root/java/live/esports/arena/MainActivity.java"
-          grep -Fq 'androidx.webkit:webkit:$androidxWebkitVersion' "$build_gradle"
-          ! grep -Fq 'getDir("webview"' "$native_root/java/live/esports/arena/MainActivity.java"
-          ! grep -Fq 'android:hardwareAccelerated="false"' "$manifest"
-          grep -Fq 'REQUEST_INSTALL_PACKAGES' "$manifest"
-          grep -Fq 'FileProvider.getUriForFile' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
-          grep -Fq 'emitDownloadState' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
-          ! grep -Fq 'DownloadManager' "$native_root/java/live/esports/arena/ArenaUpdaterPlugin.java"
-          test -f "$native_root/res/mipmap-anydpi-v26/arena_launcher.xml"
-          test -f "$native_root/res/drawable/arena_splash_mark.xml"
-          test -f "apps/mobile-v3-native/scripts/verify-android-webview.mjs"
-          test -f "apps/mobile-v3-native/scripts/run-android-smoke.sh"
-
-      - name: Build Android debug APK and AAB
-        shell: bash
-        run: |
-          chmod +x apps/mobile-v3-native/android/gradlew
-          cd apps/mobile-v3-native/android
+          chmod +x apps/arena-android/gradlew apps/arena-android/scripts/run-android-smoke.sh
+          cd apps/arena-android
           ./gradlew assembleDebug bundleDebug --no-daemon --stacktrace
 
       - name: Enable Android emulator acceleration
@@ -239,7 +150,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Boot Android emulator and verify rendered ARENA UI
+      - name: Boot Android 16 and verify native UI
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: 36
@@ -249,34 +160,31 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: bash apps/mobile-v3-native/scripts/run-android-smoke.sh
+          script: bash apps/arena-android/scripts/run-android-smoke.sh
 
-      - name: Upload Android smoke diagnostics
+      - name: Upload native Android smoke diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: arena-v3-android-smoke-${{ github.sha }}
+          name: arena-native-android-smoke-${{ github.sha }}
           path: artifacts/android-smoke-*
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Verify Android debug packages
+      - name: Verify native Android packages
         shell: bash
         run: |
-          apk="apps/mobile-v3-native/android/app/build/outputs/apk/debug/app-debug.apk"
-          aab="apps/mobile-v3-native/android/app/build/outputs/bundle/debug/app-debug.aab"
+          apk="apps/arena-android/app/build/outputs/apk/debug/app-debug.apk"
+          aab="apps/arena-android/app/build/outputs/bundle/debug/app-debug.aab"
           test -s "$apk"
           test -s "$aab"
           aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
-          if [[ -x "$aapt" ]]; then
-            "$aapt" dump badging "$apk" > /tmp/arena-v3-apk-badging.txt
-            grep -Fq "package: name='live.esports.arena'" /tmp/arena-v3-apk-badging.txt
-            grep -Fq "application-label:'ARENA'" /tmp/arena-v3-apk-badging.txt
-          fi
+          "$aapt" dump badging "$apk" > /tmp/arena-apk-badging.txt
+          grep -Fq "package: name='live.esports.arena'" /tmp/arena-apk-badging.txt
+          grep -Fq "application-label:'ARENA'" /tmp/arena-apk-badging.txt
           apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
-          test -x "$apksigner"
-          "$apksigner" verify --print-certs "$apk" | tee /tmp/arena-v3-apk-signing.txt
-          signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/arena-v3-apk-signing.txt)"
+          "$apksigner" verify --print-certs "$apk" | tee /tmp/arena-apk-signing.txt
+          signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/arena-apk-signing.txt)"
           test -n "$signer_sha256"
           if [[ "$signer_sha256" != "$ARENA_ANDROID_EXPECTED_SIGNER_SHA256" ]]; then
             echo "Unexpected ARENA Android signer: $signer_sha256"
@@ -284,19 +192,16 @@ jobs:
           fi
           echo "ARENA_ANDROID_SIGNER_SHA256=$signer_sha256" >> "$GITHUB_ENV"
           jarsigner -verify "$aab"
-          mkdir -p artifacts
-          short_sha="${MOBILE_V3_COMMIT_SHA:0:7}"
-          cp "$apk" "artifacts/arena-v3-${short_sha}-debug.apk"
-          cp "$aab" "artifacts/arena-v3-${short_sha}-debug.aab"
 
-      - name: Prepare public in-app update files
+      - name: Stage public native APK
         shell: bash
         run: |
-          apk="apps/mobile-v3-native/android/app/build/outputs/apk/debug/app-debug.apk"
-          public_apk="artifacts/arena-v3-latest.apk"
-          cp "$apk" "$public_apk"
-          apk_sha="$(sha256sum "$public_apk" | awk '{print $1}')"
-          apk_size="$(stat -c '%s' "$public_apk")"
+          mkdir -p artifacts
+          apk="apps/arena-android/app/build/outputs/apk/debug/app-debug.apk"
+          cp "$apk" "artifacts/ARENA-v${ARENA_ANDROID_VERSION_NAME}.apk"
+          cp "$apk" artifacts/arena-v3-latest.apk
+          apk_sha="$(sha256sum artifacts/arena-v3-latest.apk | awk '{print $1}')"
+          apk_size="$(stat -c '%s' artifacts/arena-v3-latest.apk)"
           published_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           printf '%s  %s\n' "$apk_sha" "arena-v3-latest.apk" > artifacts/arena-v3-SHA256SUMS.txt
           APK_SHA="$apk_sha" APK_SIZE="$apk_size" PUBLISHED_AT="$published_at" node - <<'NODE'
@@ -310,43 +215,43 @@ jobs:
             sha256: process.env.APK_SHA,
             signerSha256: process.env.ARENA_ANDROID_SIGNER_SHA256,
             sizeBytes: Number(process.env.APK_SIZE),
-            releaseNotes: 'Latest ARENA V3 live-score improvements and fixes.',
+            releaseNotes: 'ARENA 0.3 is rebuilt in native Kotlin and Jetpack Compose for phones. LoL only; no WebView.',
             publishedAt: process.env.PUBLISHED_AT,
             commit: process.env.MOBILE_V3_COMMIT_SHA
           };
           fs.writeFileSync('artifacts/arena-v3-latest.json', `${JSON.stringify(manifest, null, 2)}\n`);
           NODE
 
-      - name: Publish public Android update channel
+      - name: Publish direct native APK channel
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           tag="arena-v3-android-latest"
-          title="ARENA Android ${ARENA_ANDROID_VERSION_NAME}"
-          notes="Public ARENA Android update channel. The APK is signed with the existing V3 debug key so it can update compatible installed builds."
+          title="ARENA Android ${ARENA_ANDROID_VERSION_NAME} · Native rebuild"
+          notes="Native phone-first ARENA client for League of Legends. No WebView or Capacitor. Signed with the established ARENA key for compatible in-place updates."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
           else
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$title" --notes "$notes"
           fi
           gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber \
+            "artifacts/ARENA-v${ARENA_ANDROID_VERSION_NAME}.apk" \
             artifacts/arena-v3-latest.apk \
-            artifacts/arena-v3-SHA256SUMS.txt
-          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber \
+            artifacts/arena-v3-SHA256SUMS.txt \
             artifacts/arena-v3-latest.json
 
-      - name: Upload Android debug APK and AAB
+      - name: Upload native APK and AAB
         uses: actions/upload-artifact@v7
         with:
-          name: arena-v3-android-debug-${{ github.sha }}
+          name: arena-native-android-${{ github.sha }}
           path: |
             artifacts/*.apk
-            artifacts/*.aab
+            apps/arena-android/app/build/outputs/bundle/debug/app-debug.aab
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish Android build status
+      - name: Publish native Android build status
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -355,24 +260,23 @@ jobs:
         run: |
           if [[ "$ANDROID_JOB_STATUS" == "success" ]]; then
             state="success"
-            description="ARENA V3 Android debug APK/AAB built"
+            description="Native ARENA Android APK/AAB built and rendered"
           else
             state="failure"
-            description="ARENA V3 Android build failed"
+            description="Native ARENA Android build failed"
           fi
           STATE="$state" DESCRIPTION="$description" node -e '
             const fs = require("node:fs");
-            fs.writeFileSync("/tmp/mobile-v3-android-status.json", JSON.stringify({
+            fs.writeFileSync("/tmp/arena-android-status.json", JSON.stringify({
               state: process.env.STATE,
               context: "esports-live/mobile-v3-android",
               description: process.env.DESCRIPTION,
               target_url: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
             }));
           '
-          curl -fsSL --retry 3 \
-            -X POST \
+          curl -fsSL --retry 3 -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
-            --data-binary @/tmp/mobile-v3-android-status.json
+            --data-binary @/tmp/arena-android-status.json

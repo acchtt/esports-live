@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="arena_background">#060A12</color>
+    <color name="arena_cyan">#18D8F4</color>
+    <color name="arena_red">#FF495C</color>
+</resources>

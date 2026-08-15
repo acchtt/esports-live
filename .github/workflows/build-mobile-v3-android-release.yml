@@ -26,7 +26,7 @@ permissions:
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   V3_NATIVE_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
-  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name || format('0.2.{0}', github.run_number) }}
+  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name || '0.3.0' }}
   ARENA_ANDROID_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
   ARENA_ANDROID_RELEASE_KEYSTORE_B64: ${{ secrets.ARENA_ANDROID_RELEASE_KEYSTORE_B64 }}
   ARENA_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ARENA_ANDROID_RELEASE_STORE_PASSWORD }}
@@ -65,11 +65,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
@@ -85,12 +80,6 @@ jobs:
           test -n "$ARENA_ANDROID_RELEASE_STORE_PASSWORD" || { echo "Missing secret ARENA_ANDROID_RELEASE_STORE_PASSWORD."; exit 1; }
           test -n "$ARENA_ANDROID_RELEASE_KEY_ALIAS" || { echo "Missing secret ARENA_ANDROID_RELEASE_KEY_ALIAS."; exit 1; }
           test -n "$ARENA_ANDROID_RELEASE_KEY_PASSWORD" || { echo "Missing secret ARENA_ANDROID_RELEASE_KEY_PASSWORD."; exit 1; }
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Typecheck native and shared code
-        run: npm run typecheck
 
       - name: Install Android SDK 36
         shell: bash
@@ -132,45 +121,29 @@ jobs:
             process.exit(health.ok === true && health.adapters?.includes("lol") && schedule.esport === "lol" && Array.isArray(schedule.events) ? 0 : 1);
           '
 
-      - name: Prepare release build metadata
+      - name: Validate native Android release source
         shell: bash
         run: |
-          echo "VITE_BUILD_SHA=$MOBILE_V3_COMMIT_SHA" >> "$GITHUB_ENV"
-          echo "VITE_BUILD_SHA_SHORT=${MOBILE_V3_COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
-          echo "VITE_BUILD_RUN=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "VITE_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
-
-      - name: Build V3 web bundle for release
-        env:
-          VITE_API_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
-          VITE_API_FALLBACK_BASE_URL: ${{ env.V3_NATIVE_API_URL }}
-        run: npm run build:web-v3
-
-      - name: Generate, configure, and brand Android release project
-        shell: bash
-        run: |
-          rm -rf apps/mobile-v3-native/android
-          npm run cap:v3:android:add
-          npm run cap:v3:android:sync
-          npm run android:configure --workspace @esports-live/mobile-v3-native
-          npm run android:brand --workspace @esports-live/mobile-v3-native
-          build_gradle="apps/mobile-v3-native/android/app/build.gradle"
-          grep -Eq 'applicationId[[:space:]]+"live\.esports\.arena"' "$build_gradle"
-          grep -Eq "versionCode[[:space:]]+$ARENA_ANDROID_VERSION_CODE" "$build_gradle"
-          grep -Fq "versionName \"$ARENA_ANDROID_VERSION_NAME\"" "$build_gradle"
-          grep -Fq 'signingConfig signingConfigs.arenaRelease' "$build_gradle"
+          build_gradle="apps/arena-android/app/build.gradle.kts"
+          test -f apps/arena-android/app/src/main/java/live/esports/arena/MainActivity.kt
+          grep -Fq 'applicationId = "live.esports.arena"' "$build_gradle"
+          grep -Fq 'signingConfig = releaseSigning' "$build_gradle"
+          if grep -R -E 'android\.webkit\.WebView|CapacitorActivity|com\.getcapacitor' apps/arena-android/app/src/main; then
+            echo "Release source is not native-only."
+            exit 1
+          fi
 
       - name: Build signed Play AAB
         shell: bash
         run: |
-          chmod +x apps/mobile-v3-native/android/gradlew
-          cd apps/mobile-v3-native/android
+          chmod +x apps/arena-android/gradlew
+          cd apps/arena-android
           ./gradlew bundleRelease --no-daemon --stacktrace
 
       - name: Verify and stage signed AAB
         shell: bash
         run: |
-          aab="apps/mobile-v3-native/android/app/build/outputs/bundle/release/app-release.aab"
+          aab="apps/arena-android/app/build/outputs/bundle/release/app-release.aab"
           test -s "$aab"
           jarsigner -verify "$aab"
           mkdir -p artifacts

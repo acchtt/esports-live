@@ -55,6 +55,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -64,6 +66,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -95,7 +99,8 @@ fun ArenaApp(
                     onMatchFilter = viewModel::setMatchFilter,
                     onLeagueFilter = viewModel::setLeagueFilter,
                     onRefresh = { viewModel.refreshSchedule() },
-                    onOpenSeries = viewModel::openSeries
+                    onOpenSeries = viewModel::openSeries,
+                    onVisibleSeries = viewModel::warmCompletedSeries
                 )
             } else {
                 MatchDetailScreen(
@@ -115,7 +120,8 @@ private fun HomeScreen(
     onMatchFilter: (MatchFilter) -> Unit,
     onLeagueFilter: (LeagueFilter) -> Unit,
     onRefresh: () -> Unit,
-    onOpenSeries: (Series) -> Unit
+    onOpenSeries: (Series) -> Unit,
+    onVisibleSeries: (Series) -> Unit
 ) {
     val filtered = remember(state.events, state.matchFilter, state.leagueFilter) {
         state.events.filter { event ->
@@ -141,7 +147,11 @@ private fun HomeScreen(
                     FeedSummary(filtered.size, state.feedStatus, state.lastUpdatedAt)
                 }
                 items(filtered, key = { it.series.id }) { event ->
-                    MatchCard(event.series, onClick = { onOpenSeries(event.series) })
+                    MatchCard(
+                        event.series,
+                        onClick = { onOpenSeries(event.series) },
+                        onVisible = { onVisibleSeries(event.series) }
+                    )
                 }
                 item { Spacer(Modifier.navigationBarsPadding()) }
             }
@@ -295,9 +305,12 @@ private fun FeedSummary(count: Int, status: FeedStatus, updatedAt: Long?) {
 }
 
 @Composable
-private fun MatchCard(series: Series, onClick: () -> Unit) {
+private fun MatchCard(series: Series, onClick: () -> Unit, onVisible: () -> Unit) {
     val left = series.teams.getOrNull(0) ?: Team("left", "TBD")
     val right = series.teams.getOrNull(1) ?: Team("right", "TBD")
+    LaunchedEffect(series.id, series.state, series.score.size, series.games.size) {
+        if (series.state == "completed" && (series.score.isEmpty() || series.games.isEmpty())) onVisible()
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -360,7 +373,7 @@ private fun TeamRow(team: Team, score: Int?, state: String, accent: Color) {
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            if (state == "scheduled" || state == "unknown") "–" else (score ?: 0).toString(),
+            if (state in setOf("scheduled", "unknown") || score == null) "–" else score.toString(),
             color = ArenaText,
             fontSize = 22.sp,
             fontWeight = FontWeight.Black
@@ -455,7 +468,7 @@ private fun MatchDetailScreen(
     onGame: (SeriesGame) -> Unit,
     onRetry: () -> Unit
 ) {
-    val series = detail.snapshot?.series ?: detail.series
+    val series = detail.series
     Column(Modifier.fillMaxSize()) {
         DetailHeader(series, onBack)
         LazyColumn(
@@ -520,6 +533,8 @@ private fun DetailHeader(series: Series, onBack: () -> Unit) {
 private fun SeriesHero(series: Series) {
     val left = series.teams.getOrNull(0) ?: Team("left", "TBD")
     val right = series.teams.getOrNull(1) ?: Team("right", "TBD")
+    val leftScore = series.score[left.id]?.toString() ?: "–"
+    val rightScore = series.score[right.id]?.toString() ?: "–"
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -539,7 +554,7 @@ private fun SeriesHero(series: Series) {
                 HeroTeam(left, ArenaCyan, Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(84.dp)) {
                     Text(
-                        "${series.score[left.id] ?: 0}  :  ${series.score[right.id] ?: 0}",
+                        "$leftScore  :  $rightScore",
                         color = ArenaText,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Black
@@ -771,6 +786,8 @@ private fun StandingsBoard(standings: List<Standing>) {
             standings.take(8).forEach { standing ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(standing.rank?.toString() ?: "–", Modifier.width(25.dp), color = ArenaMuted, fontSize = 11.sp)
+                    TeamAvatar(standing.team, ArenaCyan, 26.dp)
+                    Spacer(Modifier.width(9.dp))
                     Text(standing.team.name, Modifier.weight(1f), color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     Text("${standing.wins ?: "–"}–${standing.losses ?: "–"}", color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
@@ -801,6 +818,7 @@ private fun SectionTitle(value: String) {
 
 @Composable
 private fun TeamAvatar(team: Team, accent: Color, size: androidx.compose.ui.unit.Dp) {
+    val context = LocalContext.current
     Box(
         modifier = Modifier
             .size(size)
@@ -815,6 +833,20 @@ private fun TeamAvatar(team: Team, accent: Color, size: androidx.compose.ui.unit
             fontSize = (size.value * 0.30f).sp,
             fontWeight = FontWeight.Black
         )
+        team.imageUrl?.let { imageUrl ->
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .memoryCacheKey("arena-team:$imageUrl")
+                    .diskCacheKey("arena-team:$imageUrl")
+                    .crossfade(true)
+                    .build(),
+                imageLoader = ArenaImageLoader.get(context),
+                contentDescription = "${team.name} logo",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(size * 0.12f)
+            )
+        }
     }
 }
 

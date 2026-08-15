@@ -4,12 +4,14 @@ import android.app.Application
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import java.time.Instant
 import java.util.concurrent.Executors
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -21,6 +23,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private val main = Handler(Looper.getMainLooper())
     private val preferences = application.getSharedPreferences("arena_feed", Context.MODE_PRIVATE)
     private val loadingSchedule = AtomicBoolean(false)
+    private val enrichingSeries = ConcurrentHashMap.newKeySet<String>()
     private var snapshotPoll: ScheduledFuture<*>? = null
 
     var uiState by mutableStateOf(ArenaUiState())
@@ -49,10 +52,14 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val active = api.fetchSchedule("live,paused,scheduled,unknown")
                 val completed = api.fetchSchedule("completed")
-                val events = mergeEvents(active.value, completed.value)
+                val cachedCompleted = preferences.getString("completed", null)
+                    ?.let { runCatching { api.parseSchedule(it) }.getOrDefault(emptyList()) }
+                    .orEmpty()
+                val recentResults = retainRecentResults(cachedCompleted, completed.value)
+                val events = mergeEvents(active.value, recentResults)
                 preferences.edit()
                     .putString("active", active.raw)
-                    .putString("completed", completed.raw)
+                    .putString("completed", api.serializeSchedule(recentResults))
                     .putLong("savedAt", System.currentTimeMillis())
                     .apply()
                 post {
@@ -63,6 +70,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                         lastUpdatedAt = System.currentTimeMillis()
                     )
                 }
+                recentResults.take(12).forEach(::warmCompletedSeries)
             } catch (error: Exception) {
                 post {
                     val hasCache = uiState.events.isNotEmpty()
@@ -106,6 +114,40 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         loadDetail(detail.series, game)
     }
 
+    fun warmCompletedSeries(series: Series) {
+        if (series.state != "completed" || (series.score.isNotEmpty() && series.games.isNotEmpty())) return
+        if (!enrichingSeries.add(series.id)) return
+        worker.execute {
+            try {
+                val context = api.fetchContext(series.id)
+                val enriched = enrichSeries(series, context)
+                post {
+                    val updatedEvents = uiState.events.map { event ->
+                        if (event.series.id == series.id) event.copy(series = mergeSeries(event.series, enriched)) else event
+                    }
+                    val currentDetail = uiState.detail
+                    val updatedDetail = if (currentDetail?.series?.id == series.id) {
+                        val detailSeries = mergeSeries(currentDetail.series, enriched)
+                        currentDetail.copy(
+                            series = detailSeries,
+                            context = currentDetail.context ?: context,
+                            selectedGameId = currentDetail.selectedGameId ?: preferredGame(detailSeries.games)?.id
+                        )
+                    } else currentDetail
+                    uiState = uiState.copy(events = updatedEvents, detail = updatedDetail)
+                    persistCompletedResults(updatedEvents)
+                    val left = enriched.teams.getOrNull(0)?.let { enriched.score[it.id] } ?: 0
+                    val right = enriched.teams.getOrNull(1)?.let { enriched.score[it.id] } ?: 0
+                    Log.i("ARENA", "ARENA_RESULT_ENRICHED id=${series.id} score=$left-$right")
+                    enrichingSeries.remove(series.id)
+                }
+            } catch (error: Exception) {
+                Log.w("ARENA", "Could not enrich completed series ${series.id}", error)
+                enrichingSeries.remove(series.id)
+            }
+        }
+    }
+
     private fun loadDetail(series: Series, game: SeriesGame?) {
         worker.execute {
             var context: SeriesContext? = null
@@ -116,27 +158,36 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                 contextError = error
             }
 
-            if (game == null) {
-                val loadedContext = context
-                post {
-                    val current = uiState.detail?.takeIf { it.series.id == series.id } ?: return@post
-                    uiState = uiState.copy(
-                        detail = current.copy(
-                            loading = false,
-                            context = loadedContext,
-                            error = contextError?.let(::friendlyError)
-                        )
-                    )
+            val enrichedSeries = context?.let { enrichSeries(series, it) } ?: series
+            val resolvedGame = game?.let { selected ->
+                enrichedSeries.games.firstOrNull { it.id == selected.id } ?: selected
+            } ?: preferredGame(enrichedSeries.games)
+            val loadedContext = context
+            post {
+                val current = uiState.detail?.takeIf { it.series.id == series.id } ?: return@post
+                val updatedEvents = uiState.events.map { event ->
+                    if (event.series.id == series.id) event.copy(series = mergeSeries(event.series, enrichedSeries)) else event
                 }
-                return@execute
+                uiState = uiState.copy(
+                    events = updatedEvents,
+                    detail = current.copy(
+                        series = enrichedSeries,
+                        selectedGameId = resolvedGame?.id,
+                        loading = resolvedGame != null,
+                        context = loadedContext,
+                        error = if (resolvedGame == null) contextError?.let(::friendlyError) else null
+                    )
+                )
+                if (enrichedSeries.state == "completed") persistCompletedResults(updatedEvents)
             }
 
+            if (resolvedGame == null) return@execute
+
             try {
-                val snapshot = api.fetchSnapshot(game.id)
-                val loadedContext = context
+                val snapshot = api.fetchSnapshot(resolvedGame.id)
                 post {
                     val current = uiState.detail?.takeIf {
-                        it.series.id == series.id && it.selectedGameId == game.id
+                        it.series.id == series.id && it.selectedGameId == resolvedGame.id
                     } ?: return@post
                     uiState = uiState.copy(
                         detail = current.copy(
@@ -148,7 +199,6 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             } catch (error: Exception) {
-                val loadedContext = context
                 post {
                     val current = uiState.detail?.takeIf { it.series.id == series.id } ?: return@post
                     uiState = uiState.copy(
@@ -160,7 +210,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
-            startSnapshotPolling(series, game)
+            startSnapshotPolling(enrichedSeries, resolvedGame)
         }
     }
 
@@ -188,7 +238,11 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startSnapshotPolling(series: Series, game: SeriesGame) {
         snapshotPoll?.cancel(false)
-        val seconds = if (game.state in setOf("live", "paused", "draft")) 5L else 20L
+        if (game.state !in setOf("live", "paused", "draft")) {
+            snapshotPoll = null
+            return
+        }
+        val seconds = 5L
         snapshotPoll = scheduler.scheduleWithFixedDelay(
             { loadSnapshot(series, game, schedulePolling = false) },
             seconds,
@@ -204,7 +258,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val events = mergeEvents(
                 active?.let(api::parseSchedule).orEmpty(),
-                completed?.let(api::parseSchedule).orEmpty()
+                retainRecentResults(completed?.let(api::parseSchedule).orEmpty())
             )
             if (events.isNotEmpty()) {
                 uiState = uiState.copy(
@@ -213,6 +267,10 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                     statusMessage = "Updating saved matches",
                     lastUpdatedAt = preferences.getLong("savedAt", 0L).takeIf { it > 0 }
                 )
+                events.asSequence()
+                    .filter { it.series.state == "completed" }
+                    .take(12)
+                    .forEach { warmCompletedSeries(it.series) }
             }
         } catch (_: Exception) {
             preferences.edit().clear().apply()
@@ -220,9 +278,16 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun mergeEvents(first: List<ScheduleEvent>, second: List<ScheduleEvent>): List<ScheduleEvent> {
-        val unique = (first + second).associateBy { it.series.id }.values
+        val unique = linkedMapOf<String, ScheduleEvent>()
+        (first + second).forEach { event ->
+            val previous = unique[event.series.id]
+            unique[event.series.id] = if (previous == null) event else event.copy(
+                series = mergeSeries(previous.series, event.series),
+                observedAt = event.observedAt.ifBlank { previous.observedAt }
+            )
+        }
         val now = Instant.now()
-        return unique.sortedWith(
+        return unique.values.sortedWith(
             compareBy<ScheduleEvent> { event ->
                 when (event.series.state) {
                     "live", "paused" -> 0
@@ -235,6 +300,46 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             }
         )
     }
+
+    private fun retainRecentResults(vararg sources: List<ScheduleEvent>): List<ScheduleEvent> {
+        val cutoff = Instant.now().minusSeconds(RESULT_CACHE_DAYS * 86_400L)
+        val merged = sources.fold(emptyList<ScheduleEvent>()) { acc, source -> mergeEvents(acc, source) }
+        return merged.asSequence()
+            .filter { it.series.state == "completed" }
+            .filter { event ->
+                runCatching { Instant.parse(event.series.scheduledStart) }.getOrNull()?.isAfter(cutoff) == true
+            }
+            .take(RESULT_CACHE_LIMIT)
+            .toList()
+    }
+
+    private fun persistCompletedResults(events: List<ScheduleEvent>) {
+        val recent = retainRecentResults(events.filter { it.series.state == "completed" })
+        preferences.edit()
+            .putString("completed", api.serializeSchedule(recent))
+            .putLong("savedAt", System.currentTimeMillis())
+            .apply()
+    }
+
+    private fun enrichSeries(series: Series, context: SeriesContext): Series {
+        val history = context.history ?: return series
+        val meaningfulGames = history.games.filter { game ->
+            game.id.isNotBlank() && game.state !in setOf("unknown", "unstarted")
+        }
+        return series.copy(
+            score = history.score.ifEmpty { series.score },
+            games = meaningfulGames.ifEmpty { series.games }
+        )
+    }
+
+    private fun mergeSeries(previous: Series, incoming: Series): Series = incoming.copy(
+        teams = incoming.teams.map { team ->
+            val old = previous.teams.firstOrNull { it.id == team.id }
+            team.copy(imageUrl = team.imageUrl ?: old?.imageUrl)
+        }.ifEmpty { previous.teams },
+        games = incoming.games.ifEmpty { previous.games },
+        score = incoming.score.ifEmpty { previous.score }
+    )
 
     private fun preferredGame(games: List<SeriesGame>): SeriesGame? =
         games.firstOrNull { it.state in setOf("live", "paused", "draft") }
@@ -254,5 +359,10 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         scheduler.shutdownNow()
         worker.shutdownNow()
         super.onCleared()
+    }
+
+    private companion object {
+        const val RESULT_CACHE_DAYS = 14L
+        const val RESULT_CACHE_LIMIT = 150
     }
 }

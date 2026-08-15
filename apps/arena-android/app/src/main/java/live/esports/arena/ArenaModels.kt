@@ -104,9 +104,15 @@ data class Roster(
     val players: List<PlayerState>
 )
 
+data class SeriesHistory(
+    val score: Map<String, Int>,
+    val games: List<SeriesGame>
+)
+
 data class SeriesContext(
     val standings: List<Standing>,
     val rosters: List<Roster>,
+    val history: SeriesHistory?,
     val complete: Boolean
 )
 

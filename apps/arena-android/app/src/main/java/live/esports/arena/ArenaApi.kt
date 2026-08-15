@@ -20,6 +20,11 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
         return root.optJSONArray("events").objects().map(::parseScheduleEvent)
     }
 
+    fun serializeSchedule(events: List<ScheduleEvent>): String = JSONObject()
+        .put("esport", "lol")
+        .put("events", JSONArray().apply { events.forEach { put(scheduleEventJson(it)) } })
+        .toString()
+
     fun fetchContext(seriesId: String): SeriesContext {
         return parseContext(get("/v1/lol/series/${encodePath(seriesId)}/context"))
     }
@@ -44,7 +49,15 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
                 players = item.optJSONArray("players").objects().map(::parseRosterPlayer)
             )
         }
-        return SeriesContext(standings, rosters, root.optBoolean("complete", false))
+        val history = root.optJSONObject("history")?.let { item ->
+            SeriesHistory(
+                score = item.optJSONArray("score").objects().associate { score ->
+                    score.getJSONObject("team").optString("id") to score.optInt("wins", 0)
+                },
+                games = item.optJSONArray("games").objects().map(::parseGame)
+            )
+        }
+        return SeriesContext(standings, rosters, history, root.optBoolean("complete", false))
     }
 
     fun parseSnapshot(raw: String): LiveSnapshot {
@@ -120,7 +133,7 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
         id = json.optString("id"),
         name = json.optString("name", "TBD"),
         code = json.stringOrNull("code"),
-        imageUrl = json.stringOrNull("imageUrl")
+        imageUrl = json.stringOrNull("imageUrl")?.replaceFirst("http://", "https://")
     )
 
     private fun parseGame(json: JSONObject) = SeriesGame(
@@ -180,6 +193,40 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
         creepScore = null,
         totalGold = null
     )
+
+    private fun scheduleEventJson(event: ScheduleEvent) = JSONObject()
+        .put("series", seriesJson(event.series))
+        .put("observedAt", event.observedAt)
+
+    private fun seriesJson(series: Series) = JSONObject()
+        .put("id", series.id)
+        .put("esport", "lol")
+        .put("competition", JSONObject()
+            .put("id", series.competition.id)
+            .put("name", series.competition.name)
+            .put("region", series.competition.region)
+            .put("stage", series.competition.stage))
+        .put("teams", JSONArray().apply { series.teams.forEach { put(teamJson(it)) } })
+        .put("bestOf", series.bestOf)
+        .put("state", series.state)
+        .put("scheduledStart", series.scheduledStart)
+        .put("games", JSONArray().apply {
+            series.games.forEach { game ->
+                put(JSONObject().put("id", game.id).put("number", game.number).put("state", game.state))
+            }
+        })
+        .put("score", JSONArray().apply {
+            series.score.forEach { (teamId, wins) ->
+                val team = series.teams.firstOrNull { it.id == teamId } ?: Team(teamId, teamId)
+                put(JSONObject().put("team", teamJson(team)).put("wins", wins))
+            }
+        })
+
+    private fun teamJson(team: Team) = JSONObject()
+        .put("id", team.id)
+        .put("name", team.name)
+        .put("code", team.code)
+        .put("imageUrl", team.imageUrl)
 
     private fun encodePath(value: String): String = java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
 }

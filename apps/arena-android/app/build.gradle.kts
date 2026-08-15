@@ -18,7 +18,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = env("ARENA_ANDROID_VERSION_CODE")?.toIntOrNull() ?: 46
-        versionName = env("ARENA_ANDROID_VERSION_NAME") ?: "0.3.0"
+        versionName = env("ARENA_ANDROID_VERSION_NAME") ?: "0.3.1"
 
         buildConfigField(
             "String",
@@ -102,6 +102,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-svg:2.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 

@@ -28,6 +28,22 @@ if [[ "$ready" != "true" ]]; then
   exit 1
 fi
 
+result_ready=false
+for attempt in {1..30}; do
+  if adb logcat -d -s ARENA:I '*:S' \
+    | grep -Eq 'ARENA_RESULT_ENRICHED.*score=([1-9][0-9]*-[0-9]+|[0-9]+-[1-9][0-9]*)'; then
+    result_ready=true
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$result_ready" != "true" ]]; then
+  echo "Completed LoL results were not enriched with a final score."
+  adb logcat -d > "$artifact_dir/android-smoke-logcat.txt"
+  exit 1
+fi
+
 adb shell uiautomator dump --compressed /sdcard/arena-window.xml
 adb pull /sdcard/arena-window.xml "$artifact_dir/android-smoke-window.xml"
 grep -Eq 'ARENA_NATIVE_UI_READY|text="ARENA"' "$artifact_dir/android-smoke-window.xml"
@@ -45,4 +61,4 @@ if grep -E 'FATAL EXCEPTION|ANR in live\.esports\.arena' "$artifact_dir/android-
   exit 1
 fi
 
-echo "Native ARENA UI rendered and remained responsive."
+echo "Native ARENA UI rendered, loaded a final score, and remained responsive."

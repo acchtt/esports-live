@@ -57,7 +57,8 @@ data class PlayerState(
     val deaths: Int?,
     val assists: Int?,
     val creepScore: Int?,
-    val totalGold: Int?
+    val totalGold: Int?,
+    val items: List<String> = emptyList()
 )
 
 data class TeamState(

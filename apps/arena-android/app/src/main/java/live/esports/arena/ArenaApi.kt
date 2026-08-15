@@ -5,6 +5,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.Instant
 
 data class ApiPayload<T>(val value: T, val raw: String)
 
@@ -100,10 +101,13 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
         }
     }
 
-    private fun parseScheduleEvent(json: JSONObject) = ScheduleEvent(
-        series = parseSeries(json.getJSONObject("series")),
-        observedAt = json.optString("observedAt", "")
-    )
+    private fun parseScheduleEvent(json: JSONObject): ScheduleEvent {
+        val parsed = parseSeries(json.getJSONObject("series"))
+        return ScheduleEvent(
+            series = normalizeFalseFinal(parsed),
+            observedAt = json.optString("observedAt", "")
+        )
+    }
 
     private fun parseSeries(json: JSONObject): Series {
         val teams = json.optJSONArray("teams").objects().map(::parseTeam)
@@ -178,7 +182,8 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
         deaths = json.intOrNull("deaths"),
         assists = json.intOrNull("assists"),
         creepScore = json.intOrNull("creepScore"),
-        totalGold = json.intOrNull("totalGold")
+        totalGold = json.intOrNull("totalGold"),
+        items = json.optJSONArray("items")?.strings().orEmpty()
     )
 
     private fun parseRosterPlayer(json: JSONObject) = PlayerState(
@@ -191,8 +196,34 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
         deaths = null,
         assists = null,
         creepScore = null,
-        totalGold = null
+        totalGold = null,
+        items = emptyList()
     )
+
+    private fun normalizeFalseFinal(series: Series, now: Instant = Instant.now()): Series {
+        if (series.state != "completed") return series
+        val scheduled = runCatching { Instant.parse(series.scheduledStart) }.getOrNull() ?: return series
+        val winsRequired = (series.bestOf.coerceAtLeast(1) / 2) + 1
+        val decisiveScore = series.score.values.maxOrNull()?.let { it >= winsRequired } == true
+        val completedGames = series.games.count { it.state == "completed" }
+        val decisiveGames = completedGames >= winsRequired
+        val future = scheduled.isAfter(now.plusSeconds(FUTURE_FINAL_TOLERANCE_SECONDS))
+        val recentLplWithoutEvidence = isLpl(series) && scheduled.isAfter(now.minusSeconds(LPL_FALSE_FINAL_WINDOW_SECONDS))
+            && (!decisiveScore || !decisiveGames)
+        if (!future && !recentLplWithoutEvidence) return series
+        return series.copy(
+            state = "scheduled",
+            games = series.games.map { it.copy(state = "unstarted") },
+            score = emptyMap()
+        )
+    }
+
+    private fun isLpl(series: Series): Boolean {
+        val searchable = "${series.competition.id} ${series.competition.name}".lowercase()
+        return series.competition.id == "98767991314006698"
+            || Regex("(^|[^a-z])lpl([^a-z]|$)").containsMatchIn(searchable)
+            || searchable.contains("league of legends pro league")
+    }
 
     private fun scheduleEventJson(event: ScheduleEvent) = JSONObject()
         .put("series", seriesJson(event.series))
@@ -229,6 +260,11 @@ class ArenaApi(private val baseUrl: String = BuildConfig.API_BASE_URL.trimEnd('/
         .put("imageUrl", team.imageUrl)
 
     private fun encodePath(value: String): String = java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
+
+    private companion object {
+        const val FUTURE_FINAL_TOLERANCE_SECONDS = 5L * 60L
+        const val LPL_FALSE_FINAL_WINDOW_SECONDS = 12L * 60L * 60L
+    }
 }
 
 private fun JSONArray?.objects(): List<JSONObject> {

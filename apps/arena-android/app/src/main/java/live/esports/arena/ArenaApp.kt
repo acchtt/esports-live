@@ -309,7 +309,7 @@ private fun MatchCard(series: Series, onClick: () -> Unit, onVisible: () -> Unit
     val left = series.teams.getOrNull(0) ?: Team("left", "TBD")
     val right = series.teams.getOrNull(1) ?: Team("right", "TBD")
     LaunchedEffect(series.id, series.state, series.score.size, series.games.size) {
-        if (series.state == "completed" && (series.score.isEmpty() || series.games.isEmpty())) onVisible()
+        onVisible()
     }
     Surface(
         modifier = Modifier
@@ -476,9 +476,8 @@ private fun MatchDetailScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 26.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item { SeriesHero(series) }
             if (series.games.isNotEmpty()) {
-                item { GameSelector(series.games, detail.selectedGameId, onGame) }
+                item { V3GameSelector(series.games, detail.selectedGameId, onGame) }
             }
             if (detail.loading && detail.snapshot == null) {
                 item { DetailLoading() }
@@ -487,17 +486,11 @@ private fun MatchDetailScreen(
                 item { DetailError(message, onRetry) }
             }
             detail.snapshot?.let { snapshot ->
-                item { SnapshotFreshness(snapshot.quality) }
                 snapshot.stats?.let { stats ->
-                    item { LiveScoreboard(snapshot, stats) }
-                    item { ObjectiveBoard(stats) }
-                    if (stats.blue.players.isNotEmpty() || stats.red.players.isNotEmpty()) {
-                        item { PlayerBoard(stats.blue) }
-                        item { PlayerBoard(stats.red) }
-                    }
+                    item { V3Scoreboard(series, snapshot, stats) }
                 } ?: item { WaitingForTelemetry(snapshot.game.state) }
             }
-            detail.context?.standings?.takeIf { it.isNotEmpty() }?.let { standings ->
+            if (detail.snapshot?.stats == null) detail.context?.standings?.takeIf { it.isNotEmpty() }?.let { standings ->
                 item { StandingsBoard(standings) }
             }
             item { Spacer(Modifier.navigationBarsPadding()) }
@@ -514,18 +507,30 @@ private fun DetailHeader(series: Series, onBack: () -> Unit) {
         IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ArenaText)
         }
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
             Text(
-                series.competition.name,
-                color = ArenaText,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
+                series.competition.name.uppercase(Locale.ROOT),
+                color = ArenaCyan,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text("LEAGUE OF LEGENDS", color = ArenaCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+            Text(
+                "${series.teams.getOrNull(0)?.name ?: "TBD"} vs ${series.teams.getOrNull(1)?.name ?: "TBD"}",
+                color = ArenaText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                listOfNotNull(series.competition.stage, formatMatchTime(series.scheduledStart)).joinToString(" · "),
+                color = ArenaMuted,
+                fontSize = 10.sp,
+                maxLines = 1
+            )
         }
-        MatchStatusPill(series)
     }
 }
 

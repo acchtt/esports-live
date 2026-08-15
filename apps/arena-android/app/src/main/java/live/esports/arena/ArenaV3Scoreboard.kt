@@ -216,8 +216,8 @@ private fun V3TeamSide(team: Team, state: TeamState, accent: Color, modifier: Mo
 @Composable
 private fun V3Objectives(stats: LolStats) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         V3Objective("♜", "TOWERS", stats.blue.objectives.towers, stats.red.objectives.towers, ArenaCyan, Modifier.weight(1f))
         V3Objective("✦", "DRAGONS", stats.blue.objectives.dragons?.size, stats.red.objectives.dragons?.size, V3Lime, Modifier.weight(1f))
@@ -233,8 +233,9 @@ private fun V3Objective(icon: String, label: String, blue: Int?, red: Int?, icon
             .clip(RoundedCornerShape(10.dp))
             .background(ArenaSurface.copy(alpha = 0.82f))
             .border(1.dp, ArenaLine.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
-            .padding(vertical = 4.dp, horizontal = 1.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(vertical = 6.dp, horizontal = 1.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
         Text(icon, color = iconColor, fontSize = 14.sp, fontWeight = FontWeight.Black)
         Text(label, color = ArenaMuted, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1)
@@ -254,11 +255,11 @@ private fun V3PlayerPair(pair: V3PlayerPair, patch: String?) {
     val redGold = pair.red?.totalGold
     val difference = if (blueGold != null && redGold != null) blueGold - redGold else null
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         V3PlayerSide(pair.blue, ArenaCyan, false, patch, Modifier.weight(1f))
-        Column(Modifier.width(50.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(46.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 when {
                     difference == null -> "—"
@@ -286,9 +287,13 @@ private fun V3PlayerSide(player: PlayerState?, accent: Color, reversed: Boolean,
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (!reversed) {
                 V3ChampionPortrait(player, accent, patch)
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(6.dp))
             }
-            Column(Modifier.weight(1f), horizontalAlignment = if (reversed) Alignment.End else Alignment.Start) {
+            Column(
+                Modifier.weight(1f),
+                horizontalAlignment = if (reversed) Alignment.End else Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
                 Text(
                     player?.handle ?: "Player",
                     color = ArenaText,
@@ -316,7 +321,7 @@ private fun V3PlayerSide(player: PlayerState?, accent: Color, reversed: Boolean,
                 )
             }
             if (reversed) {
-                Spacer(Modifier.width(5.dp))
+                Spacer(Modifier.width(6.dp))
                 V3ChampionPortrait(player, accent, patch)
             }
         }
@@ -332,7 +337,7 @@ private fun V3ChampionPortrait(player: PlayerState?, accent: Color, patch: Strin
     val source = if (url != null && url == loadingUrl && loadingUrl != squareUrl) "loading" else "square"
     Box(
         Modifier
-            .size(34.dp)
+            .size(38.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(accent.copy(alpha = 0.12f))
             .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(8.dp)),

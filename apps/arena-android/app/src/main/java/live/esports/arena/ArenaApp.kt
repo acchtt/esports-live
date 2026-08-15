@@ -51,10 +51,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -168,33 +166,27 @@ private fun ArenaHeader(status: FeedStatus, message: String, onRefresh: () -> Un
             .padding(start = 18.dp, top = 14.dp, end = 8.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ArenaMark(38.dp)
-        Spacer(Modifier.width(11.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                "ARENA",
-                color = ArenaText,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.8.sp
+        ArenaMark(58.dp)
+        Spacer(Modifier.width(12.dp))
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .background(statusColor(status), CircleShape)
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(6.dp)
-                        .background(statusColor(status), CircleShape)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    message.uppercase(Locale.ROOT),
-                    color = ArenaMuted,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.7.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Spacer(Modifier.width(6.dp))
+            Text(
+                message.uppercase(Locale.ROOT),
+                color = ArenaMuted,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.7.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
         Surface(
             shape = RoundedCornerShape(20.dp),
@@ -876,7 +868,6 @@ private fun ArenaMark(size: androidx.compose.ui.unit.Dp) {
         }
         drawPath(cyan, ArenaCyan)
         drawPath(red, ArenaRed)
-        drawLine(ArenaText, Offset(width * .42f, height * .74f), Offset(width * .68f, height * .83f), strokeWidth = width * .06f, cap = StrokeCap.Round)
     }
 }
 

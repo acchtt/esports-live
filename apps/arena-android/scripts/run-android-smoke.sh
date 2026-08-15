@@ -50,12 +50,33 @@ if ! adb logcat -d -s ARENA:I '*:S' | grep -Fq 'ARENA_SCHEDULE_STATE_SAFE future
   exit 1
 fi
 
+dump_ui_tree() {
+  local remote_path="$1"
+  local local_path="$2"
+  local max_attempts="${3:-30}"
+  local attempt
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    rm -f "$local_path"
+    adb shell rm -f "$remote_path" >/dev/null 2>&1 || true
+    if adb shell uiautomator dump --compressed "$remote_path" >/dev/null 2>&1 \
+      && adb pull "$remote_path" "$local_path" >/dev/null 2>&1 \
+      && [[ -s "$local_path" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 tap_text() {
   local label="$1"
-  adb shell uiautomator dump --compressed /sdcard/arena-tap.xml >/dev/null
-  adb pull /sdcard/arena-tap.xml "$artifact_dir/android-smoke-tap.xml" >/dev/null
+  local remote_path="/sdcard/arena-tap.xml"
+  local local_path="$artifact_dir/android-smoke-tap.xml"
   local coordinates
-  coordinates="$(LABEL="$label" XML_PATH="$artifact_dir/android-smoke-tap.xml" node <<'NODE'
+  local attempt
+  for attempt in {1..20}; do
+    if dump_ui_tree "$remote_path" "$local_path" 3; then
+      coordinates="$(LABEL="$label" XML_PATH="$local_path" node <<'NODE' || true
   const fs = require('node:fs');
   const xml = fs.readFileSync(process.env.XML_PATH, 'utf8');
   const label = process.env.LABEL;
@@ -69,8 +90,16 @@ tap_text() {
   process.stdout.write(`${Math.floor((Number(bounds[1]) + Number(bounds[3])) / 2)} ${Math.floor((Number(bounds[2]) + Number(bounds[4])) / 2)}`);
 NODE
 )"
-  test -n "$coordinates"
-  adb shell input tap $coordinates
+      if [[ -n "$coordinates" ]]; then
+        adb shell input tap $coordinates
+        return 0
+      fi
+    fi
+    sleep 1
+  done
+  echo "Unable to find tappable UI label: $label"
+  adb logcat -d > "$artifact_dir/android-smoke-logcat.txt"
+  return 1
 }
 
 tap_text "Results"
@@ -92,8 +121,11 @@ if [[ "$scoreboard_ready" != "true" ]]; then
   exit 1
 fi
 
-adb shell uiautomator dump --compressed /sdcard/arena-window.xml
-adb pull /sdcard/arena-window.xml "$artifact_dir/android-smoke-window.xml"
+if ! dump_ui_tree /sdcard/arena-window.xml "$artifact_dir/android-smoke-window.xml" 30; then
+  echo "Android never produced a usable UIAutomator tree for the rendered scoreboard."
+  adb logcat -d > "$artifact_dir/android-smoke-logcat.txt"
+  exit 1
+fi
 grep -Eq 'ARENA_NATIVE_UI_READY|text="ARENA"' "$artifact_dir/android-smoke-window.xml"
 
 adb exec-out screencap -p > "$artifact_dir/android-smoke-native-ui.png"

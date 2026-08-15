@@ -36,7 +36,7 @@ adb exec-out screencap -p > "$artifact_dir/android-smoke-native-ui.png"
 test "$(stat -c '%s' "$artifact_dir/android-smoke-native-ui.png")" -gt 10000
 
 adb shell dumpsys activity activities > "$artifact_dir/android-smoke-activities.txt"
-grep -Fq 'mResumedActivity: ActivityRecord' "$artifact_dir/android-smoke-activities.txt"
+grep -Eq 'topResumedActivity=ActivityRecord|ResumedActivity: ActivityRecord' "$artifact_dir/android-smoke-activities.txt"
 grep -Fq 'live.esports.arena/.MainActivity' "$artifact_dir/android-smoke-activities.txt"
 
 adb logcat -d > "$artifact_dir/android-smoke-logcat.txt"

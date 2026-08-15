@@ -121,6 +121,22 @@ if [[ "$scoreboard_ready" != "true" ]]; then
   exit 1
 fi
 
+if adb logcat -d -s ARENA:I '*:S' | grep -Eq 'ARENA_V3_SCOREBOARD_READY.*players=[1-9]'; then
+  portrait_ready=false
+  for attempt in {1..20}; do
+    if adb logcat -d -s ARENA:I '*:S' | grep -Fq 'ARENA_CHAMPION_PORTRAIT_READY'; then
+      portrait_ready=true
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$portrait_ready" != "true" ]]; then
+    echo "Player telemetry rendered but no champion portrait image loaded."
+    adb logcat -d > "$artifact_dir/android-smoke-logcat.txt"
+    exit 1
+  fi
+fi
+
 if ! dump_ui_tree /sdcard/arena-window.xml "$artifact_dir/android-smoke-window.xml" 30; then
   echo "Android never produced a usable UIAutomator tree for the rendered scoreboard."
   adb logcat -d > "$artifact_dir/android-smoke-logcat.txt"
@@ -141,4 +157,4 @@ if grep -E 'FATAL EXCEPTION|ANR in live\.esports\.arena' "$artifact_dir/android-
   exit 1
 fi
 
-echo "Native ARENA UI rendered, rejected future finals, and opened the v3 scoreboard."
+echo "Native ARENA UI rendered, rejected future finals, loaded champion portraits, and opened the v3 scoreboard."

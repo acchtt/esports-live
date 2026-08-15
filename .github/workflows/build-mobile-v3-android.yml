@@ -21,7 +21,7 @@ permissions:
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   ARENA_ANDROID_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
-  ARENA_ANDROID_VERSION_NAME: 0.3.2
+  ARENA_ANDROID_VERSION_NAME: 0.3.3
   ARENA_ANDROID_VERSION_CODE: ${{ github.run_number }}
   ARENA_ANDROID_EXPECTED_SIGNER_SHA256: 0c1eef0be39008076ed3d5549412690eb58d143f91e6fe57f9d525a28faaa37c
 
@@ -218,7 +218,7 @@ jobs:
             sha256: process.env.APK_SHA,
             signerSha256: process.env.ARENA_ANDROID_SIGNER_SHA256,
             sizeBytes: Number(process.env.APK_SIZE),
-            releaseNotes: 'ARENA 0.3.2 rejects false LPL finals without decisive evidence and ports the current v3 paired-player scoreboard to the native app.',
+            releaseNotes: 'ARENA 0.3.3 tightens Match Center spacing, hides item rows, and switches champion portraits to square Data Dragon icons.',
             publishedAt: process.env.PUBLISHED_AT,
             commit: process.env.MOBILE_V3_COMMIT_SHA
           };
@@ -232,7 +232,7 @@ jobs:
         run: |
           tag="arena-v3-android-latest"
           title="ARENA Android ${ARENA_ANDROID_VERSION_NAME} · Native rebuild"
-          notes="Native phone-first ARENA client for League of Legends. False LPL finals are rejected without decisive game evidence, and Match Center now uses the current v3 paired-player scoreboard. Signed with the established ARENA key for compatible in-place updates."
+          notes="Native phone-first ARENA client for League of Legends. Match Center is denser, item rows are hidden for now, and champion portraits now use square Data Dragon icons. Signed with the established ARENA key for compatible in-place updates."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
           else

@@ -18,7 +18,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = env("ARENA_ANDROID_VERSION_CODE")?.toIntOrNull() ?: 46
-        versionName = env("ARENA_ANDROID_VERSION_NAME") ?: "0.3.2"
+        versionName = env("ARENA_ANDROID_VERSION_NAME") ?: "0.3.3"
 
         buildConfigField(
             "String",

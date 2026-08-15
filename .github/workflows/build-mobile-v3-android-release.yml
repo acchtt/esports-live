@@ -26,7 +26,7 @@ permissions:
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   V3_NATIVE_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
-  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name || '0.3.2' }}
+  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name || '0.3.3' }}
   ARENA_ANDROID_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
   ARENA_ANDROID_RELEASE_KEYSTORE_B64: ${{ secrets.ARENA_ANDROID_RELEASE_KEYSTORE_B64 }}
   ARENA_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ARENA_ANDROID_RELEASE_STORE_PASSWORD }}

@@ -63,7 +63,7 @@ fun V3GameSelector(games: List<SeriesGame>, selectedId: String?, onGame: (Series
                         .background(if (selected) ArenaCyan.copy(alpha = 0.12f) else Color.Transparent)
                         .border(1.dp, if (selected) ArenaCyan.copy(alpha = 0.55f) else Color.Transparent, shape)
                         .clickable { onGame(game) }
-                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("Game ${game.number}", color = ArenaText, fontSize = 12.sp, fontWeight = FontWeight.Black)
@@ -98,7 +98,7 @@ fun V3Scoreboard(series: Series, snapshot: LiveSnapshot, stats: LolStats) {
                 .background(Brush.horizontalGradient(listOf(ArenaCyan, ArenaCyan.copy(alpha = 0.15f), ArenaRed.copy(alpha = 0.15f), ArenaRed)))
         )
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -114,7 +114,7 @@ fun V3Scoreboard(series: Series, snapshot: LiveSnapshot, stats: LolStats) {
         V3TeamBanner(blueTeam, redTeam, stats)
         V3Objectives(stats)
         if (pairs.isEmpty()) {
-            Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("PLAYER STATISTICS PENDING", color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.Black)
                 Text("Champion, KDA, CS and lane gold will appear here.", color = ArenaMuted, fontSize = 10.sp)
             }
@@ -138,7 +138,7 @@ private fun V3Freshness(quality: SnapshotQuality) {
         Modifier
             .fillMaxWidth()
             .background(color.copy(alpha = if (fresh) 0.09f else 0.16f))
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(8.dp).background(color, RoundedCornerShape(4.dp)))
@@ -160,7 +160,7 @@ private fun V3TeamBanner(blueTeam: Team, redTeam: Team, stats: LolStats) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.horizontalGradient(listOf(ArenaCyan.copy(alpha = 0.15f), V3Board, ArenaRed.copy(alpha = 0.15f))))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         V3TeamSide(blueTeam, stats.blue, ArenaCyan, Modifier.weight(1f), Alignment.Start)
@@ -170,7 +170,7 @@ private fun V3TeamBanner(blueTeam: Team, redTeam: Team, stats: LolStats) {
                 .clip(RoundedCornerShape(15.dp))
                 .background(V3BoardDeep.copy(alpha = 0.86f))
                 .border(1.dp, ArenaCyan.copy(alpha = 0.28f), RoundedCornerShape(15.dp))
-                .padding(vertical = 10.dp, horizontal = 3.dp),
+                .padding(vertical = 8.dp, horizontal = 3.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("GOLD LEAD", color = ArenaMuted, fontSize = 8.sp, fontWeight = FontWeight.Black)
@@ -196,8 +196,8 @@ private fun V3TeamBanner(blueTeam: Team, redTeam: Team, stats: LolStats) {
 @Composable
 private fun V3TeamSide(team: Team, state: TeamState, accent: Color, modifier: Modifier, alignment: Alignment.Horizontal) {
     Column(modifier.padding(horizontal = 3.dp), horizontalAlignment = alignment) {
-        V3TeamLogo(team, accent, 30.dp)
-        Spacer(Modifier.height(5.dp))
+        V3TeamLogo(team, accent, 28.dp)
+        Spacer(Modifier.height(3.dp))
         Text(team.name, color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = if (alignment == Alignment.End) TextAlign.End else TextAlign.Start)
         Row(verticalAlignment = Alignment.Bottom) {
             Text("KILLS ", color = ArenaMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
@@ -209,7 +209,7 @@ private fun V3TeamSide(team: Team, state: TeamState, accent: Color, modifier: Mo
 @Composable
 private fun V3Objectives(stats: LolStats) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         V3Objective("♜", "TOWERS", stats.blue.objectives.towers, stats.red.objectives.towers, ArenaCyan, Modifier.weight(1f))
@@ -226,7 +226,7 @@ private fun V3Objective(icon: String, label: String, blue: Int?, red: Int?, icon
             .clip(RoundedCornerShape(11.dp))
             .background(ArenaSurface.copy(alpha = 0.82f))
             .border(1.dp, ArenaLine.copy(alpha = 0.8f), RoundedCornerShape(11.dp))
-            .padding(vertical = 7.dp, horizontal = 2.dp),
+            .padding(vertical = 5.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(icon, color = iconColor, fontSize = 15.sp, fontWeight = FontWeight.Black)
@@ -247,7 +247,7 @@ private fun V3PlayerPair(pair: V3PlayerPair, patch: String?) {
     val redGold = pair.red?.totalGold
     val difference = if (blueGold != null && redGold != null) blueGold - redGold else null
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         V3PlayerSide(pair.blue, ArenaCyan, false, patch, Modifier.weight(1f))
@@ -277,8 +277,8 @@ private fun V3PlayerSide(player: PlayerState?, accent: Color, reversed: Boolean,
     Column(modifier, horizontalAlignment = if (reversed) Alignment.End else Alignment.Start) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (!reversed) {
-                V3ChampionPortrait(player, accent)
-                Spacer(Modifier.width(7.dp))
+                V3ChampionPortrait(player, accent, patch)
+                Spacer(Modifier.width(6.dp))
             }
             Column(Modifier.weight(1f), horizontalAlignment = if (reversed) Alignment.End else Alignment.Start) {
                 Text(player?.handle ?: "Player", color = ArenaText, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -298,30 +298,23 @@ private fun V3PlayerSide(player: PlayerState?, accent: Color, reversed: Boolean,
                 )
             }
             if (reversed) {
-                Spacer(Modifier.width(7.dp))
-                V3ChampionPortrait(player, accent)
-            }
-        }
-        val items = player?.items.orEmpty().take(6)
-        if (items.isNotEmpty()) {
-            Spacer(Modifier.height(5.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                items.forEach { V3ItemIcon(it, patch) }
+                Spacer(Modifier.width(6.dp))
+                V3ChampionPortrait(player, accent, patch)
             }
         }
     }
 }
 
 @Composable
-private fun V3ChampionPortrait(player: PlayerState?, accent: Color) {
+private fun V3ChampionPortrait(player: PlayerState?, accent: Color, patch: String?) {
     val context = LocalContext.current
-    val url = championImageUrl(player?.championId)
+    val url = championImageUrl(player?.championId, patch)
     Box(
         Modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .size(40.dp)
+            .clip(RoundedCornerShape(9.dp))
             .background(accent.copy(alpha = 0.12f))
-            .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(10.dp)),
+            .border(1.dp, accent.copy(alpha = 0.45f), RoundedCornerShape(9.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(player?.championId?.take(2)?.uppercase(Locale.ROOT) ?: "?", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Black)
@@ -329,29 +322,6 @@ private fun V3ChampionPortrait(player: PlayerState?, accent: Color) {
             model = ImageRequest.Builder(context).data(url).diskCacheKey("arena-champion:$url").memoryCacheKey("arena-champion:$url").build(),
             imageLoader = ArenaImageLoader.get(context),
             contentDescription = player?.championId,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-    }
-}
-
-@Composable
-private fun V3ItemIcon(itemId: String, patch: String?) {
-    val context = LocalContext.current
-    val url = itemImageUrl(itemId, patch)
-    Box(
-        Modifier
-            .size(18.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(ArenaSurfaceRaised)
-            .border(1.dp, ArenaLine, RoundedCornerShape(4.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(itemId.takeLast(2), color = ArenaMuted, fontSize = 6.sp)
-        if (url != null) AsyncImage(
-            model = ImageRequest.Builder(context).data(url).diskCacheKey("arena-item:$url").memoryCacheKey("arena-item:$url").build(),
-            imageLoader = ArenaImageLoader.get(context),
-            contentDescription = "Item $itemId",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
@@ -414,9 +384,11 @@ private fun normalizedRole(role: String?): String {
     }
 }
 
-private fun championImageUrl(championId: String?): String? {
+private fun championImageUrl(championId: String?, patch: String?): String? {
     val raw = championId?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    if (raw.all(Char::isDigit)) return "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/$raw.png"
+    if (raw.all(Char::isDigit)) {
+        return "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/$raw.png"
+    }
     val key = raw.replace(Regex("[^A-Za-z0-9]"), "").let { value ->
         when (value) {
             "Wukong" -> "MonkeyKing"
@@ -425,20 +397,18 @@ private fun championImageUrl(championId: String?): String? {
             else -> value
         }
     }
-    return "https://ddragon.leagueoflegends.com/cdn/img/champion/loading/${key}_0.jpg"
+    val version = dataDragonVersion(patch)
+    return "https://ddragon.leagueoflegends.com/cdn/$version/img/champion/$key.png"
 }
 
-private fun itemImageUrl(itemId: String, patch: String?): String? {
-    val id = itemId.filter(Char::isDigit).takeIf { it.isNotBlank() } ?: return null
-    val raw = patch.orEmpty().trim()
-    val parts = raw.split('.').toMutableList()
-    val version = if (parts.size >= 2 && parts[0].toIntOrNull() != null) {
-        val major = parts[0].toInt()
-        if (major >= 25) parts[0] = (major - 10).toString()
-        while (parts.size < 3) parts += "1"
-        parts.take(3).joinToString(".")
-    } else "16.15.1"
-    return "https://ddragon.leagueoflegends.com/cdn/$version/img/item/$id.png"
+private fun dataDragonVersion(patch: String?): String {
+    val parts = patch.orEmpty().trim().split('.').toMutableList()
+    if (parts.size < 2 || parts[0].toIntOrNull() == null || parts[1].toIntOrNull() == null) return "16.15.1"
+    val major = parts[0].toInt()
+    if (major >= 25) parts[0] = (major - 10).toString()
+    while (parts.size < 3) parts += "1"
+    if (parts[2].toIntOrNull() == null) parts[2] = "1"
+    return parts.take(3).joinToString(".")
 }
 
 private fun v3GameState(state: String): String = when (state) {

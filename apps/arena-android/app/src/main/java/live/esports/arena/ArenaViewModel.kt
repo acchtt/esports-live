@@ -70,7 +70,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                         lastUpdatedAt = System.currentTimeMillis()
                     )
                 }
-                recentResults.take(12).forEach(::warmCompletedSeries)
+                recentResults.take(12).forEach { warmCompletedSeries(it.series) }
             } catch (error: Exception) {
                 post {
                     val hasCache = uiState.events.isNotEmpty()

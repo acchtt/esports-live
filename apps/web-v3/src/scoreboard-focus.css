@@ -1,0 +1,104 @@
+@media (max-width: 760px) {
+  html[data-arena-route="match"] .app-main {
+    padding-top: 8px;
+  }
+
+  html[data-arena-route="match"] .match-panel {
+    position: relative;
+  }
+
+  html[data-arena-route="match"] .detail-header {
+    position: absolute;
+    z-index: 24;
+    top: 38px;
+    left: 10px;
+    min-height: 0;
+    margin: 0;
+    pointer-events: none;
+  }
+
+  html[data-arena-route="match"] .detail-header > div {
+    display: none;
+  }
+
+  html[data-arena-route="match"] .detail-header .back-button {
+    width: 28px;
+    height: 28px;
+    border-color: rgba(126, 161, 204, 0.2);
+    border-radius: 9px;
+    background: rgba(5, 13, 24, 0.82);
+    font-size: 0.95rem;
+    pointer-events: auto;
+    backdrop-filter: blur(8px);
+  }
+
+  html[data-arena-route="match"] #game-tabs {
+    position: absolute;
+    z-index: 23;
+    top: 78px;
+    right: 8px;
+    left: 8px;
+    display: none;
+    margin: 0;
+    border-color: rgba(126, 161, 204, 0.28);
+    background: rgba(5, 13, 24, 0.97);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(12px);
+  }
+
+  html[data-arena-route="match"] #game-tabs[data-menu-open="true"]:not([hidden]) {
+    display: grid;
+  }
+
+  html[data-arena-route="match"] .scoreboard-header {
+    padding-left: 48px;
+  }
+
+  html[data-arena-route="match"] #game-label {
+    min-width: 0;
+    border: 0;
+    border-radius: 8px;
+    outline: 0;
+  }
+
+  html[data-arena-route="match"] #game-label.game-selector-trigger {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  html[data-arena-route="match"] #game-label.game-selector-trigger::after {
+    content: "⌄";
+    display: inline-block;
+    margin-left: 5px;
+    color: #70a7cc;
+    font-size: 0.72em;
+    line-height: 1;
+    transform: translateY(-1px);
+  }
+
+  html[data-arena-route="match"] #game-label.game-selector-trigger:focus-visible {
+    box-shadow: 0 0 0 2px rgba(59, 188, 246, 0.42);
+  }
+}
+
+@media (max-width: 400px) {
+  html[data-arena-route="match"] .detail-header {
+    top: 37px;
+    left: 8px;
+  }
+
+  html[data-arena-route="match"] .detail-header .back-button {
+    width: 26px;
+    height: 26px;
+  }
+
+  html[data-arena-route="match"] #game-tabs {
+    top: 74px;
+    right: 6px;
+    left: 6px;
+  }
+
+  html[data-arena-route="match"] .scoreboard-header {
+    padding-left: 44px;
+  }
+}

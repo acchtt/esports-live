@@ -220,12 +220,22 @@ function eventWithContext(event: ScheduleEvent, context: SeriesContext): Schedul
     number: game.number,
     state: game.state
   }));
+  const games = contextGames.length ? contextGames : event.series.games;
+  if (history.score?.length) {
+    return {
+      ...event,
+      series: {
+        ...event.series,
+        score: history.score,
+        games
+      }
+    };
+  }
   return {
     ...event,
     series: {
       ...event.series,
-      score: history.score?.length ? history.score : event.series.score,
-      games: contextGames.length ? contextGames : event.series.games
+      games
     }
   };
 }

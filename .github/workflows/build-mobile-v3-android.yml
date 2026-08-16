@@ -21,7 +21,7 @@ permissions:
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   ARENA_ANDROID_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
-  ARENA_ANDROID_VERSION_NAME: 0.3.4
+  ARENA_ANDROID_VERSION_NAME: 0.3.5
   ARENA_ANDROID_VERSION_CODE: ${{ github.run_number }}
   ARENA_ANDROID_EXPECTED_SIGNER_SHA256: 0c1eef0be39008076ed3d5549412690eb58d143f91e6fe57f9d525a28faaa37c
 
@@ -137,6 +137,9 @@ jobs:
           grep -Fq 'compileSdk = 36' apps/arena-android/app/build.gradle.kts
           grep -Fq 'IN_APP_UPDATE_ENABLED", "true"' apps/arena-android/app/build.gradle.kts
           grep -Fq 'android.permission.REQUEST_INSTALL_PACKAGES' apps/arena-android/app/src/debug/AndroidManifest.xml
+          grep -Fq 'contentKey = { detail -> detail?.series?.id ?: "home" }' apps/arena-android/app/src/main/java/live/esports/arena/ArenaApp.kt
+          grep -Fq 'ARENA_SNAPSHOT_HELD' apps/arena-android/app/src/main/java/live/esports/arena/ArenaViewModel.kt
+          grep -Fq '"unknown competition"' apps/arena-android/app/src/main/java/live/esports/arena/ArenaViewModel.kt
           grep -Fq 'Dota is intentionally not present' apps/arena-android/README.md
           if grep -R -E 'android\.webkit\.WebView|CapacitorActivity|com\.getcapacitor' apps/arena-android/app/src/main; then
             echo "A WebView or Capacitor dependency leaked into the native app."
@@ -224,7 +227,7 @@ jobs:
             sha256: process.env.APK_SHA,
             signerSha256: process.env.ARENA_ANDROID_SIGNER_SHA256,
             sizeBytes: Number(process.env.APK_SIZE),
-            releaseNotes: 'ARENA 0.3.4 adds verified in-app updates for sideload builds while keeping the compact Match Center refinements.',
+            releaseNotes: 'ARENA 0.3.5 stops Match Center refresh flicker and preserves the last good live snapshot across transient partial polls.',
             publishedAt: process.env.PUBLISHED_AT,
             commit: process.env.MOBILE_V3_COMMIT_SHA
           };
@@ -238,7 +241,7 @@ jobs:
         run: |
           tag="arena-v3-android-latest"
           title="ARENA Android ${ARENA_ANDROID_VERSION_NAME} · Native rebuild"
-          notes="Native phone-first ARENA client for League of Legends. Version 0.3.4 adds verified in-app updates for the sideload channel. Every downloaded APK is checked against its published SHA-256, package ID, version code, and the signing certificate already installed on the phone."
+          notes="Native phone-first ARENA client for League of Legends. Version 0.3.5 stops Match Center refresh flicker and holds the last good live snapshot when a transient poll returns partial or placeholder data. The sideload updater continues to verify SHA-256, package ID, version code, and the installed signing certificate before installation."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
           else

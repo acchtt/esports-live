@@ -51,8 +51,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -166,27 +168,33 @@ private fun ArenaHeader(status: FeedStatus, message: String, onRefresh: () -> Un
             .padding(start = 18.dp, top = 14.dp, end = 8.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ArenaMark(58.dp)
-        Spacer(Modifier.width(12.dp))
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                Modifier
-                    .size(6.dp)
-                    .background(statusColor(status), CircleShape)
-            )
-            Spacer(Modifier.width(6.dp))
+        ArenaMark(38.dp)
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
             Text(
-                message.uppercase(Locale.ROOT),
-                color = ArenaMuted,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.7.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                "ARENA",
+                color = ArenaText,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.8.sp
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(6.dp)
+                        .background(statusColor(status), CircleShape)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    message.uppercase(Locale.ROOT),
+                    color = ArenaMuted,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.7.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         Surface(
             shape = RoundedCornerShape(20.dp),
@@ -353,7 +361,7 @@ private fun MatchCard(series: Series, onClick: () -> Unit, onVisible: () -> Unit
 @Composable
 private fun TeamRow(team: Team, score: Int?, state: String, accent: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        TeamAvatar(team, accent, 34.dp)
+        TeamAvatar(team, accent, 42.dp)
         Spacer(Modifier.width(11.dp))
         Text(
             team.name,
@@ -816,21 +824,27 @@ private fun SectionTitle(value: String) {
 @Composable
 private fun TeamAvatar(team: Team, accent: Color, size: androidx.compose.ui.unit.Dp) {
     val context = LocalContext.current
+    val imageUrl = team.imageUrl?.takeIf { it.isNotBlank() }
     Box(
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(size / 3))
-            .background(accent.copy(alpha = 0.12f))
-            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(size / 3)),
+        modifier = Modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            initials(team),
-            color = accent,
-            fontSize = (size.value * 0.30f).sp,
-            fontWeight = FontWeight.Black
-        )
-        team.imageUrl?.let { imageUrl ->
+        if (imageUrl == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(size / 3))
+                    .background(accent.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    initials(team),
+                    color = accent,
+                    fontSize = (size.value * 0.30f).sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        } else {
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(imageUrl)
@@ -841,7 +855,7 @@ private fun TeamAvatar(team: Team, accent: Color, size: androidx.compose.ui.unit
                 imageLoader = ArenaImageLoader.get(context),
                 contentDescription = "${team.name} logo",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(size * 0.12f)
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
@@ -868,6 +882,7 @@ private fun ArenaMark(size: androidx.compose.ui.unit.Dp) {
         }
         drawPath(cyan, ArenaCyan)
         drawPath(red, ArenaRed)
+        drawLine(ArenaText, Offset(width * .42f, height * .74f), Offset(width * .68f, height * .83f), strokeWidth = width * .06f, cap = StrokeCap.Round)
     }
 }
 

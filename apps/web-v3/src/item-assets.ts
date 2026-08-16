@@ -41,7 +41,7 @@ async function latestDataDragonVersion(): Promise<string> {
 function itemUrl(version: string, id: string): string {
   const url = new URL(`${DATA_DRAGON_ROOT}/cdn/${encodeURIComponent(version)}/img/item/${encodeURIComponent(id)}.png`);
   // A failed opaque image response can be retained by the PWA runtime cache.
-  // Give the retry its own cache key so a valid image can recover immediately.
+  // Give the normalized request its own cache key so a valid image can recover.
   url.searchParams.set('arena-item-retry', '1');
   return url.toString();
 }
@@ -58,36 +58,42 @@ function missing(image: HTMLImageElement): void {
   slot?.classList.remove('image-loaded');
 }
 
-async function retryItem(image: HTMLImageElement): Promise<void> {
-  if (image.dataset.itemAssetRetried === 'true') {
-    missing(image);
-    return;
-  }
-  image.dataset.itemAssetRetried = 'true';
-
+async function normalizeItem(image: HTMLImageElement): Promise<void> {
+  if (image.dataset.itemAssetNormalized === 'true' || image.dataset.itemAssetNormalizing === 'true') return;
   const id = itemId(image);
-  if (!id) {
-    missing(image);
+  if (!id) return;
+
+  image.dataset.itemAssetNormalizing = 'true';
+  const version = await latestDataDragonVersion();
+  if (!image.isConnected) {
+    delete image.dataset.itemAssetNormalizing;
     return;
   }
 
-  const version = await latestDataDragonVersion();
-  if (!image.isConnected) return;
+  const source = itemUrl(version, id);
+  image.dataset.itemAssetNormalized = 'true';
+  delete image.dataset.itemAssetNormalizing;
   missing(image);
-  image.src = itemUrl(version, id);
+  if (image.src !== source) image.src = source;
+  else if (image.complete && image.naturalWidth > 0) loaded(image);
 }
 
 function bindImage(image: HTMLImageElement): void {
   if (image.dataset.itemAssetBound === 'true') return;
   image.dataset.itemAssetBound = 'true';
+
+  // The app initially keeps item images hidden until they load. Hidden lazy
+  // images can be deferred indefinitely by Chromium, so item assets must be eager.
+  image.loading = 'eager';
   image.addEventListener('load', () => loaded(image));
   image.addEventListener('error', () => {
-    void retryItem(image);
+    if (image.dataset.itemAssetNormalized === 'true') {
+      missing(image);
+      return;
+    }
+    void normalizeItem(image);
   });
-
-  if (image.complete && image.naturalWidth === 0) {
-    void retryItem(image);
-  }
+  void normalizeItem(image);
 }
 
 function scan(root: ParentNode): void {

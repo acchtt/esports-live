@@ -216,8 +216,8 @@ private fun V3TeamSide(team: Team, state: TeamState, accent: Color, modifier: Mo
 @Composable
 private fun V3Objectives(stats: LolStats) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         V3Objective("♜", "TOWERS", stats.blue.objectives.towers, stats.red.objectives.towers, ArenaCyan, Modifier.weight(1f))
         V3Objective("✦", "DRAGONS", stats.blue.objectives.dragons?.size, stats.red.objectives.dragons?.size, V3Lime, Modifier.weight(1f))
@@ -230,19 +230,19 @@ private fun V3Objectives(stats: LolStats) {
 private fun V3Objective(icon: String, label: String, blue: Int?, red: Int?, iconColor: Color, modifier: Modifier) {
     Column(
         modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(9.dp))
             .background(ArenaSurface.copy(alpha = 0.82f))
-            .border(1.dp, ArenaLine.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
-            .padding(vertical = 6.dp, horizontal = 1.dp),
+            .border(1.dp, ArenaLine.copy(alpha = 0.8f), RoundedCornerShape(9.dp))
+            .padding(vertical = 4.dp, horizontal = 1.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
-        Text(icon, color = iconColor, fontSize = 14.sp, fontWeight = FontWeight.Black)
+        Text(icon, color = iconColor, fontSize = 13.sp, fontWeight = FontWeight.Black)
         Text(label, color = ArenaMuted, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(blue?.toString() ?: "—", color = ArenaCyan, fontSize = 13.sp, fontWeight = FontWeight.Black)
-            Text(" – ", color = ArenaMuted, fontSize = 10.sp)
-            Text(red?.toString() ?: "—", color = ArenaRed, fontSize = 13.sp, fontWeight = FontWeight.Black)
+            Text(blue?.toString() ?: "—", color = ArenaCyan, fontSize = 12.sp, fontWeight = FontWeight.Black)
+            Text(" – ", color = ArenaMuted, fontSize = 9.sp)
+            Text(red?.toString() ?: "—", color = ArenaRed, fontSize = 12.sp, fontWeight = FontWeight.Black)
         }
     }
 }
@@ -381,15 +381,29 @@ private fun V3ChampionPortrait(player: PlayerState?, accent: Color, patch: Strin
 @Composable
 private fun V3TeamLogo(team: Team, accent: Color, size: androidx.compose.ui.unit.Dp) {
     val context = LocalContext.current
+    val imageUrl = team.imageUrl?.takeIf { it.isNotBlank() }
+    var failed by remember(imageUrl) { mutableStateOf(false) }
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Text(team.code ?: team.name.take(2), color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
-        team.imageUrl?.let { url ->
+        if (imageUrl == null || failed) {
+            Text(team.code ?: team.name.take(2), color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
+        } else {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(url).diskCacheKey("arena-team:$url").memoryCacheKey("arena-team:$url").build(),
+                model = ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .diskCacheKey("arena-team:$imageUrl")
+                    .memoryCacheKey("arena-team:$imageUrl")
+                    .build(),
                 imageLoader = ArenaImageLoader.get(context),
                 contentDescription = "${team.name} logo",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                onSuccess = {
+                    Log.i("ARENA", "ARENA_TEAM_LOGO_READY team=${team.name}")
+                },
+                onError = {
+                    Log.w("ARENA", "ARENA_TEAM_LOGO_FAILED team=${team.name}")
+                    failed = true
+                }
             )
         }
     }

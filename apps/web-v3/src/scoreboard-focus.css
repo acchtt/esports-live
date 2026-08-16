@@ -1,10 +1,35 @@
 @media (max-width: 760px) {
+  html[data-arena-route="match"] .v2-shell {
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+  }
+
   html[data-arena-route="match"] .app-main {
+    display: flex;
+    flex: 1 0 auto;
     padding-top: 8px;
   }
 
   html[data-arena-route="match"] .match-panel {
     position: relative;
+    display: flex;
+    width: 100%;
+    flex: 1 0 auto;
+    flex-direction: column;
+  }
+
+  html[data-arena-route="match"] .scoreboard {
+    display: flex;
+    min-height: 0;
+    flex: 1 0 auto;
+    flex-direction: column;
+  }
+
+  html[data-arena-route="match"] .player-board {
+    display: grid;
+    flex: 1 1 auto;
+    grid-auto-rows: minmax(80px, 1fr);
   }
 
   html[data-arena-route="match"] .detail-header {

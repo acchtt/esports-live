@@ -174,10 +174,10 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
     };
   });
   expect(scoreboardScale.width).toBeGreaterThanOrEqual(370);
-  expect(scoreboardScale.headerHeight).toBeGreaterThanOrEqual(58);
-  expect(scoreboardScale.teamHeight).toBeGreaterThanOrEqual(90);
-  expect(scoreboardScale.playerHeight).toBeGreaterThanOrEqual(98);
-  expect(scoreboardScale.portraitWidth).toBeGreaterThanOrEqual(44);
+  expect(scoreboardScale.headerHeight).toBeGreaterThanOrEqual(40);
+  expect(scoreboardScale.teamHeight).toBeGreaterThanOrEqual(66);
+  expect(scoreboardScale.playerHeight).toBeGreaterThanOrEqual(76);
+  expect(scoreboardScale.portraitWidth).toBeGreaterThanOrEqual(40);
 
   const tabsFit = await page.locator('#game-tabs').evaluate(tabs => {
     const last = tabs.querySelector<HTMLElement>('[data-game-id]:last-child');

@@ -242,12 +242,14 @@ test('V3 match scrolling stops at the bottom of the scoreboard', async ({ page }
     return {
       scoreboardBottom: box.bottom + window.scrollY,
       documentBottom: root.scrollHeight,
+      viewportHeight: window.innerHeight,
       scrollY: window.scrollY,
       maxScrollY: Math.max(0, root.scrollHeight - window.innerHeight)
     };
   });
 
-  expect(Math.abs(boundary.documentBottom - boundary.scoreboardBottom)).toBeLessThanOrEqual(2);
+  const expectedDocumentBottom = Math.max(boundary.scoreboardBottom, boundary.viewportHeight);
+  expect(Math.abs(boundary.documentBottom - expectedDocumentBottom)).toBeLessThanOrEqual(2);
   expect(Math.abs(boundary.maxScrollY - boundary.scrollY)).toBeLessThanOrEqual(2);
 });
 

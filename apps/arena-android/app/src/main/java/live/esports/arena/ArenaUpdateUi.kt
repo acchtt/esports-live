@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -125,7 +126,7 @@ internal fun ArenaUpdateOverlay(
 }
 
 @Composable
-private fun BoxScopeUpdateChip(label: String, onClick: () -> Unit) {
+private fun BoxScope.UpdateChip(label: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .align(Alignment.BottomEnd)
@@ -148,11 +149,7 @@ private fun BoxScopeUpdateChip(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.UpdateChip(label: String, onClick: () -> Unit) =
-    BoxScopeUpdateChip(label, onClick)
-
-@Composable
-private fun androidx.compose.foundation.layout.BoxScope.UpdatePanel(
+private fun BoxScope.UpdatePanel(
     title: String,
     body: String,
     meta: String?,

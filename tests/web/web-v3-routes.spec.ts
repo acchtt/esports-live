@@ -150,6 +150,11 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#quality-text')).toHaveText('LIVE DATA · Updated just now');
   await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'live');
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
+  await expect(page.locator('.detail-header > div')).toBeHidden();
+  await expect(page.locator('.back-button')).toBeVisible();
+  await expect(page.locator('#game-tabs')).toBeHidden();
+  await expect(page.locator('#game-label')).toHaveAttribute('role', 'button');
+  await expect(page.locator('#game-label')).toHaveAttribute('aria-expanded', 'false');
 
   const itemIcon = page.locator('.player-item-slot img').first();
   await expect(itemIcon).toBeVisible();
@@ -179,6 +184,10 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   expect(scoreboardScale.playerHeight).toBeGreaterThanOrEqual(76);
   expect(scoreboardScale.portraitWidth).toBeGreaterThanOrEqual(40);
 
+  await page.locator('#game-label').click();
+  await expect(page.locator('#game-label')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#game-tabs')).toBeVisible();
+
   const tabsFit = await page.locator('#game-tabs').evaluate(tabs => {
     const last = tabs.querySelector<HTMLElement>('[data-game-id]:last-child');
     const outer = tabs.getBoundingClientRect();
@@ -192,6 +201,7 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
   await expect(page.locator('#quality-text')).toHaveText('FINAL DATA · Complete snapshot');
   await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'final');
+  await expect(page.locator('#game-tabs')).toBeHidden();
 
   await page.locator('.back-button').click();
   await expect(page).toHaveURL(/\/$/);

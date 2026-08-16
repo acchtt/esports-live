@@ -53,7 +53,7 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
   expect(manifest.icons.some(icon => icon.src === '/pwa/arena-icon.svg' && icon.type === 'image/svg+xml')).toBe(true);
 
   await expect(page.locator('#arena-startup-fallback')).toBeHidden();
-  await expect(page.locator('head style').first()).toContainText('background: #06090d');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(6, 9, 13)');
 });
 
 test('V3 service worker keeps the routed app shell available offline', async ({ page, context }) => {

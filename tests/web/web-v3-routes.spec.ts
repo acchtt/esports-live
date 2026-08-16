@@ -226,7 +226,7 @@ test('V3 opens a deep match URL directly, including the /v3 compatibility base',
   await expect(page).toHaveURL(/\/v3\/match\/series-routed\/game-routed-2$/);
 });
 
-test('V3 match scrolling stops at the bottom of the scoreboard', async ({ page }) => {
+test('V3 match scoreboard fills short phone view and owns the scroll boundary', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 420 });
   await installFixtures(page);
   await page.goto('/match/series-routed/game-routed-2');
@@ -248,8 +248,8 @@ test('V3 match scrolling stops at the bottom of the scoreboard', async ({ page }
     };
   });
 
-  const expectedDocumentBottom = Math.max(boundary.scoreboardBottom, boundary.viewportHeight);
-  expect(Math.abs(boundary.documentBottom - expectedDocumentBottom)).toBeLessThanOrEqual(2);
+  expect(boundary.scoreboardBottom).toBeGreaterThanOrEqual(boundary.viewportHeight - 2);
+  expect(Math.abs(boundary.documentBottom - boundary.scoreboardBottom)).toBeLessThanOrEqual(2);
   expect(Math.abs(boundary.maxScrollY - boundary.scrollY)).toBeLessThanOrEqual(2);
 });
 

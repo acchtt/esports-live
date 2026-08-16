@@ -18,6 +18,22 @@ const series = {
   ]
 };
 
+function player(id: string, handle: string, championId: string, items: readonly string[]) {
+  return {
+    id,
+    handle,
+    championId,
+    role: 'top',
+    level: 16,
+    kills: 4,
+    deaths: 2,
+    assists: 7,
+    creepScore: 245,
+    totalGold: 12_400,
+    items
+  };
+}
+
 function snapshot(gameId: string) {
   const game = series.games.find(item => item.id === gameId) ?? series.games[1]!;
   const completed = game.id === 'game-routed-1';
@@ -42,7 +58,7 @@ function snapshot(gameId: string) {
         gold: completed ? 47_000 : 31_200,
         kills: completed ? 12 : 7,
         objectives: { towers: 5, inhibitors: 0, dragons: ['cloud'], barons: 0, heralds: 1, grubs: null },
-        players: []
+        players: [player('route-blue-top', 'RBL Top', 'Aatrox', ['3078'])]
       },
       red: {
         id: red.id,
@@ -51,7 +67,7 @@ function snapshot(gameId: string) {
         gold: completed ? 44_000 : 30_600,
         kills: completed ? 9 : 6,
         objectives: { towers: 3, inhibitors: 0, dragons: [], barons: 0, heralds: 0, grubs: null },
-        players: []
+        players: [player('route-red-top', 'RRD Top', 'Renekton', ['3157'])]
       }
     },
     quality: {
@@ -72,7 +88,22 @@ async function json(route: Route, value: unknown): Promise<void> {
 }
 
 async function installFixtures(page: Page): Promise<void> {
-  await page.route('https://ddragon.leagueoflegends.com/**', route => route.abort());
+  await page.route('https://ddragon.leagueoflegends.com/**', async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/versions.json') {
+      await json(route, ['16.16.1']);
+      return;
+    }
+    if (/^\/cdn\/16\.16\.1\/img\/item\/(?:3078|3157)\.png$/.test(url.pathname)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="#d7e4ff"/></svg>'
+      });
+      return;
+    }
+    await route.abort();
+  });
   await page.route('**/health**', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -119,6 +150,34 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#quality-text')).toHaveText('LIVE DATA · Updated just now');
   await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'live');
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
+
+  const itemIcon = page.locator('.player-item-slot img').first();
+  await expect(itemIcon).toBeVisible();
+  await expect(itemIcon).toHaveAttribute(
+    'src',
+    /\/cdn\/16\.16\.1\/img\/item\/3078\.png\?arena-item-retry=1$/
+  );
+
+  const scoreboardScale = await page.locator('#scoreboard').evaluate(scoreboard => {
+    const box = (selector: string) => scoreboard.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+    const scoreboardBox = scoreboard.getBoundingClientRect();
+    const header = box('.scoreboard-header');
+    const team = box('.team-banner');
+    const player = box('.player-row');
+    const portrait = box('.champion-portrait');
+    return {
+      width: scoreboardBox.width,
+      headerHeight: header?.height ?? 0,
+      teamHeight: team?.height ?? 0,
+      playerHeight: player?.height ?? 0,
+      portraitWidth: portrait?.width ?? 0
+    };
+  });
+  expect(scoreboardScale.width).toBeGreaterThanOrEqual(370);
+  expect(scoreboardScale.headerHeight).toBeGreaterThanOrEqual(58);
+  expect(scoreboardScale.teamHeight).toBeGreaterThanOrEqual(90);
+  expect(scoreboardScale.playerHeight).toBeGreaterThanOrEqual(98);
+  expect(scoreboardScale.portraitWidth).toBeGreaterThanOrEqual(44);
 
   const tabsFit = await page.locator('#game-tabs').evaluate(tabs => {
     const last = tabs.querySelector<HTMLElement>('[data-game-id]:last-child');

@@ -1,0 +1,220 @@
+@media (max-width: 760px) {
+  html[data-arena-route="match"] .app-main {
+    padding-inline: 8px;
+  }
+
+  .scoreboard-header {
+    min-height: 64px;
+    padding: 14px 18px;
+  }
+
+  .scoreboard-header strong,
+  .scoreboard-header span {
+    font-size: clamp(1.3rem, 6.4vw, 1.72rem);
+  }
+
+  .telemetry-freshness {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: clamp(0.56rem, 2.65vw, 0.66rem);
+  }
+
+  .team-banner {
+    grid-template-columns: minmax(0, 1fr) 106px minmax(0, 1fr);
+    min-height: 98px;
+  }
+
+  .team-side {
+    gap: 4px;
+    padding: 12px 14px;
+  }
+
+  .team-side > .team-logo {
+    max-width: 42px;
+    max-height: 28px;
+  }
+
+  .team-side > span {
+    font-size: 0.58rem;
+  }
+
+  .team-side > strong {
+    font-size: clamp(0.84rem, 3.75vw, 1rem);
+  }
+
+  .team-side small {
+    font-size: 0.6rem;
+  }
+
+  .team-side b {
+    font-size: 1.34rem;
+  }
+
+  .gold-card {
+    min-height: 76px;
+    gap: 5px;
+    margin: 10px 0;
+    padding: 9px 5px;
+    border-radius: 17px;
+  }
+
+  .gold-card span {
+    font-size: 0.5rem;
+  }
+
+  .gold-card strong {
+    font-size: 1.18rem;
+  }
+
+  .objective-grid {
+    gap: 5px;
+    padding: 9px 8px;
+  }
+
+  .objective-grid article {
+    min-height: 60px;
+    gap: 5px;
+    padding: 6px 2px;
+    border-radius: 11px;
+  }
+
+  .objective-grid article > span {
+    font-size: clamp(0.5rem, 2.35vw, 0.58rem);
+  }
+
+  .objective-grid strong {
+    gap: 4px;
+    font-size: clamp(0.96rem, 4.45vw, 1.14rem);
+  }
+
+  .player-row {
+    grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr);
+    gap: 7px;
+    min-height: 106px;
+    padding: 10px;
+  }
+
+  .player-side {
+    gap: 8px;
+    row-gap: 6px;
+  }
+
+  .blue-player {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .red-player {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .champion-portrait {
+    width: 48px;
+    height: 48px;
+    border-radius: 11px;
+  }
+
+  .player-items {
+    gap: 3px;
+  }
+
+  .player-item-slot {
+    width: 22px;
+    height: 22px;
+  }
+
+  .player-copy strong {
+    font-size: clamp(0.76rem, 3.45vw, 0.9rem);
+  }
+
+  .player-copy .player-statline {
+    font-size: 0.7rem;
+  }
+
+  .player-copy .player-champion {
+    font-size: 0.6rem;
+  }
+
+  .player-copy .champion-level {
+    min-width: 28px;
+    height: 16px;
+    font-size: 0.48rem;
+  }
+
+  .lane-gold {
+    gap: 4px;
+    font-size: clamp(0.8rem, 3.8vw, 0.98rem);
+  }
+}
+
+@media (max-width: 400px) {
+  .scoreboard-header {
+    min-height: 60px;
+    padding: 13px 16px;
+  }
+
+  .team-banner {
+    grid-template-columns: minmax(0, 1fr) 94px minmax(0, 1fr);
+    min-height: 94px;
+  }
+
+  .team-side {
+    padding-inline: 10px;
+  }
+
+  .team-side > .team-logo {
+    max-width: 38px;
+    max-height: 25px;
+  }
+
+  .gold-card {
+    min-height: 72px;
+  }
+
+  .objective-grid article {
+    min-height: 56px;
+  }
+
+  .player-row {
+    grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr);
+    min-height: 102px;
+    padding: 9px 8px;
+  }
+
+  .blue-player {
+    grid-template-columns: 45px minmax(0, 1fr);
+  }
+
+  .red-player {
+    grid-template-columns: minmax(0, 1fr) 45px;
+  }
+
+  .champion-portrait {
+    width: 45px;
+    height: 45px;
+  }
+
+  .player-items {
+    gap: 2px;
+  }
+
+  .player-item-slot {
+    width: 20px;
+    height: 20px;
+  }
+
+  .player-copy strong {
+    font-size: clamp(0.74rem, 3.5vw, 0.86rem);
+  }
+
+  .player-copy .player-statline {
+    font-size: 0.67rem;
+  }
+
+  .player-copy .player-champion {
+    font-size: 0.58rem;
+  }
+
+  .lane-gold {
+    font-size: clamp(0.76rem, 3.7vw, 0.9rem);
+  }
+}

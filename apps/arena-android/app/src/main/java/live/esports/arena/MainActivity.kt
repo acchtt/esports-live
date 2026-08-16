@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 
 class MainActivity : ComponentActivity() {
-    private lateinit var updater: ArenaUpdater
+    private var updater: ArenaUpdater? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -18,8 +18,9 @@ class MainActivity : ComponentActivity() {
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = false
 
-        updater = ArenaUpdater(applicationContext)
-        if (BuildConfig.IN_APP_UPDATE_ENABLED) updater.checkForUpdate(silent = true)
+        if (BuildConfig.IN_APP_UPDATE_ENABLED) {
+            updater = ArenaUpdater(applicationContext).also { it.checkForUpdate(silent = true) }
+        }
 
         setContent {
             ArenaTheme {
@@ -27,13 +28,13 @@ class MainActivity : ComponentActivity() {
                     ArenaApp(onFirstFrame = {
                         Log.i("ARENA", "ARENA_NATIVE_UI_READY version=${BuildConfig.VERSION_NAME} sha=${BuildConfig.BUILD_SHA}")
                     })
-                    if (BuildConfig.IN_APP_UPDATE_ENABLED) {
+                    updater?.let { activeUpdater ->
                         ArenaUpdateOverlay(
-                            state = updater.state,
-                            onCheck = { updater.checkForUpdate(silent = false) },
-                            onDownload = updater::downloadUpdate,
-                            onInstall = { updater.install(this@MainActivity) },
-                            onDismiss = updater::dismiss
+                            state = activeUpdater.state,
+                            onCheck = { activeUpdater.checkForUpdate(silent = false) },
+                            onDownload = activeUpdater::downloadUpdate,
+                            onInstall = { activeUpdater.install(this@MainActivity) },
+                            onDismiss = activeUpdater::dismiss
                         )
                     }
                 }
@@ -43,13 +44,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::updater.isInitialized && BuildConfig.IN_APP_UPDATE_ENABLED) {
-            updater.resumePendingInstall(this)
-        }
+        updater?.resumePendingInstall(this)
     }
 
     override fun onDestroy() {
-        if (::updater.isInitialized) updater.close()
+        updater?.close()
+        updater = null
         super.onDestroy()
     }
 }

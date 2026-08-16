@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { LolPlayerState, LolProviderClient, LolProviderSnapshot, LolTeamState } from '@esports-live/adapter-lol';
-import { createProductionInventoryProvider, createWorkerHandler } from './worker.ts';
+import {
+  createProductionInventoryProvider,
+  createProductionScheduleProvider,
+  createWorkerHandler
+} from './worker.ts';
 
 test('Worker health keeps Dota available and disables LoL when the Riot secret is absent', async () => {
   const response = await createWorkerHandler({})(new Request('https://example.test/health'));
@@ -85,6 +89,54 @@ function inventorySnapshot(): LolProviderSnapshot {
     ]
   };
 }
+
+test('production schedule loading coalesces reads and uses lightweight state probes', async () => {
+  const baseSnapshot = inventorySnapshot();
+  let scheduleLoads = 0;
+  let enrichedSnapshotLoads = 0;
+  let lightweightSnapshotLoads = 0;
+
+  const enrichedProvider: LolProviderClient = {
+    id: 'enriched',
+    name: 'Enriched provider',
+    async getSchedule() {
+      scheduleLoads += 1;
+      return [{
+        series: structuredClone(baseSnapshot.series),
+        observedAt: INVENTORY_NOW
+      }];
+    },
+    async getSnapshot() {
+      enrichedSnapshotLoads += 1;
+      return structuredClone(baseSnapshot);
+    }
+  };
+  const lightweightSnapshotProvider: LolProviderClient = {
+    ...enrichedProvider,
+    async getSnapshot() {
+      lightweightSnapshotLoads += 1;
+      return structuredClone(baseSnapshot);
+    }
+  };
+  const provider = createProductionScheduleProvider(
+    enrichedProvider,
+    lightweightSnapshotProvider
+  );
+
+  const [first, second] = await Promise.all([
+    provider.getSchedule(),
+    provider.getSchedule()
+  ]);
+
+  assert.equal(first.length, 1);
+  assert.equal(second.length, 1);
+  assert.equal(scheduleLoads, 1);
+  assert.equal(lightweightSnapshotLoads, 1);
+  assert.equal(enrichedSnapshotLoads, 0);
+
+  await provider.getSnapshot('game-inventory');
+  assert.equal(enrichedSnapshotLoads, 1);
+});
 
 test('production inventory probing keeps its adaptive frontier across live snapshots', async () => {
   const baseSnapshot = inventorySnapshot();

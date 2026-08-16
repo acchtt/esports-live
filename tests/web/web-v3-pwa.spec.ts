@@ -29,6 +29,7 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
   await expect(manifestLink).toHaveAttribute('href', /manifest\.webmanifest$/);
   await expect(page.locator('meta[name="mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
   await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#06090d');
 
   const manifestHref = await manifestLink.getAttribute('href');
   expect(manifestHref).toBeTruthy();
@@ -53,7 +54,6 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
   expect(manifest.icons.some(icon => icon.src === '/pwa/arena-icon.svg' && icon.type === 'image/svg+xml')).toBe(true);
 
   await expect(page.locator('#arena-startup-fallback')).toBeHidden();
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)).toBe('rgb(6, 9, 13)');
 });
 
 test('V3 service worker keeps the routed app shell available offline', async ({ page, context }) => {
@@ -105,15 +105,12 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
   await expect(page.locator('html')).toHaveAttribute('data-v3-display-mode', 'standalone');
   await expect(page.locator('html')).toHaveAttribute('data-v3-pwa', 'native');
 
-  const headerInsets = await page.locator('.app-header').evaluate(header => {
-    const headerStyle = getComputedStyle(header);
-    return {
-      paddingTop: Number.parseFloat(headerStyle.paddingTop),
-      minHeight: Number.parseFloat(headerStyle.minHeight)
-    };
-  });
-  expect(headerInsets.paddingTop).toBeGreaterThanOrEqual(42);
-  expect(headerInsets.minHeight).toBeGreaterThanOrEqual(103);
+  await expect.poll(async () => page.locator('.app-header').evaluate(header => (
+    Number.parseFloat(getComputedStyle(header).paddingTop)
+  ))).toBeGreaterThanOrEqual(42);
+  await expect.poll(async () => page.locator('.app-header').evaluate(header => (
+    Number.parseFloat(getComputedStyle(header).minHeight)
+  ))).toBeGreaterThanOrEqual(103);
 
   const registrations = await page.evaluate(async () => (
     'serviceWorker' in navigator

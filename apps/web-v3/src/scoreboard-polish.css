@@ -42,47 +42,250 @@
 }
 
 @media (max-width: 760px) {
-  .telemetry-freshness {
-    min-height: 38px;
-    padding-inline: 14px;
+  html[data-arena-route="match"] .scoreboard {
+    border-radius: 18px;
   }
 
-  .telemetry-freshness-detail {
-    padding: 4px 8px;
+  html[data-arena-route="match"] .telemetry-freshness {
+    min-height: 30px;
+    gap: 7px;
+    padding: 5px 10px;
   }
 
-  .player-items {
-    flex-wrap: wrap;
-    align-content: flex-start;
+  html[data-arena-route="match"] .telemetry-freshness-detail {
+    padding: 3px 7px;
+  }
+
+  html[data-arena-route="match"] .scoreboard-header {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  html[data-arena-route="match"] .scoreboard-header strong,
+  html[data-arena-route="match"] .scoreboard-header span {
+    font-size: clamp(1.04rem, 5vw, 1.3rem);
+  }
+
+  html[data-arena-route="match"] .team-banner {
+    grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr);
+    min-height: 72px;
+  }
+
+  html[data-arena-route="match"] .team-side {
+    gap: 2px;
+    padding: 6px 9px;
+  }
+
+  html[data-arena-route="match"] .team-side > .team-logo {
+    max-width: 34px;
+    max-height: 22px;
+  }
+
+  html[data-arena-route="match"] .team-side > span {
+    font-size: 0.5rem;
+  }
+
+  html[data-arena-route="match"] .team-side > strong {
+    font-size: clamp(0.74rem, 3.45vw, 0.9rem);
+  }
+
+  html[data-arena-route="match"] .team-side p {
+    gap: 4px;
+  }
+
+  html[data-arena-route="match"] .team-side small {
+    font-size: 0.52rem;
+  }
+
+  html[data-arena-route="match"] .team-side b {
+    font-size: 1.1rem;
+  }
+
+  html[data-arena-route="match"] .gold-card {
+    min-height: 54px;
+    gap: 3px;
+    margin: 6px 0;
+    padding: 5px 3px;
+    border-radius: 13px;
+  }
+
+  html[data-arena-route="match"] .gold-card span {
+    font-size: 0.44rem;
+  }
+
+  html[data-arena-route="match"] .gold-card strong {
+    font-size: 0.98rem;
+  }
+
+  html[data-arena-route="match"] .objective-grid {
+    gap: 3px;
+    padding: 5px 6px;
+  }
+
+  html[data-arena-route="match"] .objective-grid article {
+    min-height: 44px;
+    gap: 2px;
+    padding: 4px 1px;
+    border-radius: 9px;
+  }
+
+  html[data-arena-route="match"] .objective-grid article > span {
+    font-size: clamp(0.43rem, 2vw, 0.5rem);
+  }
+
+  html[data-arena-route="match"] .objective-grid strong {
+    gap: 3px;
+    font-size: clamp(0.82rem, 4vw, 0.98rem);
+  }
+
+  html[data-arena-route="match"] .player-row {
+    position: relative;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    min-height: 80px;
+    padding: 5px 7px;
+  }
+
+  html[data-arena-route="match"] .player-side {
+    gap: 4px;
+    row-gap: 3px;
+  }
+
+  html[data-arena-route="match"] .blue-player {
+    grid-template-columns: 42px minmax(0, 1fr);
+    padding-right: 4px;
+  }
+
+  html[data-arena-route="match"] .red-player {
+    grid-template-columns: minmax(0, 1fr) 42px;
+    padding-left: 4px;
+  }
+
+  html[data-arena-route="match"] .champion-portrait {
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+  }
+
+  html[data-arena-route="match"] .player-copy {
+    gap: 2px;
+  }
+
+  html[data-arena-route="match"] .player-copy strong {
+    font-size: clamp(0.7rem, 3.15vw, 0.8rem);
+    line-height: 1;
+  }
+
+  html[data-arena-route="match"] .player-copy .player-statline {
+    font-size: 0.62rem;
+    line-height: 1;
+  }
+
+  html[data-arena-route="match"] .player-copy .player-champion-meta {
     gap: 3px;
   }
 
-  .player-item-slot {
-    width: clamp(24px, 6.4vw, 28px);
-    height: clamp(24px, 6.4vw, 28px);
+  html[data-arena-route="match"] .player-copy .player-champion {
+    font-size: 0.53rem;
   }
 
-  .player-row {
-    min-height: 116px;
+  html[data-arena-route="match"] .player-copy .champion-level {
+    min-width: 25px;
+    height: 14px;
+    padding-inline: 3px;
+    font-size: 0.43rem;
+  }
+
+  html[data-arena-route="match"] .player-items {
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-content: center;
+    gap: 0;
+  }
+
+  html[data-arena-route="match"] .player-item-slot {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border-radius: 5px;
+  }
+
+  html[data-arena-route="match"] .lane-gold {
+    position: absolute;
+    z-index: 3;
+    top: 50%;
+    left: 50%;
+    width: 58px;
+    min-height: 22px;
+    padding: 3px 2px;
+    border-radius: 8px;
+    background: rgba(5, 11, 21, 0.84);
+    font-size: clamp(0.72rem, 3.4vw, 0.88rem);
+    line-height: 1;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
   }
 }
 
 @media (max-width: 400px) {
-  .telemetry-freshness {
-    gap: 7px;
-    padding-inline: 12px;
+  html[data-arena-route="match"] .telemetry-freshness {
+    gap: 6px;
+    padding-inline: 9px;
   }
 
-  .telemetry-freshness-detail {
+  html[data-arena-route="match"] .telemetry-freshness-detail {
     max-width: 48%;
+    padding-inline: 6px;
+  }
+
+  html[data-arena-route="match"] .scoreboard-header {
+    min-height: 42px;
+    padding: 7px 10px;
+  }
+
+  html[data-arena-route="match"] .team-banner {
+    grid-template-columns: minmax(0, 1fr) 78px minmax(0, 1fr);
+    min-height: 68px;
+  }
+
+  html[data-arena-route="match"] .team-side {
     padding-inline: 7px;
   }
 
-  .player-items {
-    gap: 2px;
+  html[data-arena-route="match"] .gold-card {
+    min-height: 50px;
   }
 
-  .player-row {
-    min-height: 120px;
+  html[data-arena-route="match"] .objective-grid {
+    padding-inline: 4px;
+  }
+
+  html[data-arena-route="match"] .objective-grid article {
+    min-height: 42px;
+  }
+
+  html[data-arena-route="match"] .player-row {
+    min-height: 78px;
+    padding: 4px;
+  }
+
+  html[data-arena-route="match"] .blue-player {
+    grid-template-columns: 40px minmax(0, 1fr);
+    padding-right: 3px;
+  }
+
+  html[data-arena-route="match"] .red-player {
+    grid-template-columns: minmax(0, 1fr) 40px;
+    padding-left: 3px;
+  }
+
+  html[data-arena-route="match"] .champion-portrait {
+    width: 40px;
+    height: 40px;
+  }
+
+  html[data-arena-route="match"] .lane-gold {
+    width: 54px;
   }
 }

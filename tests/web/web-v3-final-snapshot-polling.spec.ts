@@ -136,7 +136,7 @@ test('V3 keeps refreshing a selected LPL Final game until newer final telemetry 
     );
   });
 
-  await page.goto('/', { waitUntil: 'commit' });
+  await page.goto('/');
   await expect(page.locator('[data-series-id="lpl-final-series"]')).toBeVisible();
   await page.locator('[data-series-id="lpl-final-series"]').click();
 

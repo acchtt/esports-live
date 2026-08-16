@@ -252,6 +252,10 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
     return image;
   };
 
+  const setFallbackText = (fallback: HTMLElement | null, value: string): void => {
+    if (fallback && fallback.textContent !== value) fallback.textContent = value;
+  };
+
   const syncTeamLogos = (): void => {
     (['blue', 'red'] as const).forEach(side => {
       const name = root.querySelector<HTMLElement>(`#${side}-name`)?.textContent?.trim() ?? '';
@@ -267,10 +271,10 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
         image.removeAttribute('src');
         image.alt = '';
         article?.classList.remove('has-team-logo');
-        if (fallback) fallback.textContent = `${side.toUpperCase()} SIDE`;
+        setFallbackText(fallback, `${side.toUpperCase()} SIDE`);
         return;
       }
-      if (fallback) fallback.textContent = logo.code || logo.name.split(/\s+/).map(part => part[0]).join('').slice(0, 4).toUpperCase();
+      setFallbackText(fallback, logo.code || logo.name.split(/\s+/).map(part => part[0]).join('').slice(0, 4).toUpperCase());
       image.dataset.requestedSrc = logo.imageUrl;
       if (image.getAttribute('src') !== logo.imageUrl) {
         image.hidden = true;

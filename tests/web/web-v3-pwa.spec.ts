@@ -23,7 +23,7 @@ async function mockEmptyApi(page: import('@playwright/test').Page): Promise<void
 
 test('V3 exposes installable PWA metadata', async ({ page }) => {
   await mockEmptyApi(page);
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
   await expect(page.locator('meta[name="mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
@@ -55,7 +55,7 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
 
 test('V3 service worker keeps the routed app shell available offline', async ({ page, context }) => {
   await mockEmptyApi(page);
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   const serviceWorkerSource = await page.evaluate(async () => {
     const response = await fetch('/sw.js');
@@ -93,7 +93,7 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
     (window as Window & { androidBridge?: Record<string, never> }).androidBridge = {};
   });
   await mockEmptyApi(page);
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate(() => {
     document.documentElement.style.setProperty('--safe-area-inset-top', '31px');
   });
@@ -125,7 +125,7 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
     await window.caches.open('arena-v3-static-stale-native-build');
     await window.caches.open('arena-v3-api-last-good-v1');
   });
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
 
   await expect.poll(async () => page.evaluate(async () => await window.caches.keys())).toEqual([
     'arena-v3-api-last-good-v1'

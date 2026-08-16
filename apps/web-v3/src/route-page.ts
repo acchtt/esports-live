@@ -77,6 +77,8 @@ export function installV3Routing(root: HTMLElement): () => void {
 
   let applyingRoute = false;
   let scheduled = false;
+  let focusedScoreboardKey = '';
+  let scoreboardFocusFrame: number | null = null;
   const cataloguePanel = root.querySelector<HTMLElement>('#catalogue-panel');
   const matchPanel = root.querySelector<HTMLElement>('#match-panel');
 
@@ -89,6 +91,25 @@ export function installV3Routing(root: HTMLElement): () => void {
   const detachCatalogue = (): void => {
     if (!cataloguePanel?.isConnected) return;
     cataloguePanel.remove();
+  };
+
+  const focusScoreboard = (seriesId: string, gameId: string, scoreboard: HTMLElement): void => {
+    const key = `${seriesId}:${gameId}`;
+    if (focusedScoreboardKey === key) return;
+    focusedScoreboardKey = key;
+    if (scoreboardFocusFrame !== null) window.cancelAnimationFrame(scoreboardFocusFrame);
+    scoreboardFocusFrame = window.requestAnimationFrame(() => {
+      scoreboardFocusFrame = null;
+      const route = currentV3Route();
+      const activeScoreboard = root.querySelector<HTMLElement>('#scoreboard');
+      if (
+        route.kind !== 'match'
+        || route.seriesId !== seriesId
+        || activeScoreboard !== scoreboard
+        || scoreboard.dataset.gameId?.trim() !== gameId
+      ) return;
+      scoreboard.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
   };
 
   document.documentElement.dataset.arenaRoute = currentV3Route().kind;
@@ -105,6 +126,11 @@ export function installV3Routing(root: HTMLElement): () => void {
 
   const activateCatalogue = (): void => {
     restoreCatalogue();
+    focusedScoreboardKey = '';
+    if (scoreboardFocusFrame !== null) {
+      window.cancelAnimationFrame(scoreboardFocusFrame);
+      scoreboardFocusFrame = null;
+    }
     if (matchPanel?.hidden !== false) return;
     const matches = root.querySelector<HTMLElement>('[data-app-view="matches"]');
     if (!matches) return;
@@ -153,12 +179,13 @@ export function installV3Routing(root: HTMLElement): () => void {
     }
 
     const currentGameId = scoreboard?.dataset.gameId?.trim() ?? '';
-    if (currentGameId) {
+    if (currentGameId && scoreboard) {
       const canonical = routePath(route.seriesId, currentGameId);
       if (window.location.pathname !== canonical) {
         window.history.replaceState({ arenaV3: true }, '', withCommitQuery(canonical));
       }
       detachCatalogue();
+      focusScoreboard(route.seriesId, currentGameId, scoreboard);
     }
   };
 
@@ -185,6 +212,7 @@ export function installV3Routing(root: HTMLElement): () => void {
       restoreCatalogue();
       window.history.pushState({ arenaV3: true }, '', withCommitQuery(cataloguePath()));
       document.documentElement.dataset.arenaRoute = 'catalogue';
+      focusedScoreboardKey = '';
       return;
     }
 
@@ -194,6 +222,7 @@ export function installV3Routing(root: HTMLElement): () => void {
       if (window.location.pathname !== next) {
         window.history.pushState({ arenaV3: true }, '', withCommitQuery(next));
       }
+      queueApply();
     }
   };
 
@@ -211,6 +240,7 @@ export function installV3Routing(root: HTMLElement): () => void {
 
   return () => {
     restoreCatalogue();
+    if (scoreboardFocusFrame !== null) window.cancelAnimationFrame(scoreboardFocusFrame);
     observer.disconnect();
     root.removeEventListener('click', onClick, true);
     window.removeEventListener('popstate', onPopState);

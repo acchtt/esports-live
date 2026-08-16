@@ -18,7 +18,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = env("ARENA_ANDROID_VERSION_CODE")?.toIntOrNull() ?: 46
-        versionName = env("ARENA_ANDROID_VERSION_NAME") ?: "0.3.3"
+        versionName = env("ARENA_ANDROID_VERSION_NAME") ?: "0.3.4"
 
         buildConfigField(
             "String",
@@ -26,6 +26,11 @@ android {
             "\"${env("ARENA_ANDROID_API_URL") ?: "https://mobile-demo-esports-live-api.acchtt.workers.dev"}\""
         )
         buildConfigField("String", "BUILD_SHA", "\"${env("MOBILE_V3_COMMIT_SHA") ?: "local"}\"")
+        buildConfigField(
+            "String",
+            "UPDATE_MANIFEST_URL",
+            "\"https://github.com/acchtt/esports-live/releases/download/arena-v3-android-latest/arena-v3-latest.json\""
+        )
     }
 
     signingConfigs {
@@ -51,12 +56,14 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("boolean", "IN_APP_UPDATE_ENABLED", "true")
             if (env("ARENA_ANDROID_DEBUG_KEYSTORE_PATH") != null) {
                 signingConfig = signingConfigs.getByName("arenaDebug")
             }
             isMinifyEnabled = false
         }
         release {
+            buildConfigField("boolean", "IN_APP_UPDATE_ENABLED", "false")
             val releaseSigning = signingConfigs.getByName("arenaRelease")
             if (releaseSigning.storeFile != null) signingConfig = releaseSigning
             isMinifyEnabled = true

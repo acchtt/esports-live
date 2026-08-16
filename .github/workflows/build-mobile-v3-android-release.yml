@@ -26,7 +26,7 @@ permissions:
 env:
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   V3_NATIVE_API_URL: https://mobile-demo-esports-live-api.acchtt.workers.dev
-  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name || '0.3.3' }}
+  ARENA_ANDROID_VERSION_NAME: ${{ inputs.version_name || '0.3.4' }}
   ARENA_ANDROID_VERSION_CODE: ${{ inputs.version_code || github.run_number }}
   ARENA_ANDROID_RELEASE_KEYSTORE_B64: ${{ secrets.ARENA_ANDROID_RELEASE_KEYSTORE_B64 }}
   ARENA_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ARENA_ANDROID_RELEASE_STORE_PASSWORD }}
@@ -129,8 +129,15 @@ jobs:
         run: |
           build_gradle="apps/arena-android/app/build.gradle.kts"
           test -f apps/arena-android/app/src/main/java/live/esports/arena/MainActivity.kt
+          test -f apps/arena-android/app/src/main/java/live/esports/arena/ArenaUpdater.kt
+          test -f apps/arena-android/app/src/debug/AndroidManifest.xml
           grep -Fq 'applicationId = "live.esports.arena"' "$build_gradle"
           grep -Fq 'signingConfig = releaseSigning' "$build_gradle"
+          grep -Fq 'IN_APP_UPDATE_ENABLED", "false"' "$build_gradle"
+          if grep -Fq 'REQUEST_INSTALL_PACKAGES' apps/arena-android/app/src/main/AndroidManifest.xml; then
+            echo "Play release base manifest must not request package install permission."
+            exit 1
+          fi
           if grep -R -E 'android\.webkit\.WebView|CapacitorActivity|com\.getcapacitor' apps/arena-android/app/src/main; then
             echo "Release source is not native-only."
             exit 1

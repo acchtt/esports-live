@@ -28,6 +28,21 @@ if [[ "$ready" != "true" ]]; then
   exit 1
 fi
 
+update_checked=false
+for attempt in {1..30}; do
+  if adb logcat -d -s ARENA:I '*:S' | grep -Eq 'ARENA_UPDATE_(CURRENT|AVAILABLE)'; then
+    update_checked=true
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$update_checked" != "true" ]]; then
+  echo "The native app did not complete its in-app update channel check."
+  adb logcat -d > "$artifact_dir/android-smoke-logcat.txt"
+  exit 1
+fi
+
 result_ready=false
 for attempt in {1..30}; do
   if adb logcat -d -s ARENA:I '*:S' \
@@ -143,6 +158,7 @@ if ! dump_ui_tree /sdcard/arena-window.xml "$artifact_dir/android-smoke-window.x
   exit 1
 fi
 grep -Eq 'ARENA_NATIVE_UI_READY|text="ARENA"' "$artifact_dir/android-smoke-window.xml"
+grep -Eq 'content-desc="ARENA_UPDATE_(CONTROL|PANEL)"' "$artifact_dir/android-smoke-window.xml"
 
 adb exec-out screencap -p > "$artifact_dir/android-smoke-native-ui.png"
 test "$(stat -c '%s' "$artifact_dir/android-smoke-native-ui.png")" -gt 10000
@@ -157,4 +173,4 @@ if grep -E 'FATAL EXCEPTION|ANR in live\.esports\.arena' "$artifact_dir/android-
   exit 1
 fi
 
-echo "Native ARENA UI rendered, rejected future finals, loaded champion portraits, and opened the v3 scoreboard."
+echo "Native ARENA UI rendered, checked the in-app update channel, rejected future finals, loaded champion portraits, and opened the v3 scoreboard."

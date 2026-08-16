@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import type {
   LiveSnapshot,
   SeriesContext,
@@ -11,6 +12,9 @@ const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, 
 const FINALITY_PROBE_MS = 5_000;
 const CONTEXT_TIMEOUT_MS = 4_000;
 const FOREGROUND_DEBOUNCE_MS = 250;
+const TEAM_LOGO_CACHE = 'arena-v3-runtime-images-v1';
+const MAX_CACHED_TEAM_LOGOS = 180;
+const pendingLogoCacheWrites = new Map<string, Promise<void>>();
 
 interface CachedContext {
   checkedAt: number;
@@ -31,6 +35,47 @@ function secureAssetUrl(value: string | null | undefined): string {
   } catch {
     return source;
   }
+}
+
+function cacheableLogoUrl(value: string): URL | null {
+  try {
+    const url = new URL(value, window.location.href);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+async function trimTeamLogoCache(cache: Cache): Promise<void> {
+  const keys = await cache.keys();
+  const overflow = keys.length - MAX_CACHED_TEAM_LOGOS;
+  if (overflow <= 0) return;
+  await Promise.all(keys.slice(0, overflow).map(request => cache.delete(request)));
+}
+
+function persistTeamLogo(nativeFetch: typeof window.fetch, imageUrl: string): void {
+  if (Capacitor.isNativePlatform() || !('caches' in window)) return;
+  const url = cacheableLogoUrl(imageUrl);
+  if (!url || pendingLogoCacheWrites.has(url.href)) return;
+
+  const task = (async () => {
+    const cache = await window.caches.open(TEAM_LOGO_CACHE);
+    const request = new Request(url.href, {
+      method: 'GET',
+      mode: url.origin === window.location.origin ? 'same-origin' : 'no-cors',
+      credentials: 'same-origin'
+    });
+    if (await cache.match(request, { ignoreVary: true })) return;
+
+    const response = await nativeFetch(request);
+    if (!response.ok && response.type !== 'opaque') return;
+    await cache.put(request, response.clone());
+    await trimTeamLogoCache(cache);
+  })()
+    .catch(() => undefined)
+    .finally(() => pendingLogoCacheWrites.delete(url.href));
+
+  pendingLogoCacheWrites.set(url.href, task);
 }
 
 function requestUrl(input: RequestInfo | URL): URL {
@@ -197,6 +242,7 @@ export function installLiveLifecycle(root: HTMLElement): () => void {
     if (!imageUrl) return;
     const value = { name: team.name, code: team.code?.trim() ?? '', imageUrl };
     teamKeys(team).forEach(key => teamLogos.set(key, value));
+    persistTeamLogo(nativeFetch, imageUrl);
   };
 
   const rememberSeriesTeams = (value: unknown): void => {

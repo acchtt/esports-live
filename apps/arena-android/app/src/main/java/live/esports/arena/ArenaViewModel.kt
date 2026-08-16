@@ -210,6 +210,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                             else -> current.series.state
                         }
                     )
+                    val stableSnapshot = stabilizeSnapshot(current.snapshot, snapshot, snapshotSeries)
                     val updatedEvents = uiState.events.map { event ->
                         if (event.series.id == series.id) event.copy(series = snapshotSeries) else event
                     }
@@ -219,7 +220,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                             series = snapshotSeries,
                             loading = false,
                             context = loadedContext,
-                            snapshot = snapshot,
+                            snapshot = stableSnapshot,
                             error = null
                         )
                     )
@@ -249,7 +250,8 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                     val current = uiState.detail?.takeIf {
                         it.series.id == series.id && it.selectedGameId == game.id
                     } ?: return@post
-                    uiState = uiState.copy(detail = current.copy(loading = false, snapshot = snapshot, error = null))
+                    val stableSnapshot = stabilizeSnapshot(current.snapshot, snapshot, current.series)
+                    uiState = uiState.copy(detail = current.copy(loading = false, snapshot = stableSnapshot, error = null))
                 }
             } catch (error: Exception) {
                 post {
@@ -398,14 +400,107 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         return start.isAfter(Instant.now().minusSeconds(12L * 60L * 60L))
     }
 
-    private fun mergeSeries(previous: Series, incoming: Series): Series = incoming.copy(
-        teams = incoming.teams.map { team ->
-            val old = previous.teams.firstOrNull { it.id == team.id }
-            team.copy(imageUrl = team.imageUrl ?: old?.imageUrl)
-        }.ifEmpty { previous.teams },
-        games = incoming.games.ifEmpty { previous.games },
-        score = incoming.score.ifEmpty { previous.score }
-    )
+    private fun mergeSeries(previous: Series, incoming: Series): Series {
+        val incomingCompetitionPlaceholder = isPlaceholderCompetition(incoming.competition)
+        val incomingTeamsPlaceholder = incoming.teams.isNotEmpty() && incoming.teams.all(::isPlaceholderTeam)
+        val usePreviousTeams = incoming.teams.isEmpty() || (incomingTeamsPlaceholder && previous.teams.any { !isPlaceholderTeam(it) })
+        val teams = if (usePreviousTeams) {
+            previous.teams
+        } else {
+            incoming.teams.mapIndexed { index, team ->
+                val old = previous.teams.firstOrNull { oldTeam ->
+                    oldTeam.id.isNotBlank() && team.id.isNotBlank() && oldTeam.id == team.id
+                } ?: previous.teams.getOrNull(index)
+                if (isPlaceholderTeam(team) && old != null && !isPlaceholderTeam(old)) {
+                    old
+                } else {
+                    team.copy(
+                        name = team.name.takeUnless { isPlaceholderTeamName(it) } ?: old?.name ?: team.name,
+                        code = team.code ?: old?.code,
+                        imageUrl = team.imageUrl ?: old?.imageUrl
+                    )
+                }
+            }
+        }
+        val competition = if (incomingCompetitionPlaceholder && !isPlaceholderCompetition(previous.competition)) {
+            previous.competition
+        } else {
+            incoming.competition.copy(
+                id = incoming.competition.id.ifBlank { previous.competition.id },
+                name = incoming.competition.name.takeUnless(::isPlaceholderCompetitionName) ?: previous.competition.name,
+                region = incoming.competition.region ?: previous.competition.region,
+                stage = incoming.competition.stage ?: previous.competition.stage
+            )
+        }
+        val genericMetadata = incomingCompetitionPlaceholder || incomingTeamsPlaceholder
+        return incoming.copy(
+            id = previous.id,
+            competition = competition,
+            teams = teams,
+            bestOf = if (genericMetadata && previous.bestOf > incoming.bestOf) previous.bestOf else incoming.bestOf,
+            scheduledStart = incoming.scheduledStart.ifBlank { previous.scheduledStart },
+            games = incoming.games.ifEmpty { previous.games },
+            score = incoming.score.ifEmpty { previous.score }
+        )
+    }
+
+    private fun stabilizeSnapshot(previous: LiveSnapshot?, incoming: LiveSnapshot, series: Series): LiveSnapshot {
+        if (previous == null || previous.game.id != incoming.game.id) {
+            return incoming.copy(series = series)
+        }
+        val previousStats = previous.stats
+        val incomingStats = incoming.stats
+        val stats = when {
+            incomingStats == null -> previousStats
+            previousStats == null -> incomingStats
+            else -> incomingStats.copy(
+                gameClockSeconds = incomingStats.gameClockSeconds ?: previousStats.gameClockSeconds,
+                patch = incomingStats.patch ?: previousStats.patch,
+                blue = stabilizeTeamState(previousStats.blue, incomingStats.blue),
+                red = stabilizeTeamState(previousStats.red, incomingStats.red)
+            )
+        }
+        if (incomingStats == null && previousStats != null) {
+            Log.i("ARENA", "ARENA_SNAPSHOT_HELD game=${incoming.game.id} reason=missing_stats")
+        }
+        return incoming.copy(series = series, stats = stats)
+    }
+
+    private fun stabilizeTeamState(previous: TeamState, incoming: TeamState): TeamState {
+        val previousPlayers = previous.players
+        val players = if (incoming.players.size < previousPlayers.size) previousPlayers else incoming.players
+        return incoming.copy(
+            id = incoming.id.ifBlank { previous.id },
+            name = incoming.name.takeUnless(::isPlaceholderTeamName) ?: previous.name,
+            gold = incoming.gold ?: previous.gold,
+            kills = incoming.kills ?: previous.kills,
+            objectives = ObjectiveState(
+                towers = incoming.objectives.towers ?: previous.objectives.towers,
+                inhibitors = incoming.objectives.inhibitors ?: previous.objectives.inhibitors,
+                dragons = incoming.objectives.dragons ?: previous.objectives.dragons,
+                barons = incoming.objectives.barons ?: previous.objectives.barons,
+                heralds = incoming.objectives.heralds ?: previous.objectives.heralds,
+                grubs = incoming.objectives.grubs ?: previous.objectives.grubs
+            ),
+            players = players
+        )
+    }
+
+    private fun isPlaceholderCompetition(competition: Competition): Boolean =
+        competition.id.isBlank() || isPlaceholderCompetitionName(competition.name)
+
+    private fun isPlaceholderCompetitionName(value: String): Boolean = when (value.trim().lowercase()) {
+        "", "unknown", "unknown competition", "league of legends", "tbd" -> true
+        else -> false
+    }
+
+    private fun isPlaceholderTeam(team: Team): Boolean =
+        team.id.isBlank() || isPlaceholderTeamName(team.name)
+
+    private fun isPlaceholderTeamName(value: String): Boolean = when (value.trim().lowercase()) {
+        "", "team", "team 1", "team 2", "blue", "red", "blue team", "red team", "unknown", "tbd" -> true
+        else -> false
+    }
 
     private fun preferredGame(games: List<SeriesGame>): SeriesGame? =
         games.firstOrNull { it.state in setOf("live", "paused", "draft") }

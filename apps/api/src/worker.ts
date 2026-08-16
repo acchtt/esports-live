@@ -194,6 +194,46 @@ export function createProductionInventoryProvider(
   };
 }
 
+/**
+ * Schedule reconciliation only needs authoritative game state, not the full
+ * player/item/history enrichment stack used by match scoreboards. Keep the rich
+ * provider for schedule/context data and regular snapshots, but route the
+ * reconciliation snapshot probes through the lightweight Riot provider. Also
+ * coalesce concurrent catalogue schedule reads so active and completed requests
+ * do not repeat the same full reconciliation work inside one Worker isolate.
+ */
+export function createProductionScheduleProvider(
+  enrichedProvider: LolProviderClient,
+  lightweightSnapshotProvider: LolProviderClient
+): LolProviderClient {
+  const scheduleProbeProvider: LolProviderClient = {
+    ...enrichedProvider,
+    getSnapshot(gameId: string, after?: string) {
+      return lightweightSnapshotProvider.getSnapshot(gameId, after);
+    }
+  };
+  const usableScheduleProvider = createUsableScheduleProvider(scheduleProbeProvider);
+  let scheduleInFlight: ReturnType<LolProviderClient['getSchedule']> | null = null;
+
+  return {
+    ...enrichedProvider,
+    getSchedule() {
+      if (scheduleInFlight) return scheduleInFlight;
+      const request = usableScheduleProvider.getSchedule();
+      scheduleInFlight = request;
+      void request.then(
+        () => {
+          if (scheduleInFlight === request) scheduleInFlight = null;
+        },
+        () => {
+          if (scheduleInFlight === request) scheduleInFlight = null;
+        }
+      );
+      return request;
+    }
+  };
+}
+
 let cachedConfigKey: string | null = null;
 let cachedHandler: ApiHandler | null = null;
 
@@ -247,7 +287,8 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
           allowSimulated: grubsCvAllowSimulated
         })
       : historyProvider;
-    const provider = createUsableScheduleProvider(createChampionKillProvider(enrichedProvider));
+    const snapshotProvider = createChampionKillProvider(enrichedProvider);
+    const provider = createProductionScheduleProvider(snapshotProvider, riotProvider);
     registry.register(new CachedAdapter(new LolAdapter(provider), {
       scheduleTtlMs: 15_000,
       liveSnapshotTtlMs: 400,

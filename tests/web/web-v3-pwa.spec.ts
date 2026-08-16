@@ -53,7 +53,7 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
   expect(manifest.icons.some(icon => icon.src === '/pwa/arena-icon.svg' && icon.type === 'image/svg+xml')).toBe(true);
 
   await expect(page.locator('#arena-startup-fallback')).toBeHidden();
-  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(6, 9, 13)');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)).toBe('rgb(6, 9, 13)');
 });
 
 test('V3 service worker keeps the routed app shell available offline', async ({ page, context }) => {
@@ -106,15 +106,14 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
   await expect(page.locator('html')).toHaveAttribute('data-v3-pwa', 'native');
 
   const headerInsets = await page.locator('.app-header').evaluate(header => {
-    const brand = header.querySelector<HTMLElement>('.brand-lockup');
     const headerStyle = getComputedStyle(header);
     return {
       paddingTop: Number.parseFloat(headerStyle.paddingTop),
-      brandTop: brand?.getBoundingClientRect().top ?? 0
+      minHeight: Number.parseFloat(headerStyle.minHeight)
     };
   });
-  expect(headerInsets.paddingTop).toBeGreaterThan(11);
-  expect(headerInsets.brandTop).toBeGreaterThanOrEqual(31);
+  expect(headerInsets.paddingTop).toBeGreaterThanOrEqual(42);
+  expect(headerInsets.minHeight).toBeGreaterThanOrEqual(103);
 
   const registrations = await page.evaluate(async () => (
     'serviceWorker' in navigator

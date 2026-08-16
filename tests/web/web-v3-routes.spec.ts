@@ -150,11 +150,28 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#quality-text')).toHaveText('LIVE DATA · Updated just now');
   await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'live');
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
-  await expect(page.locator('.detail-header > div')).toBeHidden();
+  await expect(page.locator('.detail-header > div')).toBeVisible();
   await expect(page.locator('.back-button')).toBeVisible();
-  await expect(page.locator('#game-tabs')).toBeHidden();
-  await expect(page.locator('#game-label')).toHaveAttribute('role', 'button');
-  await expect(page.locator('#game-label')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#game-tabs')).toBeVisible();
+  await expect(page.locator('#game-label')).not.toHaveAttribute('role', 'button');
+
+  const matchLayout = await page.evaluate(() => {
+    const header = document.querySelector<HTMLElement>('.detail-header')?.getBoundingClientRect();
+    const tabs = document.querySelector<HTMLElement>('#game-tabs')?.getBoundingClientRect();
+    const scoreboard = document.querySelector<HTMLElement>('#scoreboard')?.getBoundingClientRect();
+    return {
+      headerTop: header?.top ?? -1,
+      headerBottom: header?.bottom ?? -1,
+      tabsTop: tabs?.top ?? -1,
+      tabsBottom: tabs?.bottom ?? -1,
+      scoreboardTop: scoreboard?.top ?? -1,
+      scrollY: window.scrollY
+    };
+  });
+  expect(matchLayout.scrollY).toBe(0);
+  expect(matchLayout.headerTop).toBeGreaterThanOrEqual(0);
+  expect(matchLayout.tabsTop).toBeGreaterThan(matchLayout.headerBottom);
+  expect(matchLayout.scoreboardTop).toBeGreaterThan(matchLayout.tabsBottom);
 
   const itemIcon = page.locator('.player-item-slot img').first();
   await expect(itemIcon).toBeVisible();
@@ -184,10 +201,6 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   expect(scoreboardScale.playerHeight).toBeGreaterThanOrEqual(76);
   expect(scoreboardScale.portraitWidth).toBeGreaterThanOrEqual(40);
 
-  await page.locator('#game-label').click();
-  await expect(page.locator('#game-label')).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator('#game-tabs')).toBeVisible();
-
   const tabsFit = await page.locator('#game-tabs').evaluate(tabs => {
     const last = tabs.querySelector<HTMLElement>('[data-game-id]:last-child');
     const outer = tabs.getBoundingClientRect();
@@ -201,7 +214,7 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
   await expect(page.locator('#quality-text')).toHaveText('FINAL DATA · Complete snapshot');
   await expect(page.locator('#quality-text')).toHaveAttribute('data-status', 'final');
-  await expect(page.locator('#game-tabs')).toBeHidden();
+  await expect(page.locator('#game-tabs')).toBeVisible();
 
   await page.locator('.back-button').click();
   await expect(page).toHaveURL(/\/$/);
@@ -216,17 +229,19 @@ test('V3 opens a deep match URL directly, including the /v3 compatibility base',
   await page.goto('/match/series-routed/game-routed-1');
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
+  await expect(page.locator('#game-tabs')).toBeVisible();
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
   await expect(page).toHaveURL(/\/match\/series-routed\/game-routed-1$/);
 
   await page.goto('/v3/match/series-routed/game-routed-2');
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
+  await expect(page.locator('#game-tabs')).toBeVisible();
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
   await expect(page).toHaveURL(/\/v3\/match\/series-routed\/game-routed-2$/);
 });
 
-test('V3 match scoreboard fills short phone view and owns the scroll boundary', async ({ page }) => {
+test('V3 match scrolling stops at the bottom of the scoreboard', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 420 });
   await installFixtures(page);
   await page.goto('/match/series-routed/game-routed-2');
@@ -242,13 +257,11 @@ test('V3 match scoreboard fills short phone view and owns the scroll boundary', 
     return {
       scoreboardBottom: box.bottom + window.scrollY,
       documentBottom: root.scrollHeight,
-      viewportHeight: window.innerHeight,
       scrollY: window.scrollY,
       maxScrollY: Math.max(0, root.scrollHeight - window.innerHeight)
     };
   });
 
-  expect(boundary.scoreboardBottom).toBeGreaterThanOrEqual(boundary.viewportHeight - 2);
   expect(Math.abs(boundary.documentBottom - boundary.scoreboardBottom)).toBeLessThanOrEqual(2);
   expect(Math.abs(boundary.maxScrollY - boundary.scrollY)).toBeLessThanOrEqual(2);
 });

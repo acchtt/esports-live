@@ -149,4 +149,20 @@ test('V3 keeps refreshing a selected LPL Final game until newer final telemetry 
   expect(firstTwo).toHaveLength(2);
   expect(firstTwo.every(url => !url.searchParams.has('after'))).toBe(true);
   expect(firstTwo.every(url => url.searchParams.has('final'))).toBe(true);
+
+  await page.locator('#blue-kills').evaluate(element => {
+    const target = element as HTMLElement;
+    target.dataset.renderMutations = '0';
+    const observer = new MutationObserver(records => {
+      const updates = records.filter(record => record.type === 'childList' || record.type === 'characterData').length;
+      target.dataset.renderMutations = String(Number(target.dataset.renderMutations ?? '0') + updates);
+    });
+    observer.observe(target, { childList: true, characterData: true, subtree: true });
+  });
+
+  const settledRequestCount = snapshotRequests;
+  await page.waitForTimeout(4_300);
+  expect(snapshotRequests).toBeGreaterThan(settledRequestCount);
+  await expect(page.locator('#blue-kills')).toHaveAttribute('data-render-mutations', '0');
+  await expect(page.locator('#blue-kills')).toHaveText('11');
 });

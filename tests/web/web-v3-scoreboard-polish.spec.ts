@@ -4,7 +4,7 @@ async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
 }
 
-test('V3 keeps split data status and fits a five-player scoreboard in one phone view', async ({ page }) => {
+test('V3 keeps split data status and uses readable item-free player rows on phones', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/health**', route => json(route, {
     ok: true,
@@ -110,26 +110,35 @@ test('V3 keeps split data status and fits a five-player scoreboard in one phone 
     sample.append(status, header, teams, objectives, players);
     document.body.append(sample);
 
-    const firstItems = sample.querySelector('.player-items');
-    const firstSlot = firstItems?.firstElementChild as HTMLElement | null;
-    const lastSlot = firstItems?.lastElementChild as HTMLElement | null;
-    const slotStyle = firstSlot ? getComputedStyle(firstSlot) : null;
+    const firstItems = sample.querySelector<HTMLElement>('.player-items');
+    const firstRow = sample.querySelector<HTMLElement>('.player-row');
+    const portrait = sample.querySelector<HTMLElement>('.champion-portrait');
+    const name = sample.querySelector<HTMLElement>('.player-copy strong');
+    const statline = sample.querySelector<HTMLElement>('.player-statline');
+    const champion = sample.querySelector<HTMLElement>('.player-champion');
+    const lane = sample.querySelector<HTMLElement>('.lane-gold');
     const result = {
       scoreboardHeight: sample.getBoundingClientRect().height,
-      itemWidth: slotStyle ? Number.parseFloat(slotStyle.width) : 0,
-      itemHeight: slotStyle ? Number.parseFloat(slotStyle.height) : 0,
-      itemWrap: firstItems ? getComputedStyle(firstItems).flexWrap : '',
-      sameItemRow: Boolean(firstSlot && lastSlot && Math.abs(firstSlot.getBoundingClientRect().top - lastSlot.getBoundingClientRect().top) < 1),
-      lanePosition: getComputedStyle(sample.querySelector('.lane-gold') as Element).position
+      itemDisplay: firstItems ? getComputedStyle(firstItems).display : '',
+      rowHeight: firstRow?.getBoundingClientRect().height ?? 0,
+      portraitWidth: portrait?.getBoundingClientRect().width ?? 0,
+      nameFontSize: name ? Number.parseFloat(getComputedStyle(name).fontSize) : 0,
+      statFontSize: statline ? Number.parseFloat(getComputedStyle(statline).fontSize) : 0,
+      championFontSize: champion ? Number.parseFloat(getComputedStyle(champion).fontSize) : 0,
+      laneWidth: lane?.getBoundingClientRect().width ?? 0,
+      lanePosition: lane ? getComputedStyle(lane).position : ''
     };
     sample.remove();
     return result;
   });
 
-  expect(layout.itemWidth).toBeGreaterThanOrEqual(24);
-  expect(layout.itemHeight).toBeGreaterThanOrEqual(24);
-  expect(layout.itemWrap).toBe('nowrap');
-  expect(layout.sameItemRow).toBe(true);
+  expect(layout.itemDisplay).toBe('none');
+  expect(layout.rowHeight).toBeGreaterThanOrEqual(78);
+  expect(layout.portraitWidth).toBeGreaterThanOrEqual(44);
+  expect(layout.nameFontSize).toBeGreaterThanOrEqual(13.5);
+  expect(layout.statFontSize).toBeGreaterThanOrEqual(10.5);
+  expect(layout.championFontSize).toBeGreaterThanOrEqual(9);
+  expect(layout.laneWidth).toBeGreaterThanOrEqual(58);
   expect(layout.lanePosition).toBe('absolute');
-  expect(layout.scoreboardHeight).toBeLessThanOrEqual(640);
+  expect(layout.scoreboardHeight).toBeLessThanOrEqual(620);
 });

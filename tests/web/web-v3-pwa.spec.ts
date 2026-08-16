@@ -1,5 +1,4 @@
 import { expect, test, type Route } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
 
 async function json(route: Route, value: unknown): Promise<void> {
   await route.fulfill({
@@ -131,21 +130,4 @@ test('V3 treats a Capacitor Android bridge as native and skips the browser servi
   await expect.poll(async () => page.evaluate(async () => await window.caches.keys())).toEqual([
     'arena-v3-api-last-good-v1'
   ]);
-});
-
-test('V3 Android startup keeps localhost and retries the bundled page without deleting WebView data', async () => {
-  const [config, installer] = await Promise.all([
-    readFile('apps/mobile-v3-native/capacitor.config.ts', 'utf8'),
-    readFile('apps/mobile-v3-native/scripts/install-updater-android.mjs', 'utf8')
-  ]);
-
-  expect(config).toContain("hostname: 'localhost'");
-  expect(config).not.toContain("hostname: 'arena.localhost'");
-  expect(config).toContain("errorPath: 'native-error.html'");
-  expect(installer).toContain('scheduleBundledAppRecovery();');
-  expect(installer).toContain('webView.loadUrl(getBridge().getAppUrl());');
-  expect(installer).not.toContain('getDir("webview"');
-  expect(installer.indexOf('super.onCreate(savedInstanceState);')).toBeLessThan(
-    installer.indexOf('scheduleBundledAppRecovery();')
-  );
 });

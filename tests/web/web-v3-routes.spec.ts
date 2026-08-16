@@ -173,12 +173,9 @@ test('V3 navigates from the catalogue to a shareable match route and back', asyn
   expect(matchLayout.tabsTop).toBeGreaterThan(matchLayout.headerBottom);
   expect(matchLayout.scoreboardTop).toBeGreaterThan(matchLayout.tabsBottom);
 
-  const itemIcon = page.locator('.player-item-slot img').first();
-  await expect(itemIcon).toBeVisible();
-  await expect(itemIcon).toHaveAttribute(
-    'src',
-    /\/cdn\/16\.16\.1\/img\/item\/3078\.png\?arena-item-retry=1$/
-  );
+  await expect(page.locator('.player-items')).toHaveCount(2);
+  await expect(page.locator('.player-items').first()).toBeHidden();
+  await expect(page.locator('.player-item-slot img').first()).toBeHidden();
 
   const scoreboardScale = await page.locator('#scoreboard').evaluate(scoreboard => {
     const box = (selector: string) => scoreboard.querySelector<HTMLElement>(selector)?.getBoundingClientRect();

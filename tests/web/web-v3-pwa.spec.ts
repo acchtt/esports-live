@@ -92,6 +92,59 @@ test('V3 service worker keeps the routed app shell and runtime images available 
   expect(new URL(page.url()).pathname).toBe('/match/offline-series/offline-game');
 });
 
+test('V3 persists team logos into the runtime image cache on the first catalogue load', async ({ page }) => {
+  const blueLogo = 'https://logos.example.test/pwa-blue.svg';
+  const redLogo = 'https://logos.example.test/pwa-red.svg';
+  const provider = { id: 'fixture', name: 'Fixture provider' };
+  const blue = { id: 'logo-blue', name: 'Logo Blue', code: 'LGB', imageUrl: blueLogo };
+  const red = { id: 'logo-red', name: 'Logo Red', code: 'LGR', imageUrl: redLogo };
+  const series = {
+    id: 'series-logo-cache',
+    esport: 'lol',
+    competition: { id: 'lck', name: 'LCK', stage: 'Regular Season' },
+    teams: [blue, red],
+    bestOf: 3,
+    state: 'live',
+    scheduledStart: new Date(Date.now() - 15 * 60_000).toISOString(),
+    games: [{ id: 'logo-game-1', number: 1, state: 'live' }]
+  };
+
+  await page.route('https://logos.example.test/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="#fff"/></svg>'
+  }));
+  await page.route('**/health**', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+  await page.route('**/v1/lol/schedule**', route => {
+    const url = new URL(route.request().url());
+    return json(route, {
+      esport: 'lol',
+      events: url.searchParams.get('states') === 'completed'
+        ? []
+        : [{ series, provider, observedAt: new Date().toISOString() }]
+    });
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const card = page.locator('[data-series-id="series-logo-cache"]');
+  await expect(card).toBeVisible();
+  await expect(card.locator('.match-team-logo')).toHaveCount(2);
+  await expect(card.locator('.match-team-logo').first()).toBeVisible();
+
+  await expect.poll(() => page.evaluate(async urls => {
+    const cache = await window.caches.open('arena-v3-runtime-images-v1');
+    return await Promise.all(urls.map(async url => Boolean(
+      await cache.match(url, { ignoreVary: true })
+    )));
+  }, [blueLogo, redLogo])).toEqual([true, true]);
+});
+
 test('V3 restores durable completed results after transient caches are cleared', async ({ page }) => {
   let scheduleOnline = true;
   const blue = { id: 'pwa-blue', name: 'PWA Blue', code: 'PWB' };

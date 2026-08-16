@@ -134,7 +134,7 @@ test('V3 never regresses an observed live LPL game back to Upcoming or Pending',
     () => { matchesScheduleRequests += 1; }
   );
 
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'commit' });
 
   const card = page.locator('[data-series-id="lpl-live-series"]');
   await expect(card).toBeVisible();

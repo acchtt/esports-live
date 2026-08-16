@@ -52,7 +52,7 @@ test('V3 keeps the catalogue usable when the primary API has a network failure',
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'commit' });
 
   await expect(page.locator('[data-series-id="series-api-failover"]')).toBeVisible();
   await expect(page.locator('#catalogue-meta')).not.toContainText('Failed to fetch');
@@ -85,7 +85,7 @@ test('V3 uses recent last-good schedules when both network APIs are unavailable'
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'commit' });
   await expect(page.locator('[data-series-id="series-api-failover"]')).toBeVisible();
 
   await expect.poll(() => page.evaluate(async () => {

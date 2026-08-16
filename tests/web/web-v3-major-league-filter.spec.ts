@@ -65,7 +65,7 @@ async function installFixtures(page: Page): Promise<void> {
 test('V3 league pills are multi-select and compose with status tabs', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'commit' });
 
   const statusTabs = page.locator('.match-filters [data-match-filter]');
   const pillGroup = page.locator('.catalogue-filter-pills');

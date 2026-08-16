@@ -35,7 +35,7 @@ async function mockApis(page: Page): Promise<() => number> {
 
 test('V3 temporarily runs LoL-only without requesting Dota data', async ({ page }) => {
   const dotaRequests = await mockApis(page);
-  await page.goto('/?commit=lol-only-test', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?commit=lol-only-test', { waitUntil: 'commit' });
 
   await expect(page.locator('.app-main')).toBeVisible();
   await expect(page.locator('.catalogue-header')).toContainText('LEAGUE OF LEGENDS');

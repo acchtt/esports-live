@@ -106,7 +106,7 @@ async function installFixtures(page: Page): Promise<void> {
 test('V3 navigates from the catalogue to a shareable match route and back', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'commit' });
 
   await expect(page.locator('[data-series-id="series-routed"]')).toBeVisible();
   await page.locator('[data-series-id="series-routed"]').click();
@@ -144,13 +144,13 @@ test('V3 opens a deep match URL directly, including the /v3 compatibility base',
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
 
-  await page.goto('/match/series-routed/game-routed-1', { waitUntil: 'domcontentloaded' });
+  await page.goto('/match/series-routed/game-routed-1', { waitUntil: 'commit' });
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
   await expect(page).toHaveURL(/\/match\/series-routed\/game-routed-1$/);
 
-  await page.goto('/v3/match/series-routed/game-routed-2', { waitUntil: 'domcontentloaded' });
+  await page.goto('/v3/match/series-routed/game-routed-2', { waitUntil: 'commit' });
   await expect(page.locator('#detail-title')).toHaveText('Route Blue vs Route Red');
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
   await expect(page.locator('#catalogue-panel')).toHaveCount(0);
@@ -160,7 +160,7 @@ test('V3 opens a deep match URL directly, including the /v3 compatibility base',
 test('V3 match scrolling stops at the bottom of the scoreboard', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 420 });
   await installFixtures(page);
-  await page.goto('/match/series-routed/game-routed-2', { waitUntil: 'domcontentloaded' });
+  await page.goto('/match/series-routed/game-routed-2', { waitUntil: 'commit' });
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
   await expect(page.locator('.mobile-nav')).toBeHidden();
 
@@ -193,7 +193,7 @@ test('V3 match routes preserve foreground schedule and snapshot refreshes', asyn
 
   await page.setViewportSize({ width: 390, height: 844 });
   await installFixtures(page);
-  await page.goto('/match/series-routed/game-routed-2', { waitUntil: 'domcontentloaded' });
+  await page.goto('/match/series-routed/game-routed-2', { waitUntil: 'commit' });
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
 
   // Initial navigation can itself emit focus/pageshow. Wait past the production

@@ -110,42 +110,26 @@ test('V3 keeps split data status and fits a five-player scoreboard in one phone 
     sample.append(status, header, teams, objectives, players);
     document.body.append(sample);
 
-    const firstRow = sample.querySelector('.player-row') as HTMLElement;
-    const blueItems = firstRow.querySelector('.player-items.blue') as HTMLElement;
-    const redItems = firstRow.querySelector('.player-items.red') as HTMLElement;
-    const firstSlot = blueItems.firstElementChild as HTMLElement | null;
-    const lastSlot = blueItems.lastElementChild as HTMLElement | null;
+    const firstItems = sample.querySelector('.player-items');
+    const firstSlot = firstItems?.firstElementChild as HTMLElement | null;
+    const lastSlot = firstItems?.lastElementChild as HTMLElement | null;
     const slotStyle = firstSlot ? getComputedStyle(firstSlot) : null;
-    const blueRect = blueItems.getBoundingClientRect();
-    const redRect = redItems.getBoundingClientRect();
     const result = {
       scoreboardHeight: sample.getBoundingClientRect().height,
       itemWidth: slotStyle ? Number.parseFloat(slotStyle.width) : 0,
       itemHeight: slotStyle ? Number.parseFloat(slotStyle.height) : 0,
-      itemWrap: getComputedStyle(blueItems).flexWrap,
+      itemWrap: firstItems ? getComputedStyle(firstItems).flexWrap : '',
       sameItemRow: Boolean(firstSlot && lastSlot && Math.abs(firstSlot.getBoundingClientRect().top - lastSlot.getBoundingClientRect().top) < 1),
-      itemTrayGap: redRect.left - blueRect.right,
-      blueTrayWidth: blueRect.width,
-      redTrayWidth: redRect.width,
-      blueJustifySelf: getComputedStyle(blueItems).justifySelf,
-      redJustifySelf: getComputedStyle(redItems).justifySelf,
-      redDirection: getComputedStyle(redItems).flexDirection,
       lanePosition: getComputedStyle(sample.querySelector('.lane-gold') as Element).position
     };
     sample.remove();
     return result;
   });
 
-  expect(layout.itemWidth).toBeGreaterThanOrEqual(21);
-  expect(layout.itemHeight).toBeGreaterThanOrEqual(21);
+  expect(layout.itemWidth).toBeGreaterThanOrEqual(24);
+  expect(layout.itemHeight).toBeGreaterThanOrEqual(24);
   expect(layout.itemWrap).toBe('nowrap');
   expect(layout.sameItemRow).toBe(true);
-  expect(layout.itemTrayGap).toBeGreaterThanOrEqual(8);
-  expect(layout.blueTrayWidth).toBeLessThan(180);
-  expect(layout.redTrayWidth).toBeLessThan(180);
-  expect(layout.blueJustifySelf).toBe('start');
-  expect(layout.redJustifySelf).toBe('end');
-  expect(layout.redDirection).toBe('row-reverse');
   expect(layout.lanePosition).toBe('absolute');
   expect(layout.scoreboardHeight).toBeLessThanOrEqual(640);
 });

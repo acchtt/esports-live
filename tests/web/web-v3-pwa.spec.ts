@@ -56,7 +56,7 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
   await expect(page.locator('#arena-startup-fallback')).toBeHidden();
 });
 
-test('V3 service worker keeps the routed app shell available offline', async ({ page, context }) => {
+test('V3 service worker keeps the routed app shell and runtime images available offline', async ({ page, context }) => {
   await mockEmptyApi(page);
   await page.goto('/');
 
@@ -66,6 +66,8 @@ test('V3 service worker keeps the routed app shell available offline', async ({ 
     return await response.text();
   });
   expect(serviceWorkerSource).toContain('arena-v3-shell-');
+  expect(serviceWorkerSource).toContain('arena-v3-runtime-images-v1');
+  expect(serviceWorkerSource).toContain("response.type === 'opaque'");
 
   await page.evaluate(async () => {
     await navigator.serviceWorker.register('/sw.js?v=pwa-test', { scope: '/' });
@@ -88,6 +90,91 @@ test('V3 service worker keeps the routed app shell available offline', async ({ 
   await expect(page.locator('.brand-lockup')).toBeVisible();
   await expect(page.locator('meta[name="arena-version"]')).toHaveAttribute('content', 'v3');
   expect(new URL(page.url()).pathname).toBe('/match/offline-series/offline-game');
+});
+
+test('V3 restores durable completed results after transient caches are cleared', async ({ page }) => {
+  let scheduleOnline = true;
+  const blue = { id: 'pwa-blue', name: 'PWA Blue', code: 'PWB' };
+  const red = { id: 'pwa-red', name: 'PWA Red', code: 'PWR' };
+  const completedSeries = {
+    id: 'series-pwa-history',
+    esport: 'lol',
+    competition: { id: 'lck', name: 'LCK', stage: 'Playoffs' },
+    teams: [blue, red],
+    bestOf: 3,
+    state: 'completed',
+    scheduledStart: new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString(),
+    score: [
+      { team: blue, wins: 2 },
+      { team: red, wins: 0 }
+    ],
+    games: [
+      { id: 'pwa-game-1', number: 1, state: 'completed' },
+      { id: 'pwa-game-2', number: 2, state: 'completed' }
+    ]
+  };
+  const provider = { id: 'fixture', name: 'Fixture provider' };
+
+  await page.route('**/health**', route => json(route, {
+    ok: true,
+    service: 'esports-live-api',
+    schemaVersion: '1.0',
+    adapters: ['lol']
+  }));
+  await page.route('**/v1/lol/schedule**', async route => {
+    if (!scheduleOnline) {
+      await route.abort('failed');
+      return;
+    }
+    const url = new URL(route.request().url());
+    const history = url.searchParams.get('states') === 'completed';
+    await json(route, {
+      esport: 'lol',
+      events: history
+        ? [{ series: completedSeries, provider, observedAt: new Date().toISOString() }]
+        : []
+    });
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const card = page.locator('[data-series-id="series-pwa-history"]');
+  await expect(card).toBeVisible();
+  await expect(card.locator('.match-series-score')).toHaveText('2 – 0');
+
+  await expect.poll(() => page.evaluate(async () => {
+    try {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('arena-v3-pwa-history', 1);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const count = await new Promise<number>((resolve, reject) => {
+        const request = database.transaction('completed-series', 'readonly')
+          .objectStore('completed-series')
+          .count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      database.close();
+      return count;
+    } catch {
+      return 0;
+    }
+  })).toBeGreaterThanOrEqual(1);
+
+  await page.evaluate(async () => {
+    window.localStorage.clear();
+    await window.caches.delete('arena-v3-api-last-good-v1');
+  });
+  scheduleOnline = false;
+  await page.reload();
+
+  const restored = page.locator('[data-series-id="series-pwa-history"]');
+  await expect(restored).toBeVisible();
+  await expect(restored.locator('.match-status')).toHaveText('FINAL');
+  await expect(restored.locator('.match-series-score')).toHaveText('2 – 0');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3DataSource)).toBe('cache');
 });
 
 test('V3 treats a Capacitor Android bridge as native and skips the browser service worker', async ({ page }) => {

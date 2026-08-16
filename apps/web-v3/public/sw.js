@@ -1,6 +1,8 @@
 const version = new URL(self.location.href).searchParams.get('v') || 'dev';
 const SHELL_CACHE = `arena-v3-shell-${version}`;
 const STATIC_CACHE = `arena-v3-static-${version}`;
+const RUNTIME_IMAGE_CACHE = 'arena-v3-runtime-images-v1';
+const MAX_RUNTIME_IMAGES = 180;
 const SHELL_KEY = new Request(new URL('/__arena-v3-shell__', self.location.origin));
 const CORE_ASSETS = ['/manifest.webmanifest', '/pwa/arena-icon.svg'];
 
@@ -18,6 +20,17 @@ function staticRequest(request, url) {
     || url.pathname === '/manifest.webmanifest'
     || url.pathname.startsWith('/pwa/')
   );
+}
+
+function runtimeImageRequest(request, url) {
+  return request.destination === 'image' && !sameOrigin(url);
+}
+
+async function trimRuntimeImages(cache) {
+  const keys = await cache.keys();
+  const overflow = keys.length - MAX_RUNTIME_IMAGES;
+  if (overflow <= 0) return;
+  await Promise.all(keys.slice(0, overflow).map(request => cache.delete(request)));
 }
 
 async function cacheStaticAsset(cache, value) {
@@ -49,7 +62,12 @@ async function cacheShell() {
 }
 
 async function cleanOldCaches() {
-  const keep = new Set([SHELL_CACHE, STATIC_CACHE, 'arena-v3-api-last-good-v1']);
+  const keep = new Set([
+    SHELL_CACHE,
+    STATIC_CACHE,
+    RUNTIME_IMAGE_CACHE,
+    'arena-v3-api-last-good-v1'
+  ]);
   const names = await caches.keys();
   await Promise.all(names
     .filter(name => (name.startsWith('arena-v3-shell-') || name.startsWith('arena-v3-static-')) && !keep.has(name))
@@ -97,6 +115,26 @@ self.addEventListener('fetch', event => {
             headers: { 'content-type': 'text/plain; charset=utf-8' }
           });
       }
+    })());
+    return;
+  }
+
+  if (runtimeImageRequest(request, url)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(RUNTIME_IMAGE_CACHE);
+      const cached = await cache.match(request, { ignoreVary: true });
+      if (cached) return cached;
+
+      const response = await fetch(request);
+      if (response.ok || response.type === 'opaque') {
+        try {
+          await cache.put(request, response.clone());
+          await trimRuntimeImages(cache);
+        } catch {
+          // Image caching is opportunistic; the fetched image can still be shown.
+        }
+      }
+      return response;
     })());
     return;
   }

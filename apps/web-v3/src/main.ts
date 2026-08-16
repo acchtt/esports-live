@@ -31,6 +31,7 @@ import { installDotaLivescore } from './dota-livescore.ts';
 import { installNativeLifecycle } from './native-lifecycle.ts';
 import { installAppUpdater } from './app-updater.ts';
 import { installPlayerBoardCopy } from './player-board-copy.ts';
+import { installPwaPersistence } from './pwa-persistence.ts';
 import { installPwa } from './pwa.ts';
 import { currentV3Route, installV3Routing } from './route-page.ts';
 import { installTeamSideIdentity } from './team-side-identity.ts';
@@ -47,6 +48,7 @@ if (initialRoute.kind !== 'match') {
   installCatalogueTeamLogos(root);
   installCatalogueSeriesScores(root);
 }
+installPwaPersistence();
 installLiveLifecycle(root);
 installNativeLifecycle();
 installPlayerBoardCopy(root);

@@ -92,7 +92,11 @@ fun ArenaApp(
             .semantics { contentDescription = "ARENA_NATIVE_UI_READY" }
             .testTag("arena-native-root")
     ) {
-        AnimatedContent(targetState = state.detail, label = "screen") { detail ->
+        AnimatedContent(
+            targetState = state.detail,
+            contentKey = { detail -> detail?.series?.id ?: "home" },
+            label = "screen"
+        ) { detail ->
             if (detail == null) {
                 HomeScreen(
                     state = state,

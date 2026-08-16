@@ -25,12 +25,15 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
   await mockEmptyApi(page);
   await page.goto('/');
 
-  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
+  const manifestLink = page.locator('link[rel="manifest"]');
+  await expect(manifestLink).toHaveAttribute('href', /manifest\.webmanifest$/);
   await expect(page.locator('meta[name="mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
   await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
 
-  const manifest = await page.evaluate(async () => {
-    const response = await fetch('/manifest.webmanifest');
+  const manifestHref = await manifestLink.getAttribute('href');
+  expect(manifestHref).toBeTruthy();
+  const manifest = await page.evaluate(async href => {
+    const response = await fetch(href);
     if (!response.ok) throw new Error(`Manifest returned ${response.status}`);
     return await response.json() as {
       name: string;
@@ -40,7 +43,7 @@ test('V3 exposes installable PWA metadata', async ({ page }) => {
       display: string;
       icons: Array<{ src: string; type: string }>;
     };
-  });
+  }, manifestHref!);
 
   expect(manifest.name).toBe('ARENA Esports Live');
   expect(manifest.short_name).toBe('ARENA');

@@ -124,6 +124,30 @@ test('V3 home is curated and only loads the full results archive on demand', asy
   expect(spacing.tabGap).toBeGreaterThanOrEqual(8);
   expect(spacing.sectionGap).toBeGreaterThanOrEqual(16);
 
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  await page.locator('.match-filters [data-match-filter="ended"]').click();
+  await expect.poll(() => counters.full).toBeGreaterThanOrEqual(1);
+  await expect(page.locator('.match-card:visible')).toHaveCount(30);
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3HistoryMode)).toBe('full');
+
+  const boundedBeforeHome = counters.bounded;
+  await page.locator('.match-filters [data-match-filter="all"]').click();
+  await expect(page.locator('[data-home-dashboard]')).toBeVisible();
+  await expect(page.locator('#catalogue-grid .match-card')).toHaveCount(13);
+  await expect.poll(() => counters.bounded).toBeGreaterThan(boundedBeforeHome);
+  await expect(page.locator('#catalogue-meta')).toHaveText('36 matches · 13 shown');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3HistoryMode)).toBe('recent');
+});
+
+test('V3 scrolling back to the top does not relayout the header', async ({ page }) => {
+  const counters = { bounded: 0, full: 0 };
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installFixtures(page, counters);
+  await page.goto('/');
+  await expect(page.locator('[data-home-dashboard]')).toBeVisible();
+
   const header = page.locator('.app-header');
   const expandedHeaderHeight = await header.evaluate(element => element.getBoundingClientRect().height);
   expect(expandedHeaderHeight).toBeGreaterThanOrEqual(70);
@@ -140,20 +164,4 @@ test('V3 home is curated and only loads the full results archive on demand', asy
   expect(await header.getAttribute('data-compact')).toBeNull();
   const topHeaderHeight = await header.evaluate(element => element.getBoundingClientRect().height);
   expect(Math.abs(topHeaderHeight - expandedHeaderHeight)).toBeLessThanOrEqual(1);
-
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-
-  await page.locator('.match-filters [data-match-filter="ended"]').click();
-  await expect.poll(() => counters.full).toBeGreaterThanOrEqual(1);
-  await expect(page.locator('.match-card:visible')).toHaveCount(30);
-  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3HistoryMode)).toBe('full');
-
-  const boundedBeforeHome = counters.bounded;
-  await page.locator('.match-filters [data-match-filter="all"]').click();
-  await expect(page.locator('[data-home-dashboard]')).toBeVisible();
-  await expect(page.locator('#catalogue-grid .match-card')).toHaveCount(13);
-  await expect.poll(() => counters.bounded).toBeGreaterThan(boundedBeforeHome);
-  await expect(page.locator('#catalogue-meta')).toHaveText('36 matches · 13 shown');
-  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3HistoryMode)).toBe('recent');
 });

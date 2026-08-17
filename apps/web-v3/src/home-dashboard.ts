@@ -74,7 +74,7 @@ function buildSection(section: HomeSection, cards: readonly HTMLElement[]): HTML
   const action = document.createElement('button');
   action.type = 'button';
   action.className = 'catalogue-section-action';
-  action.dataset.matchFilter = copy.filter;
+  action.dataset.homeFilter = copy.filter;
   action.textContent = copy.action;
   header.append(heading, action);
   wrapper.append(header);
@@ -160,12 +160,20 @@ export function installHomeDashboard(root: ParentNode): () => void {
   const observer = new MutationObserver(queueSync);
   observer.observe(grid, { childList: true });
   const handleFilter = (): void => queueSync();
+  const handleHomeAction = (event: Event): void => {
+    const target = event.target instanceof Element ? event.target : null;
+    const filter = target?.closest<HTMLElement>('[data-home-filter]')?.dataset.homeFilter;
+    if (!filter) return;
+    filters.querySelector<HTMLButtonElement>(`[data-match-filter="${filter}"]`)?.click();
+  };
   filters.addEventListener('click', handleFilter);
+  grid.addEventListener('click', handleHomeAction);
   queueSync();
 
   return () => {
     observer.disconnect();
     filters.removeEventListener('click', handleFilter);
+    grid.removeEventListener('click', handleHomeAction);
     delete panel.dataset.homeDashboardActive;
   };
 }

@@ -96,6 +96,34 @@ test('V3 home is curated and only loads the full results archive on demand', asy
   expect(counters.full).toBe(0);
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3HistoryMode)).toBe('recent');
 
+  const transientDisplay = await page.evaluate(() => {
+    const grid = document.querySelector<HTMLElement>('#catalogue-grid');
+    if (!grid) throw new Error('Missing catalogue grid');
+    const card = document.createElement('article');
+    card.className = 'match-card';
+    grid.append(card);
+    const display = getComputedStyle(card).display;
+    card.remove();
+    return display;
+  });
+  expect(transientDisplay).toBe('none');
+
+  const spacing = await page.evaluate(() => {
+    const tabs = document.querySelector<HTMLElement>('.match-filters');
+    const pills = document.querySelector<HTMLElement>('.catalogue-filter-pills');
+    const firstSection = document.querySelector<HTMLElement>('[data-home-section="live"]');
+    if (!tabs || !pills || !firstSection) throw new Error('Missing homepage spacing elements');
+    const tabRect = tabs.getBoundingClientRect();
+    const pillRect = pills.getBoundingClientRect();
+    const sectionRect = firstSection.getBoundingClientRect();
+    return {
+      tabGap: pillRect.top - tabRect.bottom,
+      sectionGap: sectionRect.top - pillRect.bottom
+    };
+  });
+  expect(spacing.tabGap).toBeGreaterThanOrEqual(8);
+  expect(spacing.sectionGap).toBeGreaterThanOrEqual(16);
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 

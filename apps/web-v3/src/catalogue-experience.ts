@@ -210,12 +210,13 @@ function createResultsTools(pills: HTMLElement): HTMLElement {
   dateLabel.textContent = 'Date';
   const select = document.createElement('select');
   select.dataset.resultsDays = 'true';
-  [
+  const dateOptions: readonly (readonly [string, string])[] = [
     ['all', 'All time'],
     ['7', 'Last 7 days'],
     ['30', 'Last 30 days'],
     ['90', 'Last 90 days']
-  ].forEach(([value, label]) => {
+  ];
+  dateOptions.forEach(([value, label]) => {
     const option = document.createElement('option');
     option.value = value;
     option.textContent = label;

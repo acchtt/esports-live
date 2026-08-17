@@ -92,7 +92,7 @@ test('V3 service worker keeps the routed app shell and runtime images available 
   expect(new URL(page.url()).pathname).toBe('/match/offline-series/offline-game');
 });
 
-test('V3 persists team logos into the runtime image cache on the first catalogue load', async ({ page }) => {
+test('V3 persists team logos into CacheStorage and reuses them when the logo host is unavailable', async ({ page }) => {
   const blueLogo = 'https://logos.example.test/pwa-blue.svg';
   const redLogo = 'https://logos.example.test/pwa-red.svg';
   const provider = { id: 'fixture', name: 'Fixture provider' };
@@ -108,12 +108,17 @@ test('V3 persists team logos into the runtime image cache on the first catalogue
     scheduledStart: new Date(Date.now() - 15 * 60_000).toISOString(),
     games: [{ id: 'logo-game-1', number: 1, state: 'live' }]
   };
+  let logoHostAvailable = true;
 
-  await page.route('https://logos.example.test/**', route => route.fulfill({
-    status: 200,
-    contentType: 'image/svg+xml',
-    body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="#fff"/></svg>'
-  }));
+  await page.route('https://logos.example.test/**', route => {
+    if (!logoHostAvailable) return route.abort('failed');
+    return route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      headers: { 'cache-control': 'no-store' },
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="#fff"/></svg>'
+    });
+  });
   await page.route('**/health**', route => json(route, {
     ok: true,
     service: 'esports-live-api',
@@ -136,6 +141,7 @@ test('V3 persists team logos into the runtime image cache on the first catalogue
   await expect(card).toBeVisible();
   await expect(card.locator('.match-team-logo')).toHaveCount(2);
   await expect(card.locator('.match-team-logo').first()).toBeVisible();
+  await expect(card.locator('.match-team-logo').last()).toBeVisible();
 
   await expect.poll(() => page.evaluate(async urls => {
     const cache = await window.caches.open('arena-v3-runtime-images-v1');
@@ -143,6 +149,21 @@ test('V3 persists team logos into the runtime image cache on the first catalogue
       await cache.match(url, { ignoreVary: true })
     )));
   }, [blueLogo, redLogo])).toEqual([true, true]);
+
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register('/sw.js?v=logo-cache-reuse-test', { scope: '/' });
+    await navigator.serviceWorker.ready;
+  });
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+
+  logoHostAvailable = false;
+  await page.reload();
+
+  const restored = page.locator('[data-series-id="series-logo-cache"]');
+  await expect(restored).toBeVisible();
+  await expect(restored.locator('.match-team-logo')).toHaveCount(2);
+  await expect(restored.locator('.match-team-logo').first()).toBeVisible();
+  await expect(restored.locator('.match-team-logo').last()).toBeVisible();
 });
 
 test('V3 restores durable completed results after transient caches are cleared', async ({ page }) => {

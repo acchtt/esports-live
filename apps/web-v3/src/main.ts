@@ -24,6 +24,7 @@ import { installCatalogueSeriesScores } from './catalogue-series-scores.ts';
 import { installCatalogueTeamLogos } from './catalogue-team-logos.ts';
 import { installChampionPortraitAssets } from './champion-portrait-assets.ts';
 import { installCompactHeader } from './compact-header.ts';
+import { installFinalSeriesTabs } from './final-series-tabs.ts';
 import { installFinalSnapshotPolling } from './final-snapshot-polling.ts';
 import { installGrubsObjective } from './grubs-objective.ts';
 import { installItemAssets } from './item-assets.ts';
@@ -54,6 +55,7 @@ if (initialRoute.kind !== 'match') {
 }
 installPwaPersistence();
 installLiveLifecycle(root);
+installFinalSeriesTabs(root);
 installNativeLifecycle();
 installPlayerBoardCopy(root);
 installItemAssets(root);

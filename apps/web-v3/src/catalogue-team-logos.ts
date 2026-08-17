@@ -2,6 +2,8 @@ import type { TeamRef } from '@esports-live/core';
 
 const EAGER_CARD_COUNT = 6;
 const PREWARM_EVENT_COUNT = 10;
+const RUNTIME_IMAGE_CACHE = 'arena-v3-runtime-images-v1';
+const MAX_RUNTIME_IMAGES = 180;
 
 function normalized(value: string | null | undefined): string {
   return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -45,7 +47,48 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
   const logos = new Map<string, { name: string; imageUrl: string }>();
   const prewarmed = new Set<string>();
   const warming = new Map<string, HTMLImageElement>();
+  const cacheWrites = new Map<string, Promise<void>>();
   let syncQueued = false;
+
+  const trimRuntimeImages = async (cache: Cache): Promise<void> => {
+    const keys = await cache.keys();
+    const overflow = keys.length - MAX_RUNTIME_IMAGES;
+    if (overflow <= 0) return;
+    await Promise.all(keys.slice(0, overflow).map(request => cache.delete(request)));
+  };
+
+  const cacheLogo = (imageUrl: string): void => {
+    if (!('caches' in window) || cacheWrites.has(imageUrl)) return;
+
+    let asset: URL;
+    try {
+      asset = new URL(imageUrl, window.location.href);
+    } catch {
+      return;
+    }
+    if (asset.protocol !== 'https:' && asset.protocol !== 'http:') return;
+
+    const work = (async () => {
+      const cache = await window.caches.open(RUNTIME_IMAGE_CACHE);
+      if (await cache.match(asset.href, { ignoreVary: true })) return;
+
+      const request = new Request(asset.href, {
+        method: 'GET',
+        mode: asset.origin === window.location.origin ? 'same-origin' : 'no-cors',
+        credentials: 'omit',
+        cache: 'force-cache'
+      });
+      const response = await nativeFetch(request);
+      if (!response.ok && response.type !== 'opaque') return;
+
+      await cache.put(request, response.clone());
+      await trimRuntimeImages(cache);
+    })()
+      .catch(() => undefined)
+      .finally(() => cacheWrites.delete(imageUrl));
+
+    cacheWrites.set(imageUrl, work);
+  };
 
   const prewarmLogo = (imageUrl: string, highPriority: boolean): void => {
     if (!imageUrl || prewarmed.has(imageUrl)) return;
@@ -57,7 +100,10 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
     image.loading = 'eager';
     image.setAttribute('fetchpriority', highPriority ? 'high' : 'auto');
     const release = () => warming.delete(imageUrl);
-    image.addEventListener('load', release, { once: true });
+    image.addEventListener('load', () => {
+      cacheLogo(imageUrl);
+      release();
+    }, { once: true });
     image.addEventListener('error', release, { once: true });
     warming.set(imageUrl, image);
     image.src = imageUrl;
@@ -116,6 +162,7 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
       image.addEventListener('load', () => {
         const source = image!.getAttribute('src') ?? '';
         image!.dataset.loadedSrc = source;
+        if (source) cacheLogo(source);
         if (image!.dataset.requestedSrc !== source) return;
         image!.hidden = false;
         side.classList.add('has-team-logo');

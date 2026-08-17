@@ -14,9 +14,18 @@ interface CompletedGameWinner {
   side: 'blue' | 'red' | null;
 }
 
+interface StoredCompletedGameWinner {
+  version: number;
+  savedAt: number;
+  result: CompletedGameWinner;
+}
+
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const RESULT_RETRY_MS = 5_000;
 const RESULT_TIMEOUT_MS = 12_000;
+const RESULT_CACHE_VERSION = 1;
+const RESULT_CACHE_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1_000;
+const RESULT_CACHE_PREFIX = 'arena-v3:final-winner:';
 
 function normalizedTeamName(value: string | null | undefined): string {
   return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -42,6 +51,48 @@ function teamTag(team: TeamRef): string {
   return words.length > 1
     ? words.map(word => word[0]?.toUpperCase() ?? '').join('').slice(0, 4)
     : team.name.slice(0, 4).toUpperCase();
+}
+
+function resultStorageKey(gameId: string): string {
+  return `${RESULT_CACHE_PREFIX}${gameId}`;
+}
+
+function readCachedWinner(gameId: string): CompletedGameWinner | null {
+  try {
+    const raw = window.localStorage.getItem(resultStorageKey(gameId));
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as Partial<StoredCompletedGameWinner>;
+    const result = stored.result as CompletedGameWinner | undefined;
+    const validSide = result?.side === null || result?.side === 'blue' || result?.side === 'red';
+    const valid = stored.version === RESULT_CACHE_VERSION
+      && typeof stored.savedAt === 'number'
+      && Date.now() - stored.savedAt <= RESULT_CACHE_MAX_AGE_MS
+      && result?.gameId === gameId
+      && typeof result?.gameNumber === 'number'
+      && Boolean(result?.seriesId)
+      && Boolean(result?.team?.name)
+      && validSide;
+    if (!valid) {
+      window.localStorage.removeItem(resultStorageKey(gameId));
+      return null;
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedWinner(result: CompletedGameWinner): void {
+  try {
+    const stored: StoredCompletedGameWinner = {
+      version: RESULT_CACHE_VERSION,
+      savedAt: Date.now(),
+      result
+    };
+    window.localStorage.setItem(resultStorageKey(result.gameId), JSON.stringify(stored));
+  } catch {
+    // Durable winner caching is an acceleration layer; result discovery still works without it.
+  }
 }
 
 async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -100,6 +151,8 @@ async function loadCompletedGameWinner(
 export class WinnerDeclarationController {
   readonly #root: HTMLElement;
   readonly #results = new Map<string, CompletedGameWinner>();
+  readonly #prefetchControllers = new Map<string, AbortController>();
+  readonly #prefetchAttempted = new Set<string>();
   #observer: MutationObserver | null = null;
   #requestController: AbortController | null = null;
   #retryTimer: number | null = null;
@@ -129,11 +182,13 @@ export class WinnerDeclarationController {
     this.#observer = null;
     document.removeEventListener('visibilitychange', this.#visibilityChanged);
     this.#cancelPending();
+    this.#cancelPrefetches(false);
   }
 
   readonly #visibilityChanged = (): void => {
     if (document.hidden) {
       this.#cancelPending();
+      this.#cancelPrefetches(true);
       return;
     }
     this.#queueSync();
@@ -155,11 +210,34 @@ export class WinnerDeclarationController {
     this.#retryTimer = null;
   }
 
+  #cancelPrefetches(retryLater: boolean): void {
+    this.#prefetchControllers.forEach((controller, gameId) => {
+      controller.abort();
+      if (retryLater) this.#prefetchAttempted.delete(gameId);
+    });
+    this.#prefetchControllers.clear();
+  }
+
   #scoreboard(): HTMLElement | null {
     return this.#root.querySelector<HTMLElement>('#scoreboard');
   }
 
+  #resultFor(gameId: string): CompletedGameWinner | null {
+    const memory = this.#results.get(gameId);
+    if (memory) return memory;
+    const stored = readCachedWinner(gameId);
+    if (!stored) return null;
+    this.#results.set(gameId, stored);
+    return stored;
+  }
+
+  #remember(result: CompletedGameWinner): void {
+    this.#results.set(result.gameId, result);
+    writeCachedWinner(result);
+  }
+
   #resetResultMetadata(scoreboard: HTMLElement): void {
+    delete scoreboard.dataset.winnerGameId;
     delete scoreboard.dataset.winnerTeamId;
     delete scoreboard.dataset.winnerSide;
     this.#root.querySelector<HTMLElement>('#gold-lead')?.removeAttribute('title');
@@ -173,6 +251,7 @@ export class WinnerDeclarationController {
     if (value.textContent !== 'FINAL') value.textContent = 'FINAL';
     if (value.dataset.side !== 'neutral') value.dataset.side = 'neutral';
     value.removeAttribute('title');
+    delete scoreboard.dataset.winnerGameId;
     delete scoreboard.dataset.winnerTeamId;
     delete scoreboard.dataset.winnerSide;
   }
@@ -189,12 +268,45 @@ export class WinnerDeclarationController {
     const side = result.side ?? 'neutral';
     if (value.dataset.side !== side) value.dataset.side = side;
     value.title = result.team.name;
+    scoreboard.dataset.winnerGameId = result.gameId;
     scoreboard.dataset.winnerTeamId = result.team.id;
     scoreboard.dataset.winnerSide = side;
     if (notice) {
       const message = `${result.team.name} won Game ${result.gameNumber}.`;
       if (notice.textContent !== message) notice.textContent = message;
     }
+  }
+
+  #completedTabGameIds(): readonly string[] {
+    return Array.from(this.#root.querySelectorAll<HTMLButtonElement>('#game-tabs [data-game-id]'))
+      .filter(button => button.querySelector('span')?.textContent?.trim().toLowerCase() === 'final')
+      .map(button => button.dataset.gameId?.trim() ?? '')
+      .filter(Boolean);
+  }
+
+  #prefetchFinalGames(): void {
+    if (document.hidden) return;
+    this.#completedTabGameIds().forEach(gameId => {
+      if (this.#resultFor(gameId) || this.#prefetchAttempted.has(gameId)) return;
+      this.#prefetchAttempted.add(gameId);
+      const controller = new AbortController();
+      this.#prefetchControllers.set(gameId, controller);
+      void loadCompletedGameWinner(gameId, controller.signal)
+        .then(result => {
+          if (!result || controller.signal.aborted) return;
+          this.#remember(result);
+          const scoreboard = this.#scoreboard();
+          if (scoreboard?.dataset.gameId === gameId && scoreboard.dataset.gameState === 'completed') {
+            this.#applyWinner(scoreboard, result);
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.#prefetchControllers.get(gameId) === controller) {
+            this.#prefetchControllers.delete(gameId);
+          }
+        });
+    });
   }
 
   #scheduleRetry(gameId: string): void {
@@ -216,7 +328,7 @@ export class WinnerDeclarationController {
         this.#scheduleRetry(gameId);
         return;
       }
-      this.#results.set(gameId, result);
+      this.#remember(result);
       const scoreboard = this.#scoreboard();
       if (scoreboard?.dataset.gameId === gameId && scoreboard.dataset.gameState === 'completed') {
         this.#applyWinner(scoreboard, result);
@@ -233,11 +345,13 @@ export class WinnerDeclarationController {
   #sync(): void {
     const scoreboard = this.#scoreboard();
     if (!scoreboard) return;
+    this.#prefetchFinalGames();
+
     const gameId = scoreboard.dataset.gameId?.trim() ?? '';
     const final = scoreboard.dataset.gameState === 'completed';
     const ready = scoreboard.getAttribute('aria-busy') !== 'true';
 
-    if (!final || !gameId || !ready) {
+    if (!final || !gameId) {
       if (gameId !== this.#activeGameId || !final) {
         this.#cancelPending();
         this.#activeGameId = final ? gameId : '';
@@ -251,11 +365,13 @@ export class WinnerDeclarationController {
       this.#activeGameId = gameId;
     }
 
-    const cached = this.#results.get(gameId);
+    const cached = this.#resultFor(gameId);
     if (cached) {
       this.#applyWinner(scoreboard, cached);
       return;
     }
+
+    if (!ready) return;
 
     this.#applyPending(scoreboard);
     if (!this.#requestController && this.#retryTimer === null) void this.#resolve(gameId);

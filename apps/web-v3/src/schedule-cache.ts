@@ -2,7 +2,10 @@ import type { ScheduleEvent } from '@esports-live/core';
 import type { DataView } from './state.ts';
 
 const CACHE_VERSION = 1;
-const CACHE_MAX_AGE_MS = 15 * 60 * 1_000;
+// The cache is only the instant bootstrap view. A fresh schedule request starts
+// immediately on every launch and replaces it, so keeping the last known list
+// for a day avoids an empty first paint without changing live-data authority.
+const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 const CACHE_PREFIX = 'esports-live:v2:schedule:';
 const HISTORY_CACHE_LIMIT = 24;
 

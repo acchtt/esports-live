@@ -23,6 +23,7 @@ interface StoredCompletedGameWinner {
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const RESULT_RETRY_MS = 5_000;
 const RESULT_TIMEOUT_MS = 12_000;
+const PREFETCH_SWEEP_MS = 1_000;
 const RESULT_CACHE_VERSION = 1;
 const RESULT_CACHE_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1_000;
 const RESULT_CACHE_PREFIX = 'arena-v3:final-winner:';
@@ -156,6 +157,7 @@ export class WinnerDeclarationController {
   #observer: MutationObserver | null = null;
   #requestController: AbortController | null = null;
   #retryTimer: number | null = null;
+  #prefetchTimer: number | null = null;
   #activeGameId = '';
   #syncQueued = false;
 
@@ -174,6 +176,7 @@ export class WinnerDeclarationController {
       attributeFilter: ['data-game-state', 'data-game-id', 'aria-busy']
     });
     document.addEventListener('visibilitychange', this.#visibilityChanged);
+    this.#prefetchTimer = window.setInterval(() => this.#prefetchFinalGames(), PREFETCH_SWEEP_MS);
     this.#sync();
   }
 
@@ -181,6 +184,8 @@ export class WinnerDeclarationController {
     this.#observer?.disconnect();
     this.#observer = null;
     document.removeEventListener('visibilitychange', this.#visibilityChanged);
+    if (this.#prefetchTimer !== null) window.clearInterval(this.#prefetchTimer);
+    this.#prefetchTimer = null;
     this.#cancelPending();
     this.#cancelPrefetches(false);
   }
@@ -279,7 +284,7 @@ export class WinnerDeclarationController {
 
   #completedTabGameIds(): readonly string[] {
     return Array.from(this.#root.querySelectorAll<HTMLButtonElement>('#game-tabs [data-game-id]'))
-      .filter(button => button.querySelector('span')?.textContent?.trim().toLowerCase() === 'final')
+      .filter(button => (button.textContent ?? '').trim().toLowerCase().includes('final'))
       .map(button => button.dataset.gameId?.trim() ?? '')
       .filter(Boolean);
   }

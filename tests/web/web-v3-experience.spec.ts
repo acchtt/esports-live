@@ -133,8 +133,8 @@ async function installFixtures(page: Page): Promise<void> {
         gameClockSeconds: 1_200 + liveTick * 5,
         patch: '26.15.1',
         blue: {
-          id: liveEvent.series.teams[0].id,
-          name: liveEvent.series.teams[0].name,
+          id: liveEvent.series.teams[0]!.id,
+          name: liveEvent.series.teams[0]!.name,
           side: 'blue',
           gold: blueGold,
           kills: 6 + liveTick,
@@ -142,8 +142,8 @@ async function installFixtures(page: Page): Promise<void> {
           players: bluePlayers
         },
         red: {
-          id: liveEvent.series.teams[1].id,
-          name: liveEvent.series.teams[1].name,
+          id: liveEvent.series.teams[1]!.id,
+          name: liveEvent.series.teams[1]!.name,
           side: 'red',
           gold: redGold,
           kills: 5,

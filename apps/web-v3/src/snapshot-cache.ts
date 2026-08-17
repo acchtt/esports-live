@@ -3,7 +3,7 @@ import type { LolStats } from '@esports-live/adapter-lol';
 
 const CACHE_VERSION = 1;
 const LIVE_CACHE_MAX_AGE_MS = 90 * 1_000;
-const COMPLETED_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
+const COMPLETED_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
 const CACHE_PREFIX = 'esports-live:v2:snapshot:';
 export const SNAPSHOT_UPDATED_EVENT = 'esports-live:v2-snapshot-updated';
 

@@ -4,6 +4,7 @@ import type { DataView } from './state.ts';
 const CACHE_VERSION = 1;
 const CACHE_MAX_AGE_MS = 15 * 60 * 1_000;
 const CACHE_PREFIX = 'esports-live:v2:schedule:';
+const HISTORY_CACHE_LIMIT = 24;
 
 interface StoredSchedule {
   version: number;
@@ -13,6 +14,18 @@ interface StoredSchedule {
 
 function storageKey(view: DataView): string {
   return `${CACHE_PREFIX}${view}`;
+}
+
+function eventTime(event: ScheduleEvent): number {
+  const value = Date.parse(event.series.scheduledStart);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function boundedEvents(view: DataView, events: readonly ScheduleEvent[]): readonly ScheduleEvent[] {
+  if (view !== 'history' || events.length <= HISTORY_CACHE_LIMIT) return events;
+  return [...events]
+    .sort((left, right) => eventTime(right) - eventTime(left))
+    .slice(0, HISTORY_CACHE_LIMIT);
 }
 
 export function readScheduleCache(view: DataView): readonly ScheduleEvent[] | null {
@@ -28,7 +41,7 @@ export function readScheduleCache(view: DataView): readonly ScheduleEvent[] | nu
       window.localStorage.removeItem(storageKey(view));
       return null;
     }
-    return value.events as readonly ScheduleEvent[];
+    return boundedEvents(view, value.events as readonly ScheduleEvent[]);
   } catch {
     return null;
   }
@@ -39,7 +52,7 @@ export function writeScheduleCache(view: DataView, events: readonly ScheduleEven
     const value: StoredSchedule = {
       version: CACHE_VERSION,
       savedAt: Date.now(),
-      events
+      events: boundedEvents(view, events)
     };
     window.localStorage.setItem(storageKey(view), JSON.stringify(value));
   } catch {

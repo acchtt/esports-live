@@ -22,7 +22,7 @@ function rewrittenInput(input: RequestInfo | URL, fullHistory: boolean): Request
     : url.toString();
 }
 
-export function installHomeDataPolicy(root: ParentNode): () => void {
+export function installHomeDataPolicy(root: HTMLElement): () => void {
   const upstreamFetch = window.fetch.bind(window);
   let fullHistory = false;
   document.documentElement.dataset.v3HistoryMode = 'recent';

@@ -117,6 +117,15 @@ export function installHomeDashboard(root: ParentNode): () => void {
   );
   panel.dataset.homeDashboardActive = selectedFilter() === 'all' ? 'true' : 'false';
 
+  const syncMeta = (dashboard: HTMLElement): void => {
+    if (!meta) return;
+    const total = dashboard.dataset.totalMatches;
+    const displayed = dashboard.dataset.displayedMatches;
+    if (!total || !displayed) return;
+    const next = `${total} matches · ${displayed} shown`;
+    if (meta.textContent !== next) meta.textContent = next;
+  };
+
   let syncQueued = false;
   const sync = (): void => {
     syncQueued = false;
@@ -128,7 +137,10 @@ export function installHomeDashboard(root: ParentNode): () => void {
       return;
     }
     panel.dataset.homeDashboardActive = 'true';
-    if (existingDashboard) return;
+    if (existingDashboard) {
+      syncMeta(existingDashboard);
+      return;
+    }
 
     const cards = [...grid.querySelectorAll<HTMLElement>(':scope > .match-card')];
     if (!cards.length) return;
@@ -152,8 +164,10 @@ export function installHomeDashboard(root: ParentNode): () => void {
     const displayed = Object.entries(grouped).reduce((total, [section, entries]) => (
       total + Math.min(entries.length, HOME_LIMITS[section as HomeSection])
     ), 0);
+    dashboard.dataset.totalMatches = String(cards.length);
+    dashboard.dataset.displayedMatches = String(displayed);
     grid.replaceChildren(dashboard);
-    if (meta) meta.textContent = `${cards.length} matches · ${displayed} shown`;
+    syncMeta(dashboard);
   };
 
   const queueSync = (): void => {
@@ -164,6 +178,9 @@ export function installHomeDashboard(root: ParentNode): () => void {
 
   const observer = new MutationObserver(queueSync);
   observer.observe(grid, { childList: true });
+  const metaObserver = meta ? new MutationObserver(queueSync) : null;
+  if (meta) metaObserver?.observe(meta, { childList: true, characterData: true, subtree: true });
+
   const handleFilter = (event: Event): void => {
     const target = event.target instanceof Element ? event.target : null;
     const filter = target?.closest<HTMLElement>('[data-match-filter]')?.dataset.matchFilter;
@@ -182,6 +199,7 @@ export function installHomeDashboard(root: ParentNode): () => void {
 
   return () => {
     observer.disconnect();
+    metaObserver?.disconnect();
     filters.removeEventListener('click', handleFilter);
     grid.removeEventListener('click', handleHomeAction);
     delete panel.dataset.homeDashboardActive;

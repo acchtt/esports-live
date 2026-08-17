@@ -1,0 +1,140 @@
+html[data-arena-v3-enhanced="true"] .arena-momentum[data-points="0"],
+html[data-arena-v3-enhanced="true"] .arena-momentum[data-points="1"] {
+  display: none !important;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum {
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 9px;
+  min-height: 38px;
+  padding: 5px 12px 6px;
+  border-top: 0;
+  border-bottom: 1px solid rgba(124, 151, 180, 0.12);
+  background:
+    linear-gradient(90deg, rgba(0, 229, 255, 0.025), transparent 34%),
+    linear-gradient(270deg, rgba(255, 59, 59, 0.022), transparent 34%),
+    rgba(5, 10, 16, 0.72);
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 1px;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum-copy::before {
+  content: 'GOLD TREND';
+  color: #65758a;
+  font-size: 0.46rem;
+  font-weight: 950;
+  letter-spacing: 0.09em;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum-copy > span,
+html[data-arena-v3-enhanced="true"] .arena-momentum-copy > small {
+  display: none;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum-copy > strong {
+  font-size: 0.66rem;
+  line-height: 1.05;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum-chart {
+  height: 24px;
+  opacity: 0.92;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum-zero {
+  stroke: rgba(135, 156, 181, 0.15);
+  stroke-width: 0.6;
+  stroke-dasharray: 2.5 3.5;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum-line {
+  stroke-width: 1.5;
+  filter: none;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-momentum[data-side="blue"] .arena-momentum-line,
+html[data-arena-v3-enhanced="true"] .arena-momentum[data-side="red"] .arena-momentum-line {
+  filter: none;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-match {
+  top: max(0px, env(safe-area-inset-top));
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 6px 11px 7px;
+  border: 0;
+  border-bottom: 1px solid rgba(126, 155, 185, 0.2);
+  border-radius: 0 0 12px 12px;
+  background: rgba(4, 9, 15, 0.92);
+  box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(13px) saturate(118%);
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-score {
+  flex: 1 1 auto;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 5px;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-score strong {
+  font-size: 0.64rem;
+  line-height: 1;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-score b {
+  color: #c4d0dc;
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-meta {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: 116px;
+  color: #78889b;
+  font-size: 0.48rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-meta [data-mini-game] {
+  display: none;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-meta > * + *::before {
+  content: none;
+  margin: 0;
+}
+
+html[data-arena-v3-enhanced="true"] .arena-mini-meta [data-mini-gold] {
+  overflow: hidden;
+  max-width: 68px;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 390px) {
+  html[data-arena-v3-enhanced="true"] .arena-mini-match {
+    gap: 7px;
+    padding-inline: 9px;
+  }
+
+  html[data-arena-v3-enhanced="true"] .arena-mini-meta {
+    max-width: 104px;
+  }
+
+  html[data-arena-v3-enhanced="true"] .arena-momentum {
+    grid-template-columns: 102px minmax(0, 1fr);
+    padding-inline: 10px;
+  }
+}

@@ -10,6 +10,10 @@ function isV2BaselinePath(pathname = window.location.pathname): boolean {
   return pathname === '/v2' || pathname.startsWith('/v2/');
 }
 
+function setText(element: HTMLElement | null | undefined, value: string): void {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+
 function gameClockSeconds(value: string): number | null {
   const match = value.trim().match(/^(\d+):(\d{2})$/);
   if (!match) return null;
@@ -185,7 +189,8 @@ export function installMatchExperience(root: HTMLElement): () => void {
     const gameId = scoreboard.dataset.gameId?.trim() ?? '';
     const state = scoreboard.dataset.gameState ?? '';
     const live = state === 'live' || state === 'draft' || state === 'paused';
-    momentum.hidden = !live || !gameId;
+    const shouldHide = !live || !gameId;
+    if (momentum.hidden !== shouldHide) momentum.hidden = shouldHide;
     if (!live || !gameId) return;
 
     let points = pointsByGame.get(gameId);
@@ -208,20 +213,21 @@ export function installMatchExperience(root: HTMLElement): () => void {
     }
 
     const latest = points[points.length - 1]?.gold ?? difference;
-    momentum.dataset.side = latest === null || latest === 0 ? 'neutral' : latest > 0 ? 'blue' : 'red';
-    momentum.dataset.points = String(points.length);
+    const side = latest === null || latest === 0 ? 'neutral' : latest > 0 ? 'blue' : 'red';
+    const pointCount = String(points.length);
+    if (momentum.dataset.side !== side) momentum.dataset.side = side;
+    if (momentum.dataset.points !== pointCount) momentum.dataset.points = pointCount;
     const current = momentum.querySelector<HTMLElement>('[data-momentum-current]');
     const range = momentum.querySelector<HTMLElement>('[data-momentum-range]');
     const path = momentum.querySelector<SVGPathElement>('[data-momentum-line]');
-    if (current) current.textContent = points.length < 2 ? 'Collecting live trend…' : sideCopy(latest);
-    if (range) {
-      const firstClock = points[0]?.clock;
-      const lastClock = points[points.length - 1]?.clock;
-      range.textContent = firstClock !== undefined && lastClock !== undefined && lastClock > firstClock
-        ? `Gold movement across ${Math.max(1, Math.round((lastClock - firstClock) / 60))} min observed`
-        : 'Gold lead over this game session';
-    }
-    path?.setAttribute('d', sparkPath(points));
+    setText(current, points.length < 2 ? 'Collecting live trend…' : sideCopy(latest));
+    const firstClock = points[0]?.clock;
+    const lastClock = points[points.length - 1]?.clock;
+    setText(range, firstClock !== undefined && lastClock !== undefined && lastClock > firstClock
+      ? `Gold movement across ${Math.max(1, Math.round((lastClock - firstClock) / 60))} min observed`
+      : 'Gold lead over this game session');
+    const nextPath = sparkPath(points);
+    if (path?.getAttribute('d') !== nextPath) path?.setAttribute('d', nextPath);
   };
 
   const updateMiniContent = (): void => {
@@ -231,19 +237,21 @@ export function installMatchExperience(root: HTMLElement): () => void {
     const redKills = root.querySelector<HTMLElement>('#red-kills')?.textContent?.trim() || '—';
     const game = root.querySelector<HTMLElement>('#game-label')?.textContent?.trim() || 'Game';
     const gameClock = clock.textContent?.trim() || '--:--';
-    mini.querySelector<HTMLElement>('[data-mini-blue]')!.textContent = blueName;
-    mini.querySelector<HTMLElement>('[data-mini-red]')!.textContent = redName;
-    mini.querySelector<HTMLElement>('[data-mini-kills]')!.textContent = `${blueKills}–${redKills}`;
-    mini.querySelector<HTMLElement>('[data-mini-game]')!.textContent = game;
-    mini.querySelector<HTMLElement>('[data-mini-clock]')!.textContent = gameClock;
-    mini.querySelector<HTMLElement>('[data-mini-gold]')!.textContent = sideCopy(signedGold(gold));
+    setText(mini.querySelector<HTMLElement>('[data-mini-blue]'), blueName);
+    setText(mini.querySelector<HTMLElement>('[data-mini-red]'), redName);
+    setText(mini.querySelector<HTMLElement>('[data-mini-kills]'), `${blueKills}–${redKills}`);
+    setText(mini.querySelector<HTMLElement>('[data-mini-game]'), game);
+    setText(mini.querySelector<HTMLElement>('[data-mini-clock]'), gameClock);
+    setText(mini.querySelector<HTMLElement>('[data-mini-gold]'), sideCopy(signedGold(gold)));
   };
 
   const updateMiniVisibility = (): void => {
     scrollFrame = null;
     const visible = !matchPanel.hidden && detailHeader.getBoundingClientRect().bottom < 6;
-    mini.dataset.visible = String(visible);
-    mini.setAttribute('aria-hidden', String(!visible));
+    const visibleValue = String(visible);
+    const hiddenValue = String(!visible);
+    if (mini.dataset.visible !== visibleValue) mini.dataset.visible = visibleValue;
+    if (mini.getAttribute('aria-hidden') !== hiddenValue) mini.setAttribute('aria-hidden', hiddenValue);
   };
 
   const scheduleMiniVisibility = (): void => {

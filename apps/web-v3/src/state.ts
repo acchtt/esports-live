@@ -198,7 +198,7 @@ function mergeScheduleEvents(
   snapshots: Readonly<Record<string, LiveSnapshot<LolStats>>>,
   pinnedSeriesId: string | null = null
 ): readonly ScheduleEvent[] {
-  const merged = incoming.map(event => {
+  const merged: ScheduleEvent[] = incoming.map(event => {
     const latestSnapshot = latestSnapshotForSeries(snapshots, event.series.id);
     if (event.series.state !== 'completed' && isActiveSnapshot(latestSnapshot)) {
       const activeSeriesState = latestSnapshot.game.state === 'paused' ? 'paused' : 'live';

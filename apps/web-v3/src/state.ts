@@ -195,9 +195,10 @@ function isActiveSnapshot(snapshot: LiveSnapshot<LolStats> | null): snapshot is 
 function mergeScheduleEvents(
   previous: readonly ScheduleEvent[],
   incoming: readonly ScheduleEvent[],
-  snapshots: Readonly<Record<string, LiveSnapshot<LolStats>>>
+  snapshots: Readonly<Record<string, LiveSnapshot<LolStats>>>,
+  pinnedSeriesId: string | null = null
 ): readonly ScheduleEvent[] {
-  return incoming.map(event => {
+  const merged = incoming.map(event => {
     const latestSnapshot = latestSnapshotForSeries(snapshots, event.series.id);
     if (event.series.state !== 'completed' && isActiveSnapshot(latestSnapshot)) {
       const activeSeriesState = latestSnapshot.game.state === 'paused' ? 'paused' : 'live';
@@ -227,6 +228,10 @@ function mergeScheduleEvents(
       }
     };
   });
+
+  if (!pinnedSeriesId || merged.some(event => event.series.id === pinnedSeriesId)) return merged;
+  const pinnedEvent = previous.find(event => event.series.id === pinnedSeriesId);
+  return pinnedEvent ? [...merged, pinnedEvent] : merged;
 }
 
 function catalogueStateRank(event: ScheduleEvent): number {
@@ -359,10 +364,14 @@ export function reducer(state: AppState, action: AppAction): AppState {
         scheduleError: { ...state.scheduleError, [action.view]: null }
       };
     case 'schedule-loaded': {
+      const pinnedSeriesId = state.activeView === 'match' && state.detailView === action.view
+        ? state.selections[action.view].seriesId
+        : null;
       const nextEvents = mergeScheduleEvents(
         state.events[action.view],
         action.events,
-        state.snapshots
+        state.snapshots,
+        pinnedSeriesId
       );
       const nextSelection = selectionForEvents(
         nextEvents,

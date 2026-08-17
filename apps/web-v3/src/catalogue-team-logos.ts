@@ -1,4 +1,5 @@
 import type { TeamRef } from '@esports-live/core';
+import { readScheduleCache } from './schedule-cache.ts';
 
 const EAGER_CARD_COUNT = 6;
 const PREWARM_EVENT_COUNT = 10;
@@ -210,7 +211,8 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
       try {
         const url = requestUrl(args[0]);
         if (isSchedulePath(url.pathname)) {
-          void response.clone().json().then(rememberScheduleTeams).catch(() => undefined);
+          const payload = await response.clone().json().catch(() => null);
+          if (payload) rememberScheduleTeams(payload);
         }
       } catch {
         // Ignore non-URL fetch inputs and leave the original response untouched.
@@ -220,6 +222,12 @@ export function installCatalogueTeamLogos(root: HTMLElement): () => void {
   };
 
   window.fetch = wrappedFetch;
+
+  // Cards can render synchronously from the schedule cache before the first
+  // network response. Seed the logo map from those same cached events so the
+  // first card paint already has logo URLs available and can prewarm them.
+  rememberScheduleTeams({ events: readScheduleCache('matches') ?? [] });
+  rememberScheduleTeams({ events: readScheduleCache('history') ?? [] });
 
   const observer = new MutationObserver(queueSync);
   observer.observe(root, { childList: true, subtree: true });

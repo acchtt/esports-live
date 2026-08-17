@@ -99,13 +99,13 @@ test('V3 home is curated and only loads the full results archive on demand', asy
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 
-  await page.locator('[data-match-filter="ended"]').click();
+  await page.locator('.match-filters [data-match-filter="ended"]').click();
   await expect.poll(() => counters.full).toBeGreaterThanOrEqual(1);
   await expect(page.locator('.match-card:visible')).toHaveCount(30);
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3HistoryMode)).toBe('full');
 
   const boundedBeforeHome = counters.bounded;
-  await page.locator('[data-match-filter="all"]').click();
+  await page.locator('.match-filters [data-match-filter="all"]').click();
   await expect(page.locator('[data-home-dashboard]')).toBeVisible();
   await expect(page.locator('#catalogue-grid .match-card')).toHaveCount(13);
   await expect.poll(() => counters.bounded).toBeGreaterThan(boundedBeforeHome);

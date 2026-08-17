@@ -27,6 +27,10 @@ export function installHomeDataPolicy(root: ParentNode): () => void {
   let fullHistory = false;
   document.documentElement.dataset.v3HistoryMode = 'recent';
 
+  const refreshSchedules = (): void => {
+    queueMicrotask(() => root.querySelector<HTMLButtonElement>('#refresh-data')?.click());
+  };
+
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => (
     upstreamFetch(rewrittenInput(input, fullHistory), init)
   )) as typeof window.fetch;
@@ -40,14 +44,14 @@ export function installHomeDataPolicy(root: ParentNode): () => void {
       const shouldRefresh = !fullHistory;
       fullHistory = true;
       document.documentElement.dataset.v3HistoryMode = 'full';
-      if (shouldRefresh) {
-        queueMicrotask(() => root.querySelector<HTMLButtonElement>('#refresh-data')?.click());
-      }
+      if (shouldRefresh) refreshSchedules();
       return;
     }
 
+    const shouldRefresh = fullHistory;
     fullHistory = false;
     document.documentElement.dataset.v3HistoryMode = 'recent';
+    if (shouldRefresh) refreshSchedules();
   };
 
   root.addEventListener('click', handleClick, true);

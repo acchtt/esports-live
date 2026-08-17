@@ -115,10 +115,13 @@ export function installHomeDashboard(root: ParentNode): () => void {
   const selectedFilter = (): string => (
     filters.querySelector<HTMLElement>('[data-match-filter].active')?.dataset.matchFilter ?? 'all'
   );
+  const hasSelectedLeague = (): boolean => Boolean(
+    panel.querySelector<HTMLElement>('[data-league-filter][aria-pressed="true"]')
+  );
   panel.dataset.homeDashboardActive = selectedFilter() === 'all' ? 'true' : 'false';
 
   const syncMeta = (dashboard: HTMLElement): void => {
-    if (!meta) return;
+    if (!meta || hasSelectedLeague()) return;
     const total = dashboard.dataset.totalMatches;
     const displayed = dashboard.dataset.displayedMatches;
     if (!total || !displayed) return;

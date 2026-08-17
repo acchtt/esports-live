@@ -10,6 +10,13 @@
   margin-bottom: 10px;
 }
 
+/* The catalogue renderer briefly replaces the curated dashboard with raw cards
+   during schedule refreshes. Keep that intermediate DOM state off-screen so
+   users only ever see the stable grouped Home dashboard. */
+.catalogue-panel[data-home-dashboard-active="true"] #catalogue-grid > .match-card {
+  display: none;
+}
+
 .catalogue-home-dashboard {
   display: grid;
   grid-column: 1 / -1;

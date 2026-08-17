@@ -45,6 +45,7 @@ import { installPlayerBoardCopy } from './player-board-copy.ts';
 import { installPwaPersistence } from './pwa-persistence.ts';
 import { installPwa } from './pwa.ts';
 import { currentV3Route, installV3Routing } from './route-page.ts';
+import { installScheduleContinuity } from './schedule-continuity.ts';
 import { installScheduleMetadataCapture } from './schedule-metadata.ts';
 import { installScoreboardStatus } from './scoreboard-status.ts';
 import { installTeamSideIdentity } from './team-side-identity.ts';
@@ -56,6 +57,7 @@ const dota2Enabled = String(import.meta.env.VITE_ENABLE_DOTA2 ?? '').toLowerCase
 
 installApiReliability();
 installHomeDataPolicy(root);
+installScheduleContinuity();
 const initialRoute = currentV3Route();
 if (initialRoute.kind !== 'match') {
   installCatalogueFinality();

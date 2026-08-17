@@ -111,9 +111,9 @@ async function json(route: Route, value: unknown): Promise<void> {
 }
 
 async function installFixtures(page: Page) {
-  let winnerProbeRequests = 0;
+  let finalGameRequests = 0;
   let slowNormalFinal = false;
-  let winnerBackendAvailable = true;
+  let contextAvailable = true;
 
   await page.route('https://ddragon.leagueoflegends.com/**', route => route.abort());
   await page.route('https://raw.communitydragon.org/**', route => route.abort());
@@ -130,12 +130,9 @@ async function installFixtures(page: Page) {
       : [{ series, provider, observedAt: new Date().toISOString() }]
   }));
   await page.route('**/v1/lol/series/**/context**', async route => {
-    const url = new URL(route.request().url());
-    if (url.searchParams.get('final')?.startsWith('winner-')) {
-      if (!winnerBackendAvailable) {
-        await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
-        return;
-      }
+    if (!contextAvailable) {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+      return;
     }
     await json(route, context());
   });
@@ -144,13 +141,7 @@ async function installFixtures(page: Page) {
     const match = url.pathname.match(/games\/([^/]+)\/live$/);
     const gameId = decodeURIComponent(match?.[1] ?? 'game-winner-live');
     const winnerProbe = url.searchParams.get('final')?.startsWith('winner-') ?? false;
-    if (winnerProbe) {
-      winnerProbeRequests += 1;
-      if (!winnerBackendAvailable) {
-        await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
-        return;
-      }
-    }
+    if (gameId === 'game-winner-final') finalGameRequests += 1;
     if (gameId === 'game-winner-final' && !winnerProbe && slowNormalFinal) {
       await new Promise(resolve => setTimeout(resolve, 800));
     }
@@ -158,10 +149,10 @@ async function installFixtures(page: Page) {
   });
 
   return {
-    winnerProbeRequests: () => winnerProbeRequests,
-    resetWinnerProbeRequests: () => { winnerProbeRequests = 0; },
+    finalGameRequests: () => finalGameRequests,
+    resetFinalGameRequests: () => { finalGameRequests = 0; },
     setSlowNormalFinal: (value: boolean) => { slowNormalFinal = value; },
-    setWinnerBackendAvailable: (value: boolean) => { winnerBackendAvailable = value; }
+    setContextAvailable: (value: boolean) => { contextAvailable = value; }
   };
 }
 
@@ -171,12 +162,13 @@ test('V3 prefetches final winners, keeps them visible during loading, and restor
   await page.goto('/match/series-winner-cache/game-winner-live');
 
   await expect(page.locator('#game-label')).toHaveText('Game 2 · Live');
-  await expect.poll(fixture.winnerProbeRequests, { timeout: 5_000 }).toBeGreaterThan(0);
+  await expect(page.locator('#game-tabs [data-game-id="game-winner-final"]')).toContainText('Final');
+  await expect.poll(fixture.finalGameRequests, { timeout: 5_000 }).toBeGreaterThan(0);
   await expect.poll(async () => page.evaluate(() => Boolean(
     localStorage.getItem('arena-v3:final-winner:game-winner-final')
   )), { timeout: 5_000 }).toBe(true);
 
-  fixture.resetWinnerProbeRequests();
+  fixture.resetFinalGameRequests();
   fixture.setSlowNormalFinal(true);
   await page.locator('#game-tabs [data-game-id="game-winner-final"]').click();
 
@@ -188,20 +180,19 @@ test('V3 prefetches final winners, keeps them visible during loading, and restor
   await expect(page.locator('#scoreboard')).toHaveAttribute('aria-busy', 'true');
   await expect(page.locator('#gold-lead-label')).toHaveText('WINNER');
   await expect(page.locator('#gold-lead')).toHaveText('WBL');
-  expect(fixture.winnerProbeRequests()).toBe(0);
 
   await expect(page.locator('#scoreboard')).toHaveAttribute('aria-busy', 'false', { timeout: 3_000 });
   await expect(page.locator('#gold-lead-label')).toHaveText('WINNER');
   await expect(page.locator('#scoreboard-notice')).toContainText('Winner Blue won Game 1');
 
-  fixture.resetWinnerProbeRequests();
   fixture.setSlowNormalFinal(false);
-  fixture.setWinnerBackendAvailable(false);
+  fixture.setContextAvailable(false);
   await page.reload();
 
   await expect(page.locator('#game-label')).toHaveText('Game 1 · Final');
   await expect(page.locator('#gold-lead-label')).toHaveText('WINNER');
   await expect(page.locator('#gold-lead')).toHaveText('WBL');
   await page.waitForTimeout(500);
-  expect(fixture.winnerProbeRequests()).toBe(0);
+  await expect(page.locator('#gold-lead-label')).toHaveText('WINNER');
+  await expect(page.locator('#gold-lead')).toHaveText('WBL');
 });

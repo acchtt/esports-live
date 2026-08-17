@@ -147,8 +147,15 @@ test('V3 champion portraits load immediately without waiting for version metadat
 
   const portraits = page.locator('.champion-portrait img');
   await expect(portraits).toHaveCount(10);
-  await expect(portraits).toHaveAttribute('loading', 'eager');
-  await expect(portraits).toHaveAttribute('fetchpriority', 'high');
+
+  const prioritization = await portraits.evaluateAll(images => images.map(image => ({
+    loading: image.getAttribute('loading'),
+    fetchPriority: image.getAttribute('fetchpriority')
+  })));
+  expect(prioritization).toHaveLength(10);
+  expect(prioritization.every(value => (
+    value.loading === 'eager' && value.fetchPriority === 'high'
+  ))).toBe(true);
 
   await expect.poll(async () => portraits.evaluateAll(images => images.every(image => {
     const portrait = image as HTMLImageElement;

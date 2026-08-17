@@ -10,6 +10,11 @@
   margin-bottom: 10px;
 }
 
+.catalogue-panel[data-home-dashboard-active="true"] .catalogue-filter-pills {
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
 /* The catalogue renderer briefly replaces the curated dashboard with raw cards
    during schedule refreshes. Keep that intermediate DOM state off-screen so
    users only ever see the stable grouped Home dashboard. */
@@ -139,6 +144,11 @@
 
   .catalogue-panel[data-home-dashboard-active="true"] .catalogue-header p {
     font-size: 0.72rem;
+  }
+
+  .catalogue-panel[data-home-dashboard-active="true"] .catalogue-filter-pills {
+    margin-top: 12px;
+    margin-bottom: 20px;
   }
 
   .catalogue-home-dashboard {

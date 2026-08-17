@@ -247,7 +247,9 @@ export function installMatchExperience(root: HTMLElement): () => void {
 
   const updateMiniVisibility = (): void => {
     scrollFrame = null;
-    const visible = !matchPanel.hidden && detailHeader.getBoundingClientRect().bottom < 6;
+    const naturalThreshold = detailHeader.offsetTop + detailHeader.offsetHeight * 0.6;
+    const triggerY = Math.max(96, Math.min(220, naturalThreshold));
+    const visible = !matchPanel.hidden && window.scrollY >= triggerY;
     const visibleValue = String(visible);
     const hiddenValue = String(!visible);
     if (mini.dataset.visible !== visibleValue) mini.dataset.visible = visibleValue;

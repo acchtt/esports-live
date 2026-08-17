@@ -59,7 +59,8 @@ jobs:
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
-            --data-binary @/tmp/mobile-v3-status.json
+            --data-binary @/tmp/mobile-v3-status.json \
+            || echo "GitHub status API unavailable; continuing with V3 validation."
 
       - name: Check deployment configuration
         shell: bash
@@ -282,4 +283,5 @@ jobs:
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
-            --data-binary @/tmp/mobile-v3-status.json
+            --data-binary @/tmp/mobile-v3-status.json \
+            || echo "GitHub status API unavailable; deployment verification result remains authoritative."

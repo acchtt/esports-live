@@ -124,6 +124,23 @@ test('V3 home is curated and only loads the full results archive on demand', asy
   expect(spacing.tabGap).toBeGreaterThanOrEqual(8);
   expect(spacing.sectionGap).toBeGreaterThanOrEqual(16);
 
+  const header = page.locator('.app-header');
+  const expandedHeaderHeight = await header.evaluate(element => element.getBoundingClientRect().height);
+  expect(expandedHeaderHeight).toBeGreaterThanOrEqual(70);
+  expect(await header.getAttribute('data-compact')).toBeNull();
+
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await page.waitForTimeout(240);
+  expect(await header.getAttribute('data-compact')).toBeNull();
+  const scrolledHeaderHeight = await header.evaluate(element => element.getBoundingClientRect().height);
+  expect(Math.abs(scrolledHeaderHeight - expandedHeaderHeight)).toBeLessThanOrEqual(1);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(240);
+  expect(await header.getAttribute('data-compact')).toBeNull();
+  const topHeaderHeight = await header.evaluate(element => element.getBoundingClientRect().height);
+  expect(Math.abs(topHeaderHeight - expandedHeaderHeight)).toBeLessThanOrEqual(1);
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 

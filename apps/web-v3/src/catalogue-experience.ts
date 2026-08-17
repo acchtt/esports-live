@@ -7,6 +7,10 @@ function isV2BaselinePath(pathname = window.location.pathname): boolean {
   return pathname === '/v2' || pathname.startsWith('/v2/');
 }
 
+function setText(element: HTMLElement | null | undefined, value: string): void {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+
 function activeFilter(filters: HTMLElement): string {
   return filters.querySelector<HTMLElement>('[data-match-filter].active')?.dataset.matchFilter ?? 'all';
 }
@@ -130,14 +134,15 @@ function createScheduleAccessory(card: HTMLElement): HTMLElement {
 function updateGroupedSchedule(grid: HTMLElement): void {
   grid.querySelectorAll<HTMLElement>('.catalogue-date-group').forEach(group => {
     const cards = [...group.querySelectorAll<HTMLElement>('.match-card')];
-    group.hidden = cards.length > 0 && !cards.some(card => !card.hidden);
+    const hidden = cards.length > 0 && !cards.some(card => !card.hidden);
+    if (group.hidden !== hidden) group.hidden = hidden;
     cards.forEach(card => {
       const shell = card.closest<HTMLElement>('.scheduled-card-shell');
       const countdown = shell?.querySelector<HTMLElement>('.match-countdown');
       const calendar = shell?.querySelector<HTMLButtonElement>('.calendar-action');
       const metadata = metadataForSeries(card.dataset.seriesId ?? '');
-      if (countdown) countdown.textContent = metadata ? countdownCopy(metadata.scheduledStart) : 'Time pending';
-      if (calendar) calendar.disabled = !metadata;
+      setText(countdown, metadata ? countdownCopy(metadata.scheduledStart) : 'Time pending');
+      if (calendar && calendar.disabled !== !metadata) calendar.disabled = !metadata;
     });
   });
 }
@@ -269,13 +274,14 @@ export function installCatalogueExperience(root: ParentNode): () => void {
       const textMatches = !query || (card.textContent ?? '').toLowerCase().includes(query);
       const dateMatches = cutoff === null || (Number.isFinite(timestamp) && timestamp >= cutoff && timestamp <= Date.now() + DAY_MS);
       const matches = textMatches && dateMatches;
-      card.dataset.resultsMatch = String(matches);
+      const matchValue = String(matches);
+      if (card.dataset.resultsMatch !== matchValue) card.dataset.resultsMatch = matchValue;
       if (matches) matching += 1;
       if (matches && !card.hidden) visible += 1;
     });
-    summary.textContent = visible === matching
+    setText(summary, visible === matching
       ? `${matching} result${matching === 1 ? '' : 's'}`
-      : `${visible} of ${matching} results in selected leagues`;
+      : `${visible} of ${matching} results in selected leagues`);
   };
 
   const sync = (): void => {

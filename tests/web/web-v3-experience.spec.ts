@@ -205,11 +205,15 @@ test('V3 adds live momentum, a non-layout mini score, change cues and offline st
   await page.locator('[data-series-id="live-feature"]').click();
 
   await expect(page.locator('#game-label')).toContainText('Live');
-  await expect(page.locator('.arena-momentum')).toBeVisible();
   await expect.poll(async () => Number(await page.locator('.arena-momentum').getAttribute('data-points') ?? '0'), { timeout: 6_000 }).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('.arena-momentum')).toBeVisible();
   await expect(page.locator('[data-momentum-current]')).toContainText('BLUE +');
   await expect(page.locator('[data-momentum-line]')).toHaveAttribute('d', /L/);
   await expect(page.locator('.detail-header .arena-data-status')).toContainText('Live');
+
+  const momentumHeight = await page.locator('.arena-momentum').evaluate(element => element.getBoundingClientRect().height);
+  expect(momentumHeight).toBeGreaterThanOrEqual(30);
+  expect(momentumHeight).toBeLessThanOrEqual(44);
 
   await expect(page.locator('.arena-stat-changed').first()).toBeVisible({ timeout: 5_000 });
 
@@ -217,6 +221,25 @@ test('V3 adds live momentum, a non-layout mini score, change cues and offline st
   await page.evaluate(() => window.scrollTo(0, 650));
   await expect(page.locator('.arena-mini-match')).toHaveAttribute('data-visible', 'true');
   await expect(page.locator('[data-mini-kills]')).toContainText('–');
+
+  const miniLayout = await page.locator('.arena-mini-match').evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      height: rect.height,
+      left: rect.left,
+      right: rect.right,
+      display: style.display,
+      radius: style.borderBottomLeftRadius
+    };
+  });
+  expect(miniLayout.height).toBeGreaterThanOrEqual(34);
+  expect(miniLayout.height).toBeLessThanOrEqual(44);
+  expect(Math.abs(miniLayout.left)).toBeLessThanOrEqual(1);
+  expect(Math.abs(390 - miniLayout.right)).toBeLessThanOrEqual(1);
+  expect(miniLayout.display).toBe('flex');
+  expect(miniLayout.radius).not.toBe('15px');
+
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page.locator('.arena-mini-match')).toHaveAttribute('data-visible', 'false');
 

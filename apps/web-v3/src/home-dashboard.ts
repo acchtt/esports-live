@@ -112,10 +112,15 @@ export function installHomeDashboard(root: ParentNode): () => void {
     if (label) button.textContent = label;
   });
 
+  const selectedFilter = (): string => (
+    filters.querySelector<HTMLElement>('[data-match-filter].active')?.dataset.matchFilter ?? 'all'
+  );
+  panel.dataset.homeDashboardActive = selectedFilter() === 'all' ? 'true' : 'false';
+
   let syncQueued = false;
   const sync = (): void => {
     syncQueued = false;
-    const activeFilter = filters.querySelector<HTMLElement>('[data-match-filter].active')?.dataset.matchFilter ?? 'all';
+    const activeFilter = selectedFilter();
     const existingDashboard = grid.querySelector<HTMLElement>(':scope > [data-home-dashboard]');
 
     if (activeFilter !== 'all') {
@@ -159,7 +164,12 @@ export function installHomeDashboard(root: ParentNode): () => void {
 
   const observer = new MutationObserver(queueSync);
   observer.observe(grid, { childList: true });
-  const handleFilter = (): void => queueSync();
+  const handleFilter = (event: Event): void => {
+    const target = event.target instanceof Element ? event.target : null;
+    const filter = target?.closest<HTMLElement>('[data-match-filter]')?.dataset.matchFilter;
+    if (filter) panel.dataset.homeDashboardActive = filter === 'all' ? 'true' : 'false';
+    queueSync();
+  };
   const handleHomeAction = (event: Event): void => {
     const target = event.target instanceof Element ? event.target : null;
     const filter = target?.closest<HTMLElement>('[data-home-filter]')?.dataset.homeFilter;

@@ -56,13 +56,17 @@ function activeHistoryGame(game: SeriesGameHistoryRef): boolean {
   return game.state === 'live' || game.state === 'draft' || game.state === 'paused';
 }
 
-function finalEventFromContext(
+export function contextHasActiveGame(context: SeriesContext): boolean {
+  return context.history?.games.some(activeHistoryGame) ?? false;
+}
+
+export function verifiedFinalEventFromContext(
   event: ScheduleEvent,
   context: SeriesContext
 ): ScheduleEvent | null {
   if (context.seriesId !== event.series.id) return null;
   const history = context.history;
-  if (!history || history.games.some(activeHistoryGame)) return null;
+  if (!history || contextHasActiveGame(context)) return null;
 
   const winsRequired = Math.max(
     1,
@@ -221,7 +225,7 @@ export function createD1MatchStore(db: MatchDatabase): MatchStore {
     async recordSeriesContext(seriesId, context) {
       const now = new Date().toISOString();
       const history = context.history;
-      const hasActiveGame = history?.games.some(activeHistoryGame) ?? false;
+      const hasActiveGame = contextHasActiveGame(context);
       const row = await db.prepare(`
         SELECT latest_payload_json, final_payload_json, final_verified
         FROM match_series
@@ -287,7 +291,7 @@ export function createD1MatchStore(db: MatchDatabase): MatchStore {
 
       const latest = parseEvent(row?.latest_payload_json ?? null);
       if (!latest) return;
-      const finalEvent = finalEventFromContext(latest, context);
+      const finalEvent = verifiedFinalEventFromContext(latest, context);
       if (!finalEvent) return;
 
       await db.prepare(`

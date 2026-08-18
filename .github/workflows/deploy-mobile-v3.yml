@@ -209,6 +209,96 @@ jobs:
           echo "V3 primary API verification failed."
           exit 1
 
+      - name: Diagnose stale LIVE finality evidence
+        continue-on-error: true
+        env:
+          API_BASE_URL: ${{ steps.api-preview.outputs.url }}
+        shell: bash
+        run: |
+          set -u
+          node <<'NODE'
+          const fs = require('node:fs');
+          const payload = JSON.parse(fs.readFileSync('/tmp/mobile-v3-primary-schedule.json', 'utf8'));
+          const now = Date.now();
+          const stale = (payload.events || [])
+            .filter(event => ['live', 'paused'].includes(event?.series?.state))
+            .filter(event => {
+              const start = Date.parse(event?.series?.scheduledStart || '');
+              return Number.isFinite(start) && now - start >= 90 * 60 * 1000;
+            })
+            .sort((a, b) => Date.parse(a.series.scheduledStart) - Date.parse(b.series.scheduledStart))
+            .slice(0, 10);
+          fs.writeFileSync('/tmp/mobile-v3-stale-series.txt', stale.map(event => event.series.id).join('\n'));
+          console.log('STALE LIVE SCHEDULE');
+          console.log(JSON.stringify(stale.map(event => ({
+            id: event.series.id,
+            competition: event.series.competition?.name,
+            teams: event.series.teams?.map(team => team.name),
+            scheduledStart: event.series.scheduledStart,
+            state: event.series.state,
+            score: event.series.score?.map(entry => entry.wins) ?? null,
+            games: event.series.games?.map(game => ({ number: game.number, state: game.state })) ?? []
+          })), null, 2));
+          NODE
+
+          while IFS= read -r series_id; do
+            [[ -n "$series_id" ]] || continue
+            encoded="$(SERIES_ID="$series_id" node -e 'process.stdout.write(encodeURIComponent(process.env.SERIES_ID))')"
+            context="$(curl -fsSL --connect-timeout 10 --max-time 60 \
+              "$API_BASE_URL/v1/lol/series/$encoded/context?diagnostic=$MOBILE_V3_COMMIT_SHA" || true)"
+            SERIES_ID="$series_id" CONTEXT="$context" node <<'NODE'
+          const id = process.env.SERIES_ID;
+          const text = process.env.CONTEXT || '';
+          try {
+            const context = JSON.parse(text);
+            console.log('STALE LIVE CONTEXT');
+            console.log(JSON.stringify({
+              seriesId: id,
+              observedAt: context.observedAt,
+              complete: context.complete,
+              reasons: (context.reasons || []).map(reason => ({ code: reason.code, message: reason.message })),
+              history: context.history ? {
+                bestOf: context.history.bestOf,
+                winsRequired: context.history.winsRequired,
+                score: context.history.score?.map(entry => ({ team: entry.team?.name, wins: entry.wins })),
+                games: context.history.games?.map(game => ({
+                  id: game.id,
+                  number: game.number,
+                  state: game.state,
+                  winner: game.winner?.name ?? null,
+                  durationSeconds: game.durationSeconds
+                }))
+              } : null
+            }, null, 2));
+          } catch {
+            console.log(JSON.stringify({ seriesId: id, contextError: text.slice(0, 500) }, null, 2));
+          }
+          NODE
+          done < /tmp/mobile-v3-stale-series.txt
+
+          base='https://lol.fandom.com/api.php'
+          siteinfo_status="$(curl -sS -o /tmp/leaguepedia-siteinfo.json -w '%{http_code}' \
+            --connect-timeout 10 --max-time 30 \
+            -G "$base" \
+            --data-urlencode 'action=query' \
+            --data-urlencode 'format=json' \
+            --data-urlencode 'meta=siteinfo' || true)"
+          echo "LEAGUEPEDIA SITEINFO HTTP $siteinfo_status"
+          head -c 800 /tmp/leaguepedia-siteinfo.json 2>/dev/null || true
+          echo
+
+          cargo_status="$(curl -sS -o /tmp/leaguepedia-cargo.json -w '%{http_code}' \
+            --connect-timeout 10 --max-time 30 \
+            -G "$base" \
+            --data-urlencode 'action=cargoquery' \
+            --data-urlencode 'format=json' \
+            --data-urlencode 'limit=1' \
+            --data-urlencode 'tables=ScoreboardGames=SG' \
+            --data-urlencode 'fields=SG.MatchId=MatchId,SG.Team1=Team1,SG.Team2=Team2,SG.WinTeam=WinTeam,SG.N_GameInMatch=N_GameInMatch,SG.DateTime_UTC=DateTime_UTC' || true)"
+          echo "LEAGUEPEDIA CARGO HTTP $cargo_status"
+          head -c 1200 /tmp/leaguepedia-cargo.json 2>/dev/null || true
+          echo
+
       - name: Verify shared API Worker V3 fallback preview
         env:
           API_FALLBACK_URL: ${{ steps.api-fallback-preview.outputs.url }}

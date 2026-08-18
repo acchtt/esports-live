@@ -82,6 +82,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install Chromium
+        # GitHub's hosted Ubuntu image already carries Chromium's system libraries.
+        # Avoid Playwright --with-deps here so a transient Ubuntu apt mirror outage
+        # cannot block otherwise healthy V3 browser validation and deployment.
+        run: npx playwright install chromium
+
+      - name: Validate shared application code
+        run: npm run check
+
+      - name: Validate ARENA V3
+        run: npm run test:web-v3
+
       - name: Prepare V3 D1 match database
         shell: bash
         run: |
@@ -133,18 +145,6 @@ jobs:
             const required = ["match_series", "match_games", "match_contexts"];
             process.exit(required.every(name => names.has(name)) ? 0 : 1);
           '
-
-      - name: Install Chromium
-        # GitHub's hosted Ubuntu image already carries Chromium's system libraries.
-        # Avoid Playwright --with-deps here so a transient Ubuntu apt mirror outage
-        # cannot block otherwise healthy V3 browser validation and deployment.
-        run: npx playwright install chromium
-
-      - name: Validate shared application code
-        run: npm run check
-
-      - name: Validate ARENA V3
-        run: npm run test:web-v3
 
       - name: Enable Worker preview URLs
         run: npx wrangler triggers deploy --config "$V3_WRANGLER_CONFIG"

@@ -3,7 +3,10 @@ import { readScheduleCache } from './schedule-cache.ts';
 
 const PREGAME_HOLD_BEFORE_MS = 45 * 60 * 1_000;
 const PREGAME_HOLD_AFTER_MS = 2 * 60 * 60 * 1_000;
-const ACTIVE_HOLD_MS = 10 * 60 * 1_000;
+// D1 now preserves server-side match continuity and verified Final evidence.
+// Keep enough grace for several missed refreshes, but do not let a successful
+// active schedule omission leave an ended match painted LIVE for ten minutes.
+const ACTIVE_HOLD_MS = 90 * 1_000;
 
 interface SeenEvent {
   event: ScheduleEvent;

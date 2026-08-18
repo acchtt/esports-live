@@ -188,6 +188,7 @@ test('V3 rotates stale live finality probes without starving ended series', asyn
   await expect(page.locator('[data-series-id="genuine-live-8"]')).toBeVisible();
   expect(new Set(finalityRequests).size).toBe(6);
   expect(finalityRequests).not.toContain('stale-final-7');
+  expect(finalityRequests).not.toContain('genuine-live-8');
 
   await page.locator('#refresh-data').click();
 

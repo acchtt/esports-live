@@ -102,7 +102,7 @@ jobs:
           fi
 
           test -n "$database_id" || { echo "Could not resolve the V3 D1 database ID."; exit 1; }
-          config=/tmp/mobile-v3-wrangler.toml
+          config="$GITHUB_WORKSPACE/.wrangler-mobile-v3.toml"
           cp wrangler.toml "$config"
           cat >> "$config" <<EOF
 

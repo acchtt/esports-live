@@ -5,6 +5,9 @@ import type {
   TeamRef
 } from '@esports-live/core';
 
+const D1_BATCH_CHUNK = 40;
+const D1_LOOKUP_CHUNK = 40;
+
 export interface MatchDatabaseStatement {
   bind(...values: unknown[]): MatchDatabaseStatement;
   run(): Promise<unknown>;
@@ -54,6 +57,15 @@ function eventTeamKey(event: ScheduleEvent, team: TeamRef | null | undefined): s
 
 function activeHistoryGame(game: SeriesGameHistoryRef): boolean {
   return game.state === 'live' || game.state === 'draft' || game.state === 'paused';
+}
+
+async function runBatches(
+  db: MatchDatabase,
+  statements: readonly MatchDatabaseStatement[]
+): Promise<void> {
+  for (let offset = 0; offset < statements.length; offset += D1_BATCH_CHUNK) {
+    await db.batch(statements.slice(offset, offset + D1_BATCH_CHUNK));
+  }
 }
 
 export function contextHasActiveGame(context: SeriesContext): boolean {
@@ -194,25 +206,29 @@ export function createD1MatchStore(db: MatchDatabase): MatchStore {
         }
       }
 
-      await db.batch(statements);
+      await runBatches(db, statements);
     },
 
     async mergeSchedule(events) {
       if (!events.length) return events;
       const ids = [...new Set(events.map(event => event.series.id))];
-      const placeholders = ids.map(() => '?').join(',');
-      const result = await db.prepare(`
-        SELECT series_id, final_payload_json
-        FROM match_series
-        WHERE final_verified = 1
-          AND final_payload_json IS NOT NULL
-          AND series_id IN (${placeholders})
-      `).bind(...ids).all<StoredFinalRow>();
       const finals = new Map<string, ScheduleEvent>();
 
-      for (const row of result.results ?? []) {
-        const event = parseEvent(row.final_payload_json);
-        if (event) finals.set(row.series_id, event);
+      for (let offset = 0; offset < ids.length; offset += D1_LOOKUP_CHUNK) {
+        const chunk = ids.slice(offset, offset + D1_LOOKUP_CHUNK);
+        const placeholders = chunk.map(() => '?').join(',');
+        const result = await db.prepare(`
+          SELECT series_id, final_payload_json
+          FROM match_series
+          WHERE final_verified = 1
+            AND final_payload_json IS NOT NULL
+            AND series_id IN (${placeholders})
+        `).bind(...chunk).all<StoredFinalRow>();
+
+        for (const row of result.results ?? []) {
+          const event = parseEvent(row.final_payload_json);
+          if (event) finals.set(row.series_id, event);
+        }
       }
 
       return events.map(event => {
@@ -274,7 +290,7 @@ export function createD1MatchStore(db: MatchDatabase): MatchStore {
           game.winner?.id ?? null,
           now
         ));
-        await db.batch(statements);
+        await runBatches(db, statements);
       }
 
       if (hasActiveGame) {

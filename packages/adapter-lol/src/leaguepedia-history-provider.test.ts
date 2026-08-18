@@ -52,6 +52,19 @@ function history(
   };
 }
 
+function staleLiveHistory(): SeriesHistoryRef {
+  const value = history([left, null, null], [2_527, null, null]);
+  const states = ['completed', 'live', 'unstarted'] as const;
+  return {
+    ...value,
+    score: [
+      { team: left, wins: 1 },
+      { team: right, wins: 0 }
+    ],
+    games: value.games.map((game, index) => ({ ...game, state: states[index]! }))
+  };
+}
+
 function context(value: SeriesHistoryRef): LolProviderSeriesContext {
   return {
     seriesId: schedule.series.id,
@@ -148,6 +161,24 @@ function grubsPayload(
   };
 }
 
+function resultRows(winners: readonly TeamRef[]) {
+  return {
+    cargoquery: winners.map((winner, index) => ({
+      title: {
+        MatchId: 'lec-week-2-match-1',
+        GameId: `leaguepedia-game-${index + 1}`,
+        Team1: 'GIANTX',
+        Team2: 'SK Gaming',
+        WinTeam: winner.name,
+        Winner: winner.id === left.id ? '1' : '2',
+        Gamelength: `${40 + index}:00`,
+        N_GameInMatch: String(index + 1),
+        DateTime_UTC: `2026-08-01 ${String(16 + index).padStart(2, '0')}:00:00`
+      }
+    }))
+  };
+}
+
 test('supplements ambiguous completed-game winners and durations from Leaguepedia', async () => {
   let requests = 0;
   const provider = createLeaguepediaHistoryFallbackProvider(baseProvider(history()), {
@@ -200,6 +231,45 @@ test('supplements ambiguous completed-game winners and durations from Leaguepedi
   assert.deepEqual(result.history?.games.map(game => game.winner?.id ?? null), ['left', 'right', null]);
   assert.deepEqual(result.history?.games.map(game => game.durationSeconds), [2_527, 2_951, null]);
   assert.ok(result.reasons?.some(reason => reason.code === 'history_supplemented'));
+});
+
+test('recovers a stale live series when matched completed games prove the final result', async () => {
+  let requests = 0;
+  const provider = createLeaguepediaHistoryFallbackProvider(baseProvider(staleLiveHistory()), {
+    now: () => new Date(observedAt),
+    fetcher: async () => {
+      requests += 1;
+      return Response.json(resultRows([left, right, right]));
+    }
+  });
+
+  await provider.getSchedule();
+  const result = await provider.getSeriesContext!(schedule.series.id);
+
+  assert.equal(requests, 1);
+  assert.deepEqual(result.history?.score.map(entry => entry.wins), [1, 2]);
+  assert.deepEqual(result.history?.games.map(game => game.state), ['completed', 'completed', 'completed']);
+  assert.deepEqual(result.history?.games.map(game => game.winner?.id ?? null), ['left', 'right', 'right']);
+  assert.ok(result.reasons?.some(reason => reason.code === 'history_supplemented'));
+});
+
+test('keeps a genuinely active game live when fallback only proves earlier completed games', async () => {
+  let requests = 0;
+  const provider = createLeaguepediaHistoryFallbackProvider(baseProvider(staleLiveHistory()), {
+    now: () => new Date(observedAt),
+    fetcher: async () => {
+      requests += 1;
+      return Response.json(resultRows([left]));
+    }
+  });
+
+  await provider.getSchedule();
+  const result = await provider.getSeriesContext!(schedule.series.id);
+
+  assert.equal(requests, 1);
+  assert.deepEqual(result.history?.score.map(entry => entry.wins), [1, 0]);
+  assert.equal(result.history?.games[1]?.state, 'live');
+  assert.equal(result.history?.games[2]?.state, 'unstarted');
 });
 
 test('supplements completed-game Void Grubs despite Leaguepedia team-name drift', async () => {
@@ -259,11 +329,14 @@ test('retries a transient Leaguepedia Cargo throttle before giving up Grubs enri
   assert.equal(result.stats?.red.objectives.grubs, 2);
 });
 
-test('does not request fallback data when completed games already have results', async () => {
+test('does not request fallback data when completed games have results and active history is fresh', async () => {
   let requests = 0;
   const provider = createLeaguepediaHistoryFallbackProvider(
     baseProvider(history([left, right, null], [2_527, 2_951, null])),
-    { fetcher: async () => { requests += 1; return Response.json({ cargoquery: [] }); } }
+    {
+      now: () => new Date('2026-08-01T17:00:00.000Z'),
+      fetcher: async () => { requests += 1; return Response.json({ cargoquery: [] }); }
+    }
   );
 
   const result = await provider.getSeriesContext!(schedule.series.id);

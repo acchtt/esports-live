@@ -33,6 +33,7 @@ env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   MOBILE_V3_COMMIT_SHA: ${{ github.sha }}
   MOBILE_V3_VERSION: 0.1.0
+  V3_D1_DATABASE_NAME: esports-live-mobile-v3
 
 jobs:
   deploy-web:
@@ -66,6 +67,7 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$V3_D1_DATABASE_NAME" || { echo "Missing V3_D1_DATABASE_NAME"; exit 1; }
 
       - name: Check out V3 application
         uses: actions/checkout@v6
@@ -80,6 +82,58 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Prepare V3 D1 match database
+        shell: bash
+        run: |
+          npx wrangler d1 list --json > /tmp/mobile-v3-d1-list.json
+          database_id="$(DATABASE_NAME="$V3_D1_DATABASE_NAME" node -e '
+            const fs = require("node:fs");
+            const name = process.env.DATABASE_NAME;
+            const list = JSON.parse(fs.readFileSync("/tmp/mobile-v3-d1-list.json", "utf8"));
+            const match = Array.isArray(list) ? list.find(entry => entry?.name === name) : null;
+            if (match?.uuid) process.stdout.write(String(match.uuid));
+          ')"
+
+          if [[ -z "$database_id" ]]; then
+            echo "Creating D1 database $V3_D1_DATABASE_NAME."
+            create_output="$(npx wrangler d1 create "$V3_D1_DATABASE_NAME" 2>&1)"
+            echo "$create_output"
+            database_id="$(grep -Eo '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' <<<"$create_output" | tail -n 1)"
+          fi
+
+          test -n "$database_id" || { echo "Could not resolve the V3 D1 database ID."; exit 1; }
+          config=/tmp/mobile-v3-wrangler.toml
+          cp wrangler.toml "$config"
+          cat >> "$config" <<EOF
+
+          [[d1_databases]]
+          binding = "MATCH_DB"
+          database_name = "$V3_D1_DATABASE_NAME"
+          database_id = "$database_id"
+          migrations_dir = "apps/api/migrations"
+          EOF
+          echo "V3_WRANGLER_CONFIG=$config" >> "$GITHUB_ENV"
+          echo "V3_D1_DATABASE_ID=$database_id" >> "$GITHUB_ENV"
+
+      - name: Apply V3 D1 match migrations
+        shell: bash
+        run: |
+          npx wrangler d1 migrations apply "$V3_D1_DATABASE_NAME" \
+            --remote \
+            --config "$V3_WRANGLER_CONFIG"
+          result="$(npx wrangler d1 execute "$V3_D1_DATABASE_NAME" \
+            --remote \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('match_series','match_games','match_contexts') ORDER BY name" \
+            --json \
+            --config "$V3_WRANGLER_CONFIG")"
+          RESULT="$result" node -e '
+            const value = JSON.parse(process.env.RESULT || "[]");
+            const rows = value.flatMap(entry => entry?.results ?? []);
+            const names = new Set(rows.map(row => row?.name));
+            const required = ["match_series", "match_games", "match_contexts"];
+            process.exit(required.every(name => names.has(name)) ? 0 : 1);
+          '
+
       - name: Install Chromium
         # GitHub's hosted Ubuntu image already carries Chromium's system libraries.
         # Avoid Playwright --with-deps here so a transient Ubuntu apt mirror outage
@@ -93,13 +147,14 @@ jobs:
         run: npm run test:web-v3
 
       - name: Enable Worker preview URLs
-        run: npx wrangler triggers deploy
+        run: npx wrangler triggers deploy --config "$V3_WRANGLER_CONFIG"
 
       - name: Upload shared API Worker V3 primary preview
         id: api-preview
         shell: bash
         run: |
           output="$(npx wrangler versions upload \
+            --config "$V3_WRANGLER_CONFIG" \
             --preview-alias mobile-v3-routed \
             --keep-vars \
             --message "ARENA V3 primary $MOBILE_V3_COMMIT_SHA" 2>&1)"
@@ -113,6 +168,7 @@ jobs:
         shell: bash
         run: |
           output="$(npx wrangler versions upload \
+            --config "$V3_WRANGLER_CONFIG" \
             --preview-alias mobile-v3-fallback \
             --keep-vars \
             --message "ARENA V3 fallback $MOBILE_V3_COMMIT_SHA" 2>&1)"
@@ -139,12 +195,12 @@ jobs:
                 const health = JSON.parse(fs.readFileSync("/tmp/mobile-v3-primary-health.json", "utf8"));
                 const schedule = JSON.parse(fs.readFileSync("/tmp/mobile-v3-primary-schedule.json", "utf8"));
                 const headers = fs.readFileSync("/tmp/mobile-v3-primary-schedule.headers", "utf8").toLowerCase();
-                const healthy = health.ok === true && health.service === "esports-live-api" && health.adapters?.includes("lol");
+                const healthy = health.ok === true && health.service === "esports-live-api" && health.adapters?.includes("lol") && health.persistence === "d1";
                 const scheduled = schedule.esport === "lol" && Array.isArray(schedule.events);
                 const cors = /access-control-allow-origin:\s*\*/.test(headers);
                 process.exit(healthy && scheduled && cors ? 0 : 1);
               '; then
-              echo "V3 primary API is healthy and schedule-capable."
+              echo "V3 primary API is healthy, D1-backed, and schedule-capable."
               exit 0
             fi
             echo "V3 primary API not ready (attempt $attempt/12)."
@@ -171,12 +227,12 @@ jobs:
                 const health = JSON.parse(fs.readFileSync("/tmp/mobile-v3-fallback-health.json", "utf8"));
                 const schedule = JSON.parse(fs.readFileSync("/tmp/mobile-v3-fallback-schedule.json", "utf8"));
                 const headers = fs.readFileSync("/tmp/mobile-v3-fallback-schedule.headers", "utf8").toLowerCase();
-                const healthy = health.ok === true && health.service === "esports-live-api" && health.adapters?.includes("lol");
+                const healthy = health.ok === true && health.service === "esports-live-api" && health.adapters?.includes("lol") && health.persistence === "d1";
                 const scheduled = schedule.esport === "lol" && Array.isArray(schedule.events);
                 const cors = /access-control-allow-origin:\s*\*/.test(headers);
                 process.exit(healthy && scheduled && cors ? 0 : 1);
               '; then
-              echo "V3 same-commit fallback API is healthy and schedule-capable."
+              echo "V3 same-commit fallback API is healthy, D1-backed, and schedule-capable."
               exit 0
             fi
             echo "V3 fallback API not ready (attempt $attempt/12)."

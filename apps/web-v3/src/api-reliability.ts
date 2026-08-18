@@ -6,7 +6,7 @@ import {
 const CONFIGURED_PRIMARY = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 const CONFIGURED_FALLBACK = String(
   import.meta.env.VITE_API_FALLBACK_BASE_URL
-    ?? 'https://mobile-demo-esports-live-api.acchtt.workers.dev'
+    ?? 'https://mobile-v3-fallback-esports-live-api.acchtt.workers.dev'
 ).replace(/\/$/, '');
 
 let installed = false;
@@ -61,6 +61,10 @@ function markDataSource(source: 'live' | 'cache'): void {
   }
 }
 
+function markApiEndpoint(endpoint: 'primary' | 'fallback'): void {
+  document.documentElement.dataset.v3ApiEndpoint = endpoint;
+}
+
 async function cachedOrThrow(source: URL, error: unknown): Promise<Response> {
   const cached = await readLastGoodApiResponse(source);
   if (cached) {
@@ -77,11 +81,15 @@ function remember(source: URL, response: Response): void {
 }
 
 /**
- * V3 is deployed against a Cloudflare Worker version-preview URL so API changes
- * can be validated without touching the current build. Version-preview routes
- * can occasionally become unreachable from a browser even though a recent
- * health probe succeeded. Keep V3 usable by falling back to the current stable
- * mobile API after a genuine network failure.
+ * V3 is deployed against Cloudflare Worker version-preview URLs so API changes
+ * can be validated without touching the current build. Both the primary and
+ * fallback endpoints are uploaded from the exact V3 commit being deployed.
+ *
+ * A preview route can occasionally become unreachable from a browser even when
+ * a recent health probe succeeded. Every request therefore retries the primary
+ * first and uses the same-commit fallback only for a genuine network failure.
+ * The next request immediately gets another chance to recover to primary rather
+ * than pinning the page to fallback for the rest of the session.
  *
  * If both network endpoints are unavailable, recent schedule/context responses
  * can be recovered from CacheStorage. Live snapshots keep using the dedicated
@@ -103,7 +111,6 @@ export function installApiReliability(): void {
   const fallbackOrigin = fallbackBase
     ? new URL(`${fallbackBase}/`, window.location.href).origin
     : primaryOrigin;
-  let activeBase = primaryBase;
   let scheduleTail: Promise<void> = Promise.resolve();
 
   const fetchApi = async (
@@ -121,30 +128,24 @@ export function installApiReliability(): void {
     }
 
     const signal = requestSignal(input, init);
-    const targetInput = activeBase === primaryBase
-      ? input
-      : rewrittenInput(input, init, source, activeBase);
 
     try {
-      const response = await rawFetch(targetInput, init);
+      const response = await rawFetch(input, init);
+      markApiEndpoint('primary');
       remember(source, response);
       return response;
     } catch (error) {
       if (signal?.aborted) throw error;
 
-      if (
-        activeBase === primaryBase
-        && fallbackBase
-        && fallbackOrigin !== primaryOrigin
-      ) {
+      if (fallbackBase && fallbackOrigin !== primaryOrigin) {
         const fallbackInput = rewrittenInput(input, init, source, fallbackBase);
         try {
           const response = await rawFetch(fallbackInput, init);
-          activeBase = fallbackBase;
-          document.documentElement.dataset.v3ApiEndpoint = 'fallback';
+          markApiEndpoint('fallback');
           remember(source, response);
           return response;
         } catch (fallbackError) {
+          if (signal?.aborted) throw fallbackError;
           return cachedOrThrow(source, fallbackError);
         }
       }
@@ -172,6 +173,6 @@ export function installApiReliability(): void {
     return run;
   };
 
-  document.documentElement.dataset.v3ApiEndpoint = 'primary';
+  markApiEndpoint('primary');
   document.documentElement.dataset.v3DataSource = 'live';
 }

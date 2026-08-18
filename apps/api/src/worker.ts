@@ -22,6 +22,7 @@ import {
 } from '@esports-live/adapter-dota2';
 import { AdapterRegistry, CachedAdapter } from '@esports-live/core';
 import { createGrubsCvProvider } from './grubs-cv-provider.ts';
+import { createD1MatchStore, type MatchDatabase } from './match-store.ts';
 import { createApiHandler } from './router.ts';
 
 export interface WorkerEnv {
@@ -32,6 +33,7 @@ export interface WorkerEnv {
   GRUBS_CV_TOKEN?: string;
   GRUBS_CV_MIN_CONFIDENCE?: string;
   GRUBS_CV_ALLOW_SIMULATED?: string;
+  MATCH_DB?: MatchDatabase;
 }
 
 type ApiHandler = (request: Request) => Promise<Response>;
@@ -235,6 +237,7 @@ export function createProductionScheduleProvider(
 }
 
 let cachedConfigKey: string | null = null;
+let cachedMatchDb: MatchDatabase | undefined;
 let cachedHandler: ApiHandler | null = null;
 
 export function createWorkerHandler(env: WorkerEnv): ApiHandler {
@@ -254,7 +257,13 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
     grubsCvMinConfidence,
     grubsCvAllowSimulated
   ]);
-  if (cachedHandler && cachedConfigKey === configKey) return cachedHandler;
+  if (
+    cachedHandler
+    && cachedConfigKey === configKey
+    && cachedMatchDb === env.MATCH_DB
+  ) {
+    return cachedHandler;
+  }
 
   const registry = new AdapterRegistry();
   if (apiKey) {
@@ -314,7 +323,11 @@ export function createWorkerHandler(env: WorkerEnv): ApiHandler {
   ));
 
   cachedConfigKey = configKey;
-  cachedHandler = createApiHandler(registry);
+  cachedMatchDb = env.MATCH_DB;
+  cachedHandler = createApiHandler(
+    registry,
+    env.MATCH_DB ? createD1MatchStore(env.MATCH_DB) : undefined
+  );
   return cachedHandler;
 }
 

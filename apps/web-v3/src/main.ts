@@ -22,6 +22,7 @@ import './app-updater.css';
 import { startWebV2 } from './app.ts';
 import { installApiReliability } from './api-reliability.ts';
 import { installArenaBrand } from './arena-brand.ts';
+import { installCatalogueContextPrefetch } from './catalogue-context-prefetch.ts';
 import { installCatalogueExperience } from './catalogue-experience.ts';
 import { installCatalogueFinality } from './catalogue-finality.ts';
 import { installCatalogueSeriesScores } from './catalogue-series-scores.ts';
@@ -61,6 +62,7 @@ installScheduleContinuity();
 const initialRoute = currentV3Route();
 if (initialRoute.kind !== 'match') {
   installCatalogueFinality();
+  installCatalogueContextPrefetch();
   installCatalogueTeamLogos(root);
   installCatalogueSeriesScores(root);
 }

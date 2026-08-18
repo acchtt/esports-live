@@ -16,6 +16,7 @@ const RESULT_CACHE_MS = 5 * 60 * 1_000;
 const EMPTY_RESULT_CACHE_MS = 10_000;
 const LOOKBACK_MS = 8 * 60 * 60 * 1_000;
 const LOOKAHEAD_MS = 8 * 60 * 60 * 1_000;
+const STALE_ACTIVE_HISTORY_PROBE_MS = 90 * 60 * 1_000;
 const REQUEST_RETRY_DELAYS_MS = [0, 750] as const;
 const LEAGUEPEDIA_USER_AGENT = 'esports-live/1.0 (Leaguepedia completed-game enrichment)';
 const GENERIC_TEAM_TOKENS = new Set([
@@ -292,25 +293,96 @@ function winnerForRow(series: LolProviderSeries, row: LeaguepediaRow): TeamRef |
 function supplementHistory(
   series: LolProviderSeries,
   history: SeriesHistoryRef,
-  rows: readonly LeaguepediaRow[]
+  rows: readonly LeaguepediaRow[],
+  recoverCompletedRows = false
 ): { history: SeriesHistoryRef; changed: boolean } {
   const byNumber = new Map(
     rows
       .filter(row => row.gameNumber !== null)
       .map(row => [row.gameNumber!, row] as const)
   );
+  const conflictingWinner = [...byNumber.entries()].some(([number, row]) => {
+    const existing = history.games.find(game => game.number === number);
+    const winner = winnerForRow(series, row);
+    return Boolean(existing?.winner && winner && existing.winner.id !== winner.id);
+  });
+  const allowRecovery = recoverCompletedRows && !conflictingWinner;
   let changed = false;
-  const games = history.games.map(game => {
-    if (game.state !== 'completed') return game;
+  let games = history.games.map(game => {
     const row = byNumber.get(game.number);
     if (!row) return game;
-    const winner = game.winner ?? winnerForRow(series, row);
+    const rowWinner = winnerForRow(series, row);
+    const promoteCompleted = allowRecovery && rowWinner !== null;
+    if (game.state !== 'completed' && !promoteCompleted) return game;
+    const state = promoteCompleted ? 'completed' as const : game.state;
+    const winner = game.winner ?? rowWinner;
     const durationSeconds = game.durationSeconds ?? row.durationSeconds;
-    if (winner === game.winner && durationSeconds === game.durationSeconds) return game;
+    if (
+      state === game.state
+      && winner === game.winner
+      && durationSeconds === game.durationSeconds
+    ) {
+      return game;
+    }
     changed = true;
-    return { ...game, winner, durationSeconds };
+    return { ...game, state, winner, durationSeconds };
   });
-  return { history: changed ? { ...history, games } : history, changed };
+
+  if (allowRecovery) {
+    const existingNumbers = new Set(games.map(game => game.number));
+    for (const [number, row] of byNumber) {
+      if (existingNumbers.has(number) || number < 1 || number > Math.max(series.bestOf, history.bestOf)) continue;
+      const winner = winnerForRow(series, row);
+      if (!winner) continue;
+      const seriesGame = series.games.find(game => game.number === number);
+      games.push({
+        id: seriesGame?.id ?? (row.gameId || `leaguepedia:${series.id}:${number}`),
+        number,
+        state: 'completed',
+        blueTeam: null,
+        redTeam: null,
+        winner,
+        durationSeconds: row.durationSeconds
+      });
+      existingNumbers.add(number);
+      changed = true;
+    }
+    games = games.sort((left, right) => left.number - right.number);
+  }
+
+  let score = history.score;
+  if (allowRecovery) {
+    const evidence = [...byNumber.entries()]
+      .map(([number, row]) => ({ number, winner: winnerForRow(series, row) }))
+      .filter((entry): entry is { number: number; winner: TeamRef } => entry.winner !== null)
+      .sort((left, right) => left.number - right.number);
+    const coherent = evidence.length > 0
+      && evidence.every((entry, index) => entry.number === index + 1);
+    if (coherent) {
+      const rowWins = series.teams.map(team => (
+        evidence.filter(entry => entry.winner.id === team.id).length
+      )) as [number, number];
+      const clinched = rowWins.some(wins => wins >= history.winsRequired);
+      const existingGamesPlayed = history.score[0].wins + history.score[1].wins;
+      if (clinched || evidence.length > existingGamesPlayed) {
+        score = [
+          { team: history.score[0].team, wins: rowWins[0] },
+          { team: history.score[1].team, wins: rowWins[1] }
+        ];
+        changed = true;
+      }
+      if (clinched) {
+        games = games.map(game => {
+          if (game.state !== 'live' && game.state !== 'draft' && game.state !== 'paused') return game;
+          if (byNumber.has(game.number)) return game;
+          changed = true;
+          return { ...game, state: 'unstarted' as const };
+        });
+      }
+    }
+  }
+
+  return { history: changed ? { ...history, score, games } : history, changed };
 }
 
 function supplementSnapshotGrubs(
@@ -518,10 +590,15 @@ export function createLeaguepediaHistoryFallbackProvider(
     },
     async getSeriesContext(seriesId: string) {
       const context = await base.getSeriesContext!(seriesId);
-      const missing = context.history?.games.some(game => (
+      if (!context.history) return context;
+
+      const missing = context.history.games.some(game => (
         game.state === 'completed' && (!game.winner || game.durationSeconds === null)
       ));
-      if (!context.history || !missing) return context;
+      const active = context.history.games.some(game => (
+        game.state === 'live' || game.state === 'draft' || game.state === 'paused'
+      ));
+      if (!missing && !active) return context;
 
       let series = seriesById.get(seriesId);
       if (!series) {
@@ -530,13 +607,21 @@ export function createLeaguepediaHistoryFallbackProvider(
       }
       if (!series) return context;
 
+      const scheduled = Date.parse(series.scheduledStart);
+      const staleActive = active
+        && Number.isFinite(scheduled)
+        && scheduled <= now().getTime() - STALE_ACTIVE_HISTORY_PROBE_MS;
+      if (!missing && !staleActive) return context;
+
       const rows = matchingRows(series, await rowsFor(series));
-      const supplemented = supplementHistory(series, context.history, rows);
+      const supplemented = supplementHistory(series, context.history, rows, staleActive);
       if (!supplemented.changed) return context;
 
       const reason: QualityReason = {
         code: 'history_supplemented',
-        message: 'Missing completed-game winner or duration fields were supplemented from Leaguepedia.'
+        message: staleActive
+          ? 'Stale active-game history was reconciled with matched Leaguepedia completed-game evidence.'
+          : 'Missing completed-game winner or duration fields were supplemented from Leaguepedia.'
       };
       const reasons = [
         ...(context.reasons ?? []).filter(item => item.code !== reason.code),

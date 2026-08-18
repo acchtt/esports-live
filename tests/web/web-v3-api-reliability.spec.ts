@@ -1,6 +1,6 @@
 import { expect, test, type Route } from '@playwright/test';
 
-const FALLBACK_API = 'https://mobile-demo-esports-live-api.acchtt.workers.dev';
+const FALLBACK_API = 'https://mobile-v3-fallback-esports-live-api.acchtt.workers.dev';
 const provider = { id: 'fixture', name: 'Fixture provider' };
 const blue = { id: 'blue-reliable', name: 'Reliable Blue', code: 'RBL' };
 const red = { id: 'red-reliable', name: 'Reliable Red', code: 'RRD' };
@@ -23,8 +23,10 @@ async function json(route: Route, value: unknown): Promise<void> {
   });
 }
 
-test('V3 keeps the catalogue usable when the primary API has a network failure', async ({ page }) => {
+test('V3 fails over per request and returns to primary after a transient network failure', async ({ page }) => {
+  let primaryOnline = false;
   let primaryScheduleRequests = 0;
+  let primarySuccessfulScheduleRequests = 0;
   let fallbackScheduleRequests = 0;
   const fallbackOrigin = new URL(FALLBACK_API).origin;
 
@@ -37,14 +39,18 @@ test('V3 keeps the catalogue usable when the primary API has a network failure',
 
   await page.route('**/v1/lol/schedule**', async route => {
     const url = new URL(route.request().url());
+    const history = url.searchParams.get('states') === 'completed';
     if (url.origin !== fallbackOrigin) {
       primaryScheduleRequests += 1;
-      await route.abort('failed');
-      return;
+      if (!primaryOnline) {
+        await route.abort('failed');
+        return;
+      }
+      primarySuccessfulScheduleRequests += 1;
+    } else {
+      fallbackScheduleRequests += 1;
     }
 
-    fallbackScheduleRequests += 1;
-    const history = url.searchParams.get('states') === 'completed';
     await json(route, {
       esport: 'lol',
       events: history ? [] : [{ series: scheduledSeries, provider, observedAt: new Date().toISOString() }]
@@ -57,8 +63,15 @@ test('V3 keeps the catalogue usable when the primary API has a network failure',
   await expect(page.locator('[data-series-id="series-api-failover"]')).toBeVisible();
   await expect(page.locator('#catalogue-meta')).not.toContainText('Failed to fetch');
   await expect.poll(() => fallbackScheduleRequests).toBeGreaterThanOrEqual(2);
-  expect(primaryScheduleRequests).toBeGreaterThanOrEqual(1);
+  expect(primaryScheduleRequests).toBeGreaterThanOrEqual(2);
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3ApiEndpoint)).toBe('fallback');
+
+  primaryOnline = true;
+  await page.locator('#refresh-data').click();
+
+  await expect.poll(() => primarySuccessfulScheduleRequests).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.v3ApiEndpoint)).toBe('primary');
+  await expect(page.locator('[data-series-id="series-api-failover"]')).toBeVisible();
 });
 
 test('V3 uses recent last-good schedules when both network APIs are unavailable', async ({ page }) => {

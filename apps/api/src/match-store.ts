@@ -2,8 +2,10 @@ import type {
   ScheduleEvent,
   SeriesContext,
   SeriesGameHistoryRef,
+  SeriesHistoryRef,
   TeamRef
 } from '@esports-live/core';
+import { mergeObservedSeriesHistory } from '@esports-live/adapter-lol';
 
 const D1_BATCH_CHUNK = 40;
 const D1_LOOKUP_CHUNK = 40;
@@ -23,7 +25,7 @@ export interface MatchDatabase {
 export interface MatchStore {
   recordSchedule(events: readonly ScheduleEvent[]): Promise<void>;
   mergeSchedule(events: readonly ScheduleEvent[]): Promise<readonly ScheduleEvent[]>;
-  recordSeriesContext(seriesId: string, context: SeriesContext): Promise<void>;
+  persistSeriesContext(seriesId: string, context: SeriesContext): Promise<SeriesContext>;
 }
 
 interface StoredSeriesRow {
@@ -37,8 +39,23 @@ interface StoredFinalRow {
   final_payload_json: string | null;
 }
 
+interface StoredContextRow {
+  payload_json: string;
+}
+
 function normalized(value: string | null | undefined): string {
   return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function sameTeam(left: TeamRef | null | undefined, right: TeamRef | null | undefined): boolean {
+  if (!left || !right) return false;
+  if (left.id?.trim() && right.id?.trim() && left.id.trim() === right.id.trim()) return true;
+  const leftName = normalized(left.name);
+  const rightName = normalized(right.name);
+  if (leftName && rightName && leftName === rightName) return true;
+  const leftCode = normalized(left.code);
+  const rightCode = normalized(right.code);
+  return Boolean(leftCode && rightCode && leftCode === rightCode);
 }
 
 function eventTeamKey(event: ScheduleEvent, team: TeamRef | null | undefined): string | null {
@@ -57,6 +74,94 @@ function eventTeamKey(event: ScheduleEvent, team: TeamRef | null | undefined): s
 
 function activeHistoryGame(game: SeriesGameHistoryRef): boolean {
   return game.state === 'live' || game.state === 'draft' || game.state === 'paused';
+}
+
+function historyTeamsMatch(previous: SeriesHistoryRef, incoming: SeriesHistoryRef): boolean {
+  return sameTeam(previous.score[0]?.team, incoming.score[0]?.team)
+    && sameTeam(previous.score[1]?.team, incoming.score[1]?.team);
+}
+
+function historyTeamIndex(history: SeriesHistoryRef, winner: TeamRef | null): 0 | 1 | null {
+  if (!winner) return null;
+  if (sameTeam(history.score[0]?.team, winner)) return 0;
+  if (sameTeam(history.score[1]?.team, winner)) return 1;
+  return null;
+}
+
+function restoreIncomingActiveStates(
+  merged: SeriesHistoryRef,
+  incoming: SeriesHistoryRef
+): SeriesHistoryRef {
+  const incomingById = new Map(incoming.games.map(game => [game.id, game]));
+  const incomingByNumber = new Map(incoming.games.map(game => [game.number, game]));
+  return {
+    ...merged,
+    games: merged.games.map(game => {
+      const current = incomingById.get(game.id) ?? incomingByNumber.get(game.number);
+      if (!current || !activeHistoryGame(current)) return game;
+      // A current active state is preserved here instead of being overwritten by
+      // older completed state. Only a separate, already-clinched completed-game
+      // sequence below may prove that a later active slot is a phantom.
+      return { ...game, state: current.state };
+    })
+  };
+}
+
+export function reconcileClinchedTrailingHistory(history: SeriesHistoryRef): SeriesHistoryRef {
+  const winsRequired = Math.max(
+    1,
+    history.winsRequired || Math.floor(Math.max(1, history.bestOf) / 2) + 1
+  );
+  const counts: [number, number] = [0, 0];
+  const seenGames = new Set<string>();
+  let clinchNumber: number | null = null;
+  let winnerIndex: 0 | 1 | null = null;
+
+  const completed = [...history.games]
+    .filter(game => game.state === 'completed' && game.winner)
+    .sort((left, right) => left.number - right.number);
+
+  for (const game of completed) {
+    const key = game.id?.trim() || `game-${game.number}`;
+    if (seenGames.has(key)) continue;
+    seenGames.add(key);
+    const index = historyTeamIndex(history, game.winner);
+    if (index === null) continue;
+    counts[index] += 1;
+    if (counts[index] >= winsRequired) {
+      clinchNumber = game.number;
+      winnerIndex = index;
+      break;
+    }
+  }
+
+  if (clinchNumber === null || winnerIndex === null) return history;
+  if ((history.score[winnerIndex]?.wins ?? 0) < winsRequired) return history;
+
+  let changed = false;
+  const games = history.games.map(game => {
+    if (game.number <= clinchNumber || !activeHistoryGame(game)) return game;
+    changed = true;
+    return { ...game, state: 'unstarted' as const };
+  });
+  return changed ? { ...history, games } : history;
+}
+
+export function mergePersistedSeriesContext(
+  previous: SeriesContext | null,
+  incoming: SeriesContext
+): SeriesContext {
+  if (!incoming.history) return incoming;
+
+  const previousHistory = previous?.seriesId === incoming.seriesId
+    && previous.history
+    && historyTeamsMatch(previous.history, incoming.history)
+    ? previous.history
+    : undefined;
+  const monotonic = mergeObservedSeriesHistory(previousHistory, incoming.history);
+  const activeSafe = restoreIncomingActiveStates(monotonic, incoming.history);
+  const history = reconcileClinchedTrailingHistory(activeSafe);
+  return { ...incoming, history };
 }
 
 async function runBatches(
@@ -115,11 +220,13 @@ export function verifiedFinalEventFromContext(
       state: 'completed',
       bestOf: history.bestOf || event.series.bestOf,
       score,
-      games: history.games.map(game => ({
-        id: game.id,
-        number: game.number,
-        state: game.state
-      }))
+      games: history.games
+        .filter(game => game.state === 'completed')
+        .map(game => ({
+          id: game.id,
+          number: game.number,
+          state: game.state
+        }))
     }
   };
 }
@@ -128,6 +235,15 @@ function parseEvent(value: string | null): ScheduleEvent | null {
   if (!value) return null;
   try {
     return JSON.parse(value) as ScheduleEvent;
+  } catch {
+    return null;
+  }
+}
+
+function parseContext(value: string | null): SeriesContext | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as SeriesContext;
   } catch {
     return null;
   }
@@ -238,15 +354,29 @@ export function createD1MatchStore(db: MatchDatabase): MatchStore {
       });
     },
 
-    async recordSeriesContext(seriesId, context) {
+    async persistSeriesContext(seriesId, incomingContext) {
       const now = new Date().toISOString();
-      const history = context.history;
-      const hasActiveGame = contextHasActiveGame(context);
-      const row = await db.prepare(`
+      const seriesRow = await db.prepare(`
         SELECT latest_payload_json, final_payload_json, final_verified
         FROM match_series
         WHERE series_id = ?
       `).bind(seriesId).first<StoredSeriesRow>();
+      const contextRow = await db.prepare(`
+        SELECT payload_json
+        FROM match_contexts
+        WHERE series_id = ?
+      `).bind(seriesId).first<StoredContextRow>();
+      const context = mergePersistedSeriesContext(
+        parseContext(contextRow?.payload_json ?? null),
+        incomingContext
+      );
+      const history = context.history;
+      const hasActiveGame = contextHasActiveGame(context);
+
+      // A direct context request can arrive before the catalogue has written its
+      // schedule row. In that case serve the reconciled provider context without
+      // turning a missing FK parent into an API failure.
+      if (!seriesRow) return context;
 
       await db.prepare(`
         INSERT INTO match_contexts (
@@ -302,13 +432,13 @@ export function createD1MatchStore(db: MatchDatabase): MatchStore {
               updated_at = ?
           WHERE series_id = ?
         `).bind(now, seriesId).run();
-        return;
+        return context;
       }
 
-      const latest = parseEvent(row?.latest_payload_json ?? null);
-      if (!latest) return;
+      const latest = parseEvent(seriesRow.latest_payload_json);
+      if (!latest) return context;
       const finalEvent = verifiedFinalEventFromContext(latest, context);
-      if (!finalEvent) return;
+      if (!finalEvent) return context;
 
       await db.prepare(`
         UPDATE match_series
@@ -323,6 +453,7 @@ export function createD1MatchStore(db: MatchDatabase): MatchStore {
         now,
         seriesId
       ).run();
+      return context;
     }
   };
 }

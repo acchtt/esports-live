@@ -5,11 +5,10 @@ import type {
   TeamRef
 } from '@esports-live/core';
 
-const ACTIVE_SUSPECT_AGE_MS = 2 * 60 * 60 * 1_000;
+const ACTIVE_SUSPECT_AGE_MS = 90 * 60 * 1_000;
 const OVERDUE_SUSPECT_AGE_MS = 90 * 60 * 1_000;
-const MAX_ACTIVE_PROBES = 3;
-const MAX_OVERDUE_PROBES = 4;
-const RECHECK_MS = 25_000;
+const MAX_CONTEXT_PROBES = 6;
+const RECHECK_MS = 45_000;
 const CONTEXT_TIMEOUT_MS = 8_000;
 
 type FetchInput = RequestInfo | URL;
@@ -59,19 +58,15 @@ function probeCandidates(
   events: readonly ScheduleEvent[],
   now: number
 ): readonly ScheduleEvent[] {
-  const active = events
-    .filter(activeSeries)
-    .filter(event => now - scheduledTime(event) >= ACTIVE_SUSPECT_AGE_MS)
-    .sort((left, right) => scheduledTime(right) - scheduledTime(left))
-    .slice(0, MAX_ACTIVE_PROBES);
-  const overdue = events
-    .filter(overdueSeries)
-    .filter(event => now - scheduledTime(event) >= OVERDUE_SUSPECT_AGE_MS)
-    .sort((left, right) => scheduledTime(right) - scheduledTime(left))
-    .slice(0, MAX_OVERDUE_PROBES);
-  const merged = new Map<string, ScheduleEvent>();
-  [...active, ...overdue].forEach(event => merged.set(event.series.id, event));
-  return [...merged.values()];
+  const candidates = new Map<string, ScheduleEvent>();
+  events.forEach(event => {
+    const age = now - scheduledTime(event);
+    const eligible = activeSeries(event)
+      ? age >= ACTIVE_SUSPECT_AGE_MS
+      : overdueSeries(event) && age >= OVERDUE_SUSPECT_AGE_MS;
+    if (eligible) candidates.set(event.series.id, event);
+  });
+  return [...candidates.values()];
 }
 
 function normalized(value: string | null | undefined): string {
@@ -228,9 +223,14 @@ export function installCatalogueFinality(): void {
       }
     });
 
-    const candidates = [...candidateMap.values()].filter(event => (
-      now - (checkedAt.get(event.series.id) ?? 0) >= RECHECK_MS
-    ));
+    const candidates = [...candidateMap.values()]
+      .filter(event => now - (checkedAt.get(event.series.id) ?? 0) >= RECHECK_MS)
+      .sort((left, right) => {
+        const checkedDifference = (checkedAt.get(left.series.id) ?? 0)
+          - (checkedAt.get(right.series.id) ?? 0);
+        return checkedDifference || scheduledTime(left) - scheduledTime(right);
+      })
+      .slice(0, MAX_CONTEXT_PROBES);
 
     await Promise.all(candidates.map(async event => {
       checkedAt.set(event.series.id, now);

@@ -117,16 +117,17 @@ async function persistedSchedule(
   }
 }
 
-async function recordContext(
+async function persistedContext<T extends Awaited<ReturnType<NonNullable<ReturnType<AdapterRegistry['get']>['getSeriesContext']>>>>(
   store: MatchStore | undefined,
   seriesId: string,
-  context: Awaited<ReturnType<NonNullable<ReturnType<AdapterRegistry['get']>['getSeriesContext']>>>
-): Promise<void> {
-  if (!store) return;
+  context: T
+): Promise<T> {
+  if (!store) return context;
   try {
-    await store.recordSeriesContext(seriesId, context);
+    return await store.persistSeriesContext(seriesId, context) as T;
   } catch {
     // Keep serving provider context if the database is temporarily unavailable.
+    return context;
   }
 }
 
@@ -222,8 +223,8 @@ export function createApiHandler(registry: AdapterRegistry, matchStore?: MatchSt
         if (!adapter.getSeriesContext) {
           throw new ApiRequestError(404, 'context_not_supported', 'Series context is not supported for this esport.');
         }
-        const context = await adapter.getSeriesContext(seriesId);
-        await recordContext(matchStore, seriesId, context);
+        const providerContext = await adapter.getSeriesContext(seriesId);
+        const context = await persistedContext(matchStore, seriesId, providerContext);
         return json(context);
       }
 

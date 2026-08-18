@@ -83,7 +83,10 @@ jobs:
         run: npm install
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # GitHub's hosted Ubuntu image already carries Chromium's system libraries.
+        # Avoid Playwright --with-deps here so a transient Ubuntu apt mirror outage
+        # cannot block otherwise healthy V3 browser validation and deployment.
+        run: npx playwright install chromium
 
       - name: Validate shared application code
         run: npm run check

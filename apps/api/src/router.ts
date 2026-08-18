@@ -1,4 +1,5 @@
-import { AdapterRegistry, type EsportId, type ScheduleQuery } from '@esports-live/core';
+import { AdapterRegistry, type EsportId, type ScheduleEvent, type ScheduleQuery } from '@esports-live/core';
+import type { MatchStore } from './match-store.ts';
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -102,7 +103,34 @@ function pagination(url: URL): { enabled: boolean; offset: number; limit: number
   return { enabled, offset, limit };
 }
 
-export function createApiHandler(registry: AdapterRegistry) {
+async function persistedSchedule(
+  store: MatchStore | undefined,
+  events: readonly ScheduleEvent[]
+): Promise<readonly ScheduleEvent[]> {
+  if (!store || !events.length) return events;
+  try {
+    await store.recordSchedule(events);
+    return await store.mergeSchedule(events);
+  } catch {
+    // Persistence is a reliability layer, never a reason to take the live API down.
+    return events;
+  }
+}
+
+async function recordContext(
+  store: MatchStore | undefined,
+  seriesId: string,
+  context: Awaited<ReturnType<NonNullable<ReturnType<AdapterRegistry['get']>['getSeriesContext']>>>
+): Promise<void> {
+  if (!store) return;
+  try {
+    await store.recordSeriesContext(seriesId, context);
+  } catch {
+    // Keep serving provider context if the database is temporarily unavailable.
+  }
+}
+
+export function createApiHandler(registry: AdapterRegistry, matchStore?: MatchStore) {
   return async function handle(request: Request): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -120,7 +148,8 @@ export function createApiHandler(registry: AdapterRegistry) {
           ok: true,
           service: 'esports-live-api',
           schemaVersion: '1.0',
-          adapters: registry.list()
+          adapters: registry.list(),
+          persistence: matchStore ? 'd1' : 'memory'
         });
       }
 
@@ -130,7 +159,9 @@ export function createApiHandler(registry: AdapterRegistry) {
 
       if (segments.length === 3 && segments[0] === 'v1' && segments[2] === 'live') {
         const adapter = registry.get(segments[1] as EsportId);
-        const events = await adapter.getSchedule({ states: ['live', 'paused'] });
+        const sourceEvents = await adapter.getSchedule({ states: ['live', 'paused'] });
+        const events = (await persistedSchedule(matchStore, sourceEvents))
+          .filter(event => event.series.state !== 'completed');
         const gameIds = events.flatMap(event => {
           const game = event.series.games.find(candidate => (
             candidate.state === 'live'
@@ -155,7 +186,8 @@ export function createApiHandler(registry: AdapterRegistry) {
 
       if (segments.length === 3 && segments[0] === 'v1' && segments[2] === 'schedule') {
         const adapter = registry.get(segments[1] as EsportId);
-        const events = await adapter.getSchedule(scheduleQuery(url));
+        const sourceEvents = await adapter.getSchedule(scheduleQuery(url));
+        const events = await persistedSchedule(matchStore, sourceEvents);
         const pageRequest = pagination(url);
         const total = events.length;
         const pageEvents = pageRequest.enabled
@@ -190,7 +222,9 @@ export function createApiHandler(registry: AdapterRegistry) {
         if (!adapter.getSeriesContext) {
           throw new ApiRequestError(404, 'context_not_supported', 'Series context is not supported for this esport.');
         }
-        return json(await adapter.getSeriesContext(seriesId));
+        const context = await adapter.getSeriesContext(seriesId);
+        await recordContext(matchStore, seriesId, context);
+        return json(context);
       }
 
       if (

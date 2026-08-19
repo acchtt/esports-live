@@ -33,8 +33,10 @@ function event(id: string, state: 'live' | 'scheduled', hoursFromNow: number) {
   };
 }
 
-test('V3 prefetches live and nearby match context without opening a card', async ({ page }) => {
+test('V3 prefetches match context through the API client and refreshes the catalogue without a tap', async ({ page }) => {
   const prefetched = new Set<string>();
+  const contextQueries: string[] = [];
+  let activeScheduleRequests = 0;
   const live = event('series-prefetch-live', 'live', 1);
   const upcoming = event('series-prefetch-upcoming', 'scheduled', 2);
 
@@ -49,6 +51,7 @@ test('V3 prefetches live and nearby match context without opening a card', async
   await page.route('**/v1/lol/schedule**', async route => {
     const url = new URL(route.request().url());
     const history = url.searchParams.get('states') === 'completed';
+    if (!history) activeScheduleRequests += 1;
     await json(route, {
       esport: 'lol',
       events: history ? [] : [live, upcoming]
@@ -60,6 +63,7 @@ test('V3 prefetches live and nearby match context without opening a card', async
     const match = /\/series\/([^/]+)\/context$/.exec(url.pathname);
     const seriesId = decodeURIComponent(match?.[1] ?? '');
     prefetched.add(seriesId);
+    contextQueries.push(url.search);
     await json(route, {
       schemaVersion: '1.0',
       esport: 'lol',
@@ -81,5 +85,8 @@ test('V3 prefetches live and nearby match context without opening a card', async
     'series-prefetch-live',
     'series-prefetch-upcoming'
   ]);
+  await expect.poll(() => activeScheduleRequests).toBeGreaterThanOrEqual(2);
+  expect(contextQueries).toHaveLength(2);
+  expect(contextQueries.every(query => new URLSearchParams(query).has('final'))).toBe(true);
   await expect(page).toHaveURL(/\/$/);
 });

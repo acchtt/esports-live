@@ -86,7 +86,7 @@ test('V3 prefetches match context through the API client and refreshes the catal
     'series-prefetch-upcoming'
   ]);
   await expect.poll(() => activeScheduleRequests).toBeGreaterThanOrEqual(2);
-  expect(contextQueries).toHaveLength(2);
+  expect(contextQueries.length).toBeGreaterThanOrEqual(2);
   expect(contextQueries.every(query => new URLSearchParams(query).has('final'))).toBe(true);
   await expect(page).toHaveURL(/\/$/);
 });

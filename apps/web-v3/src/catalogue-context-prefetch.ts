@@ -1,10 +1,12 @@
 import type { ScheduleEvent, SeriesContext } from '@esports-live/core';
+import { loadSeriesContext } from './api.ts';
 
 const MATCH_PREFETCH_LIMIT = 8;
 const HISTORY_PREFETCH_LIMIT = 4;
 const PREFETCH_CONCURRENCY = 2;
 const PREFETCH_RECHECK_MS = 2 * 60 * 1_000;
 const CONTEXT_TIMEOUT_MS = 8_000;
+const CATALOGUE_REFRESH_DELAY_MS = 150;
 
 interface ScheduleResponse {
   events?: readonly ScheduleEvent[];
@@ -69,19 +71,11 @@ function candidates(
     .slice(0, MATCH_PREFETCH_LIMIT);
 }
 
-async function prefetchContext(
-  nativeFetch: typeof window.fetch,
-  event: ScheduleEvent
-): Promise<SeriesContext | null> {
+async function prefetchContext(event: ScheduleEvent): Promise<SeriesContext | null> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), CONTEXT_TIMEOUT_MS);
   try {
-    const response = await nativeFetch(
-      `/v1/lol/series/${encodeURIComponent(event.series.id)}/context?prefetch=${Date.now()}`,
-      { cache: 'no-store', signal: controller.signal }
-    );
-    if (!response.ok) return null;
-    return await response.json() as SeriesContext;
+    return await loadSeriesContext(event.series.id, controller.signal, 0);
   } catch {
     return null;
   } finally {
@@ -90,14 +84,14 @@ async function prefetchContext(
 }
 
 async function runPrefetch(
-  nativeFetch: typeof window.fetch,
   events: readonly ScheduleEvent[],
   history: boolean,
   prefetchedAt: Map<string, number>
-): Promise<void> {
+): Promise<boolean> {
   const now = Date.now();
   const queue = [...candidates(events, history, prefetchedAt, now)];
   queue.forEach(event => prefetchedAt.set(event.series.id, now));
+  let refreshed = false;
 
   const workers = Array.from(
     { length: Math.min(PREFETCH_CONCURRENCY, queue.length) },
@@ -105,16 +99,27 @@ async function runPrefetch(
       while (queue.length) {
         const event = queue.shift();
         if (!event) return;
-        await prefetchContext(nativeFetch, event);
+        if (await prefetchContext(event)) refreshed = true;
       }
     }
   );
   await Promise.all(workers);
+  return refreshed;
 }
 
 export function installCatalogueContextPrefetch(): void {
   const nativeFetch = window.fetch.bind(window);
   const prefetchedAt = new Map<string, number>();
+  let refreshTimer: number | null = null;
+
+  const queueCatalogueRefresh = (): void => {
+    if (document.hidden) return;
+    if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null;
+      document.querySelector<HTMLButtonElement>('#refresh-data')?.click();
+    }, CATALOGUE_REFRESH_DELAY_MS);
+  };
 
   window.fetch = async (input: FetchInput, init?: RequestInit): Promise<Response> => {
     const response = await nativeFetch(input, init);
@@ -124,14 +129,11 @@ export function installCatalogueContextPrefetch(): void {
     const copy = response.clone();
     window.setTimeout(() => {
       void copy.json()
-        .then((payload: ScheduleResponse) => {
+        .then(async (payload: ScheduleResponse) => {
           if (!Array.isArray(payload.events) || !payload.events.length) return;
-          return runPrefetch(
-            nativeFetch,
-            payload.events,
-            isHistorySchedule(url),
-            prefetchedAt
-          );
+          const history = isHistorySchedule(url);
+          const refreshed = await runPrefetch(payload.events, history, prefetchedAt);
+          if (refreshed && !history) queueCatalogueRefresh();
         })
         .catch(() => undefined);
     }, 0);

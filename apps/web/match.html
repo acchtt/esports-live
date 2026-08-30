@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Full esports match analysis, series context, and live telemetry." />
+    <title>Match · Esports Live</title>
+    <style>
+      #completed-match-list[hidden],
+      .analysis-header[hidden],
+      #series-history[hidden],
+      #quality-banner[hidden],
+      #game-content[hidden],
+      #completed-match-detail[hidden] {
+        display: none !important;
+      }
+    </style>
+    <link rel="stylesheet" href="/src/role-scoreboard-refinements.css" />
+    <link rel="stylesheet" href="/src/workspace-layout.css" />
+    <link rel="stylesheet" href="/src/main-page-shell.css" />
+    <link rel="stylesheet" href="/src/match-page.css" />
+  </head>
+  <body>
+    <div class="app-frame match-detail-frame">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="/" aria-label="Back to Esports Live matches">
+            <span class="brand-mark" aria-hidden="true">EL</span>
+            <div>
+              <strong>Esports Live</strong>
+              <small>Match detail</small>
+            </div>
+          </a>
+
+          <nav class="primary-nav" aria-label="Primary navigation">
+            <a class="back-to-matches" href="/">← All matches</a>
+            <a href="#selected-series" aria-current="page">Match</a>
+            <a href="#platform-panel">Platform</a>
+          </nav>
+
+          <div class="connection" aria-live="polite">
+            <span id="status-dot" class="status-dot"></span>
+            <div class="connection-copy">
+              <strong id="platform-status">Connecting</strong>
+              <small id="connection-detail">Loading match data</small>
+            </div>
+            <span id="status-badge" class="badge">CHECKING</span>
+          </div>
+        </div>
+      </header>
+
+      <aside class="match-route-data schedule-panel" aria-hidden="true">
+        <div class="sport-tabs"></div>
+        <div id="schedule-list"></div>
+      </aside>
+
+      <main id="workspace" class="workspace match-workspace platform-collapsed">
+        <section class="panel analysis-panel" aria-labelledby="selected-series">
+          <div class="analysis-header">
+            <div>
+              <p id="selected-competition" class="eyebrow">MATCH</p>
+              <h1 id="selected-series">Loading match…</h1>
+              <p id="selected-meta" class="selected-meta">Resolving the requested series.</p>
+            </div>
+            <div class="match-detail-header-actions">
+              <div class="refresh-controls">
+                <span id="polling-countdown" aria-live="polite">Starting…</span>
+                <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
+              </div>
+              <div id="game-selector" class="game-selector" aria-label="Series games"></div>
+            </div>
+          </div>
+
+          <section id="series-history" class="series-history" aria-live="polite" hidden></section>
+          <div id="quality-banner" hidden aria-hidden="true"></div>
+          <div id="game-content" class="game-content">
+            <div class="analysis-empty">
+              <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
+              <h3>Loading match</h3>
+              <p>Series context and verified game telemetry will appear here.</p>
+            </div>
+          </div>
+        </section>
+
+        <aside id="platform-panel" class="panel platform-panel" aria-labelledby="platform-heading" data-collapsed="true">
+          <div class="panel-heading compact platform-panel-heading">
+            <div class="platform-panel-title">
+              <p class="eyebrow">PLATFORM</p>
+              <h2 id="platform-heading">Adapter status</h2>
+            </div>
+            <button
+              id="platform-panel-toggle"
+              class="platform-panel-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="platform-panel-content"
+              aria-label="Expand platform status"
+            >
+              <span class="platform-panel-toggle-icon" aria-hidden="true">‹</span>
+              <span class="platform-panel-toggle-label" aria-hidden="true">Platform</span>
+            </button>
+          </div>
+
+          <div id="platform-panel-content" class="platform-panel-content" aria-hidden="true">
+            <div id="adapter-list" class="adapter-list"></div>
+
+            <section class="policy-card">
+              <p class="eyebrow">QUALITY POLICY</p>
+              <dl>
+                <div><dt>0–30s</dt><dd>Fresh</dd></div>
+                <div><dt>31–90s</dt><dd>Context only</dd></div>
+                <div><dt>&gt;90s</dt><dd>Stale</dd></div>
+              </dl>
+              <p>Only fresh, complete, advancing telemetry is marked safe for live analysis.</p>
+            </section>
+          </div>
+        </aside>
+      </main>
+
+      <footer>
+        <span><a class="match-footer-link" href="/">← Back to matches</a></span>
+        <span>Provider status and telemetry quality are reported separately.</span>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/startup-data-prefetch.ts"></script>
+    <script type="module" src="/src/snapshot-consistency.ts"></script>
+    <script type="module" src="/src/live-render-guard.ts"></script>
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/schedule-selection-guard.ts"></script>
+    <script type="module" src="/src/live-history-board-view.ts"></script>
+    <script type="module" src="/src/live-match-clock-view.ts"></script>
+    <script type="module" src="/src/player-board-view.ts"></script>
+    <script type="module" src="/src/champion-level-view.ts"></script>
+    <script type="module" src="/src/player-board-refresh-view.ts"></script>
+    <script type="module" src="/src/prematch-view.ts"></script>
+    <script type="module" src="/src/completed-matches-view.ts"></script>
+    <script type="module" src="/src/series-history-results-view.ts"></script>
+    <script type="module" src="/src/view-mode-guard.ts"></script>
+    <script type="module" src="/src/series-hero-view.ts"></script>
+    <script type="module" src="/src/completed-match-stats-view.ts"></script>
+    <script type="module" src="/src/completed-match-player-board-view.ts"></script>
+    <script type="module" src="/src/completed-board-merge-view.ts"></script>
+    <script type="module" src="/src/platform-panel-toggle.ts"></script>
+  </body>
+</html>

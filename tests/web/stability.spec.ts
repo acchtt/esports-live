@@ -207,7 +207,7 @@ async function installApiFixtures(page: Page): Promise<{ scheduleRequests: () =>
   };
 }
 
-test('stays visible and interactive through polling and view changes', async ({ page }) => {
+test('stays visible and interactive across match list and detail navigation', async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
@@ -219,6 +219,15 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await page.goto('/');
 
   await expect(page.getByText('API connected')).toBeVisible();
+  await expect(page.locator('#workspace')).toHaveCount(0);
+  await expect(page.locator('#live-match-list [data-series-id="series-live"]')).toBeVisible();
+  await expect(page.locator('#upcoming-match-list [data-series-id="series-upcoming"]')).toBeVisible();
+  await expect(page.locator('[data-series-id="series-completed"]')).toHaveCount(0);
+
+  const liveCard = page.locator('#live-match-list [data-series-id="series-live"]');
+  await expect(liveCard).toHaveAttribute('href', /match\.html\?series=series-live$/);
+  await liveCard.click();
+  await expect(page).toHaveURL(/\/match\.html\?series=series-live$/);
 
   const workspace = page.locator('#workspace');
   const platformToggle = page.locator('#platform-panel-toggle');
@@ -226,12 +235,10 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await expect(workspace).toHaveClass(/platform-collapsed/);
   await expect(platformToggle).toHaveAttribute('aria-expanded', 'false');
 
-  const collapsedWidths = await workspace.evaluate(element => ({
-    schedule: element.querySelector<HTMLElement>('.schedule-panel')?.getBoundingClientRect().width ?? 0,
-    analysis: element.querySelector<HTMLElement>('.analysis-panel')?.getBoundingClientRect().width ?? 0
-  }));
-  expect(collapsedWidths.schedule).toBeGreaterThan(360);
-  expect(collapsedWidths.analysis).toBeGreaterThan(800);
+  const analysisWidth = await workspace.locator('.analysis-panel').evaluate(element => (
+    element.getBoundingClientRect().width
+  ));
+  expect(analysisWidth).toBeGreaterThan(800);
 
   await platformToggle.click();
   await expect(workspace).not.toHaveClass(/platform-collapsed/);
@@ -240,10 +247,6 @@ test('stays visible and interactive through polling and view changes', async ({ 
   await platformToggle.click();
   await expect(workspace).toHaveClass(/platform-collapsed/);
   await expect(platformToggle).toHaveAttribute('aria-expanded', 'false');
-
-  const liveCard = page.locator('[data-series-id="series-live"]');
-  await expect(liveCard).toBeVisible();
-  await liveCard.click();
 
   const selectedSeries = page.locator('#selected-series');
   const liveScoreboard = page.locator('[data-live-history-game-id="game-live-1"]');
@@ -268,33 +271,32 @@ test('stays visible and interactive through polling and view changes', async ({ 
   expect(clockCenterOffset).toBeLessThan(2);
 
   const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
+  await expect(refresh).toBeVisible();
+  const scheduleRequestsBeforeRefresh = requests.scheduleRequests();
   await refresh.click();
-  await expect.poll(requests.scheduleRequests).toBeGreaterThanOrEqual(2);
+  await expect.poll(requests.scheduleRequests).toBeGreaterThan(scheduleRequestsBeforeRefresh);
   await expect(refresh).toBeEnabled();
 
-  await page.getByRole('button', { name: 'Open match history' }).click();
-  await expect(page.locator('#completed-match-list')).toBeVisible();
-  await expect(page.locator('[data-completed-series-id="series-completed"]')).toBeVisible();
+  await page.getByRole('link', { name: 'All matches' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('#workspace')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Active' }).click();
-  await expect(page.locator('#schedule-list')).toBeVisible();
-  await page.locator('[data-series-id="series-upcoming"]').click();
-  await expect(selectedSeries).toContainText('Upcoming Blue');
-  await expect(selectedSeries).toContainText('Upcoming Red');
-  await expect(page.getByText('Match scheduled')).toBeVisible();
+  const upcomingCard = page.locator('#upcoming-match-list [data-series-id="series-upcoming"]');
+  await expect(upcomingCard).toBeVisible();
+  await upcomingCard.click();
+  await expect(page).toHaveURL(/\/match\.html\?series=series-upcoming$/);
+  await expect(page.locator('#selected-series')).toContainText('Upcoming Blue');
+  await expect(page.locator('#selected-series')).toContainText('Upcoming Red');
+  await expect(page.locator('.prematch-overview[data-series-id="series-upcoming"]')).toBeVisible();
 
-  await liveCard.click();
+  await page.goto('/match.html?series=series-live');
   await expect(liveScoreboard).toBeVisible();
   const liveRequestsBeforePolling = requests.liveRequests();
-  await page.waitForTimeout(6_000);
+  await page.waitForTimeout(2_000);
   await expect.poll(requests.liveRequests).toBeGreaterThan(liveRequestsBeforePolling);
 
   await expect(page.locator('.app-frame')).toBeVisible();
   await expect(page.locator('.topbar')).toBeVisible();
-  await refresh.click();
-  await expect(refresh).toBeEnabled();
-  await expect(page.locator('[data-series-id="series-live"]')).toBeVisible();
-
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });

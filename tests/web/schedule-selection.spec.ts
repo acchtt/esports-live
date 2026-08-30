@@ -84,14 +84,14 @@ test('keeps a valid active selection when schedule entries change', async ({ pag
   page.on('pageerror', error => errors.push(error.message));
 
   const scheduleRequests = await installFixtures(page);
-  await page.goto('/');
+  await page.goto('/match.html');
 
   await expect(page.locator('#selected-series')).toHaveText('Live Blue vs Live Red');
   await expect(page.locator('#schedule-list [data-series-id="series-live-pending"]')).toHaveClass(/selected/);
   await expect(page.locator('#schedule-list .match-card.selected')).toHaveCount(1);
   await expect(page.locator('#game-selector').getByText('Game feed pending')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Refresh' }).click();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(scheduleRequests).toBeGreaterThanOrEqual(2);
 
   await expect(page.locator('#schedule-list [data-series-id="series-live-pending"]')).toHaveCount(0);

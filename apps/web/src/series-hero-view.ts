@@ -25,7 +25,8 @@ const hero = document.createElement('section');
 hero.id = 'series-hero';
 hero.className = 'series-hero';
 hero.hidden = true;
-analysisHeader.insertBefore(hero, gameSelector);
+const heroAnchor = [...analysisHeader.children].find(child => child.contains(gameSelector)) ?? null;
+analysisHeader.insertBefore(hero, heroAnchor);
 
 let activeEvent: ScheduleEvent | null = null;
 let renderFrame: number | null = null;

@@ -116,7 +116,7 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
-  await page.goto('/');
+  await page.goto('/match.html?series=series-live-hero');
 
   const hero = page.locator('#series-hero');
   await expect(hero).toBeVisible();

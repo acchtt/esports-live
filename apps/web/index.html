@@ -18,33 +18,59 @@
     </style>
     <link rel="stylesheet" href="/src/role-scoreboard-refinements.css" />
     <link rel="stylesheet" href="/src/workspace-layout.css" />
+    <link rel="stylesheet" href="/src/main-page-shell.css" />
   </head>
   <body>
     <div class="app-frame">
       <header class="topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">EL</span>
-          <div>
-            <strong>Esports Live</strong>
-            <small>Normalized live intelligence</small>
+        <div class="topbar-inner">
+          <a class="brand" href="#workspace" aria-label="Esports Live home">
+            <span class="brand-mark" aria-hidden="true">EL</span>
+            <div>
+              <strong>Esports Live</strong>
+              <small>Normalized live intelligence</small>
+            </div>
+          </a>
+
+          <nav class="primary-nav" aria-label="Primary navigation">
+            <a href="#workspace" aria-current="page">Live</a>
+            <a href="#schedule-heading">Matches</a>
+            <a href="#selected-series">Analysis</a>
+            <a href="#platform-panel">Platform</a>
+          </nav>
+
+          <div class="connection" aria-live="polite">
+            <span id="status-dot" class="status-dot"></span>
+            <div class="connection-copy">
+              <strong id="platform-status">Connecting</strong>
+              <small id="connection-detail">Checking API and adapters</small>
+            </div>
+            <span id="status-badge" class="badge">CHECKING</span>
           </div>
-        </div>
-        <div class="connection" aria-live="polite">
-          <span id="status-dot" class="status-dot"></span>
-          <div>
-            <strong id="platform-status">Connecting</strong>
-            <small id="connection-detail">Checking API and adapters</small>
-          </div>
-          <span id="status-badge" class="badge">CHECKING</span>
         </div>
       </header>
+
+      <section class="workspace-intro" aria-labelledby="main-page-heading">
+        <div class="workspace-intro-copy">
+          <p class="eyebrow">LIVE MATCH CENTER</p>
+          <h1 id="main-page-heading">Follow the match, not the feed delay.</h1>
+          <p>Schedules, series context, game state, objectives, and player telemetry in one quality-aware live workspace.</p>
+        </div>
+        <div class="live-pulse-card" aria-hidden="true">
+          <span></span>
+          <div>
+            <strong>Live-first telemetry</strong>
+            <small>Freshness and completeness stay visible</small>
+          </div>
+        </div>
+      </section>
 
       <main id="workspace" class="workspace platform-collapsed">
         <aside class="panel schedule-panel" aria-labelledby="schedule-heading">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">MATCHES</p>
-              <h1 id="schedule-heading">League of Legends</h1>
+              <h2 id="schedule-heading">League of Legends</h2>
             </div>
             <div class="refresh-controls">
               <span id="polling-countdown" aria-live="polite">Starting…</span>

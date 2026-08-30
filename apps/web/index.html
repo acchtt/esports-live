@@ -3,171 +3,91 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Provider-neutral live esports schedules and verified telemetry." />
-    <title>Esports Live</title>
-    <style>
-      #schedule-list[hidden],
-      #completed-match-list[hidden],
-      .analysis-header[hidden],
-      #series-history[hidden],
-      #quality-banner[hidden],
-      #game-content[hidden],
-      #completed-match-detail[hidden] {
-        display: none !important;
-      }
-    </style>
-    <link rel="stylesheet" href="/src/role-scoreboard-refinements.css" />
-    <link rel="stylesheet" href="/src/workspace-layout.css" />
-    <link rel="stylesheet" href="/src/main-page-shell.css" />
+    <meta name="description" content="Live and upcoming esports match listings." />
+    <title>Matches · Esports Live</title>
   </head>
   <body>
-    <div class="app-frame">
-      <header class="topbar">
-        <div class="topbar-inner">
-          <a class="brand" href="#workspace" aria-label="Esports Live home">
+    <div class="app-frame match-index-frame">
+      <header class="topbar match-index-topbar">
+        <div class="match-index-topbar-inner">
+          <a class="brand" href="/" aria-label="Esports Live matches">
             <span class="brand-mark" aria-hidden="true">EL</span>
             <div>
               <strong>Esports Live</strong>
-              <small>Normalized live intelligence</small>
+              <small>Match center</small>
             </div>
           </a>
 
-          <nav class="primary-nav" aria-label="Primary navigation">
-            <a href="#workspace" aria-current="page">Live</a>
-            <a href="#schedule-heading">Matches</a>
-            <a href="#selected-series">Analysis</a>
-            <a href="#platform-panel">Platform</a>
+          <nav class="match-index-nav" aria-label="Primary navigation">
+            <a href="/" aria-current="page">Matches</a>
           </nav>
 
           <div class="connection" aria-live="polite">
             <span id="status-dot" class="status-dot"></span>
             <div class="connection-copy">
               <strong id="platform-status">Connecting</strong>
-              <small id="connection-detail">Checking API and adapters</small>
+              <small id="connection-detail">Loading match schedule</small>
             </div>
             <span id="status-badge" class="badge">CHECKING</span>
           </div>
         </div>
       </header>
 
-      <section class="workspace-intro" aria-labelledby="main-page-heading">
-        <div class="workspace-intro-copy">
-          <p class="eyebrow">LIVE MATCH CENTER</p>
-          <h1 id="main-page-heading">Follow the match, not the feed delay.</h1>
-          <p>Schedules, series context, game state, objectives, and player telemetry in one quality-aware live workspace.</p>
-        </div>
-        <div class="live-pulse-card" aria-hidden="true">
-          <span></span>
+      <main class="match-index-main">
+        <section class="match-index-hero" aria-labelledby="match-index-heading">
           <div>
-            <strong>Live-first telemetry</strong>
-            <small>Freshness and completeness stay visible</small>
-          </div>
-        </div>
-      </section>
-
-      <main id="workspace" class="workspace platform-collapsed">
-        <aside class="panel schedule-panel" aria-labelledby="schedule-heading">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">MATCHES</p>
-              <h2 id="schedule-heading">League of Legends</h2>
-            </div>
-            <div class="refresh-controls">
-              <span id="polling-countdown" aria-live="polite">Starting…</span>
-              <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
-            </div>
+            <p class="eyebrow">MATCH CENTER</p>
+            <h1 id="match-index-heading">League of Legends matches</h1>
+            <p>Open any match for the full series view, live telemetry, objectives, player boards, and match history.</p>
           </div>
 
-          <div class="sport-tabs" aria-label="Esports">
-            <button class="sport-tab active" type="button">LoL <span>LIVE</span></button>
-            <button class="sport-tab" type="button" disabled>CS2 <span>PLANNED</span></button>
-            <button class="sport-tab" type="button" disabled>Dota 2 <span>PLANNED</span></button>
-          </div>
-
-          <div id="schedule-list" class="schedule-list" aria-live="polite">
-            <div class="empty-state">Loading schedule…</div>
-          </div>
-        </aside>
-
-        <section class="panel analysis-panel" aria-labelledby="selected-series">
-          <div class="analysis-header">
-            <div>
-              <p id="selected-competition" class="eyebrow">SELECT A MATCH</p>
-              <h2 id="selected-series">Live analysis workspace</h2>
-              <p id="selected-meta" class="selected-meta">Choose a match from the schedule.</p>
-            </div>
-            <div id="game-selector" class="game-selector" aria-label="Series games"></div>
-          </div>
-
-          <section id="series-history" class="series-history" aria-live="polite" hidden></section>
-          <div id="quality-banner" hidden aria-hidden="true"></div>
-          <div id="game-content" class="game-content">
-            <div class="analysis-empty">
-              <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
-              <h3>No match selected</h3>
-              <p>Live game state, objectives, and player telemetry will appear here.</p>
-            </div>
+          <div class="match-index-actions">
+            <span id="polling-countdown" aria-live="polite">Starting…</span>
+            <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
           </div>
         </section>
 
-        <aside id="platform-panel" class="panel platform-panel" aria-labelledby="platform-heading" data-collapsed="true">
-          <div class="panel-heading compact platform-panel-heading">
-            <div class="platform-panel-title">
-              <p class="eyebrow">PLATFORM</p>
-              <h2 id="platform-heading">Adapter status</h2>
+        <div class="match-index-sportbar" aria-label="Esports">
+          <button class="sport-tab active" type="button">LoL <span>LIVE</span></button>
+          <button class="sport-tab" type="button" disabled>CS2 <span>PLANNED</span></button>
+          <button class="sport-tab" type="button" disabled>Dota 2 <span>PLANNED</span></button>
+        </div>
+
+        <div id="schedule-list" class="match-index-lists" aria-live="polite">
+          <section class="match-index-section" aria-labelledby="live-matches-heading">
+            <div class="match-index-section-heading">
+              <div>
+                <p class="eyebrow live-eyebrow">LIVE NOW</p>
+                <h2 id="live-matches-heading">Live matches</h2>
+              </div>
+              <span id="live-match-count" class="match-count">0</span>
             </div>
-            <button
-              id="platform-panel-toggle"
-              class="platform-panel-toggle"
-              type="button"
-              aria-expanded="false"
-              aria-controls="platform-panel-content"
-              aria-label="Expand platform status"
-            >
-              <span class="platform-panel-toggle-icon" aria-hidden="true">‹</span>
-              <span class="platform-panel-toggle-label" aria-hidden="true">Platform</span>
-            </button>
-          </div>
+            <div id="live-match-list" class="match-grid">
+              <div class="match-index-empty">Loading live matches…</div>
+            </div>
+          </section>
 
-          <div id="platform-panel-content" class="platform-panel-content" aria-hidden="true">
-            <div id="adapter-list" class="adapter-list"></div>
-
-            <section class="policy-card">
-              <p class="eyebrow">QUALITY POLICY</p>
-              <dl>
-                <div><dt>0–30s</dt><dd>Fresh</dd></div>
-                <div><dt>31–90s</dt><dd>Context only</dd></div>
-                <div><dt>&gt;90s</dt><dd>Stale</dd></div>
-              </dl>
-              <p>Only fresh, complete, advancing telemetry is marked safe for live analysis.</p>
-            </section>
-          </div>
-        </aside>
+          <section class="match-index-section" aria-labelledby="upcoming-matches-heading">
+            <div class="match-index-section-heading">
+              <div>
+                <p class="eyebrow">UP NEXT</p>
+                <h2 id="upcoming-matches-heading">Upcoming matches</h2>
+              </div>
+              <span id="upcoming-match-count" class="match-count">0</span>
+            </div>
+            <div id="upcoming-match-list" class="match-grid">
+              <div class="match-index-empty">Loading upcoming matches…</div>
+            </div>
+          </section>
+        </div>
       </main>
 
-      <footer>
+      <footer class="match-index-footer">
         <span>Esports Live · clean-room community project</span>
-        <span>Provider status and telemetry quality are reported separately.</span>
+        <span>Match detail pages separate provider status from telemetry quality.</span>
       </footer>
     </div>
-    <script type="module" src="/src/startup-data-prefetch.ts"></script>
-    <script type="module" src="/src/snapshot-consistency.ts"></script>
-    <script type="module" src="/src/live-render-guard.ts"></script>
-    <script type="module" src="/src/main.ts"></script>
-    <script type="module" src="/src/schedule-selection-guard.ts"></script>
-    <script type="module" src="/src/live-history-board-view.ts"></script>
-    <script type="module" src="/src/live-match-clock-view.ts"></script>
-    <script type="module" src="/src/player-board-view.ts"></script>
-    <script type="module" src="/src/champion-level-view.ts"></script>
-    <script type="module" src="/src/player-board-refresh-view.ts"></script>
-    <script type="module" src="/src/prematch-view.ts"></script>
-    <script type="module" src="/src/completed-matches-view.ts"></script>
-    <script type="module" src="/src/series-history-results-view.ts"></script>
-    <script type="module" src="/src/view-mode-guard.ts"></script>
-    <script type="module" src="/src/series-hero-view.ts"></script>
-    <script type="module" src="/src/completed-match-stats-view.ts"></script>
-    <script type="module" src="/src/completed-match-player-board-view.ts"></script>
-    <script type="module" src="/src/completed-board-merge-view.ts"></script>
-    <script type="module" src="/src/platform-panel-toggle.ts"></script>
+
+    <script type="module" src="/src/index-page.ts"></script>
   </body>
 </html>

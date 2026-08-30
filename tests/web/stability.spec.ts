@@ -287,7 +287,7 @@ test('stays visible and interactive across match list and detail navigation', as
   await expect(page).toHaveURL(/\/match\.html\?series=series-upcoming$/);
   await expect(page.locator('#selected-series')).toContainText('Upcoming Blue');
   await expect(page.locator('#selected-series')).toContainText('Upcoming Red');
-  await expect(page.getByText('Match scheduled')).toBeVisible();
+  await expect(page.locator('.prematch-overview[data-series-id="series-upcoming"]')).toBeVisible();
 
   await page.goto('/match.html?series=series-live');
   await expect(liveScoreboard).toBeVisible();

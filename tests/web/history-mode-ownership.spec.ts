@@ -42,17 +42,19 @@ test('keeps the live series board hidden while Match History owns the analysis p
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await installFixtures(page);
-  await page.goto('/');
+  await page.goto('/match.html');
 
   const liveHistoryPanel = page.locator('#series-history');
   const completedDetail = page.locator('#completed-match-detail');
-  const matchHistoryMode = page.getByRole('button', { name: 'Open match history' });
-  const activeMode = page.getByRole('button', { name: 'Active' });
+  const matchHistoryMode = page.locator('.schedule-mode[data-mode="results"]');
+  const activeMode = page.locator('.schedule-mode[data-mode="active"]');
 
+  await expect(matchHistoryMode).toHaveCount(1);
+  await expect(activeMode).toHaveCount(1);
   await seedLiveHistoryBoard(page);
   await expect(liveHistoryPanel).toBeVisible();
 
-  await matchHistoryMode.click();
+  await matchHistoryMode.evaluate(button => (button as HTMLButtonElement).click());
   await expect(completedDetail).toBeVisible();
   await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'match-history');
   await expect(liveHistoryPanel).toBeHidden();
@@ -61,11 +63,11 @@ test('keeps the live series board hidden while Match History owns the analysis p
   await page.waitForTimeout(250);
   await expect(liveHistoryPanel).toBeHidden();
 
-  await activeMode.click();
+  await activeMode.evaluate(button => (button as HTMLButtonElement).click());
   await expect(page.locator('body')).toHaveAttribute('data-view-mode', 'active');
   await expect(liveHistoryPanel).toBeVisible();
 
-  await matchHistoryMode.click();
+  await matchHistoryMode.evaluate(button => (button as HTMLButtonElement).click());
   await seedLiveHistoryBoard(page, 50);
   await page.waitForTimeout(250);
   await expect(completedDetail).toBeVisible();

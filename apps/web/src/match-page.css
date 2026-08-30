@@ -35,6 +35,23 @@ body .match-workspace .analysis-header h1 {
   letter-spacing: -0.025em;
 }
 
+.match-detail-header-actions {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.match-detail-header-actions .refresh-controls {
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 9px;
+}
+
+.match-detail-header-actions .game-selector {
+  justify-content: flex-end;
+}
+
 .match-detail-frame footer {
   width: min(1760px, calc(100% - 28px));
   margin: 0 auto;
@@ -80,6 +97,15 @@ body .match-workspace .analysis-header h1 {
 
   body .match-workspace .analysis-header {
     min-height: 0;
+  }
+
+  .match-detail-header-actions {
+    width: 100%;
+    justify-items: start;
+  }
+
+  .match-detail-header-actions .game-selector {
+    justify-content: flex-start;
   }
 
   .match-detail-frame footer {

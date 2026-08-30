@@ -50,8 +50,6 @@
       </header>
 
       <aside class="match-route-data schedule-panel" aria-hidden="true">
-        <span id="polling-countdown">Starting…</span>
-        <button id="refresh-schedule" type="button">Refresh</button>
         <div class="sport-tabs"></div>
         <div id="schedule-list"></div>
       </aside>
@@ -64,7 +62,13 @@
               <h1 id="selected-series">Loading match…</h1>
               <p id="selected-meta" class="selected-meta">Resolving the requested series.</p>
             </div>
-            <div id="game-selector" class="game-selector" aria-label="Series games"></div>
+            <div class="match-detail-header-actions">
+              <div class="refresh-controls">
+                <span id="polling-countdown" aria-live="polite">Starting…</span>
+                <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
+              </div>
+              <div id="game-selector" class="game-selector" aria-label="Series games"></div>
+            </div>
           </div>
 
           <section id="series-history" class="series-history" aria-live="polite" hidden></section>

@@ -134,9 +134,11 @@ test('uses game result cards as the only completed-scoreboard selector', async (
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await installFixtures(page);
-  await page.goto('/');
+  await page.goto('/match.html');
 
-  await page.getByRole('button', { name: 'Open match history' }).click();
+  const matchHistoryMode = page.locator('.schedule-mode[data-mode="results"]');
+  await expect(matchHistoryMode).toHaveCount(1);
+  await matchHistoryMode.evaluate(button => (button as HTMLButtonElement).click());
 
   const detail = page.locator('#completed-match-detail');
   const cards = detail.locator('.completed-games > .completed-game');

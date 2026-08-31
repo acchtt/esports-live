@@ -1,4 +1,4 @@
-import type { ScheduleEvent } from '@esports-live/core';
+import type { ScheduleEvent, SeriesContext, TeamRef } from '@esports-live/core';
 import { apiJson } from './api-client.ts';
 import './styles.css';
 import './index-page.css';
@@ -12,6 +12,11 @@ interface HealthResponse {
 interface ScheduleResponse {
   esport: string;
   events: ScheduleEvent[];
+}
+
+interface MatchPresentation {
+  teams: readonly [TeamRef, TeamRef];
+  score: readonly [number, number];
 }
 
 const API_BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
@@ -39,6 +44,7 @@ let scheduleTimer: ReturnType<typeof setTimeout> | null = null;
 let countdownTimer: ReturnType<typeof setInterval> | null = null;
 let nextScheduleRefreshAt: number | null = null;
 let scheduleRequest: Promise<void> | null = null;
+const matchPresentation = new Map<string, MatchPresentation>();
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -85,10 +91,40 @@ function matchHref(seriesId: string): string {
   return `/match.html?series=${encodeURIComponent(seriesId)}`;
 }
 
+function initials(team: TeamRef): string {
+  const code = team.code?.replace(/[^a-z0-9]/gi, '').slice(0, 4);
+  if (code) return code.toUpperCase();
+  const words = team.name.split(/\s+/).filter(Boolean);
+  const compact = words.length > 1
+    ? words.slice(0, 3).map(word => word[0]).join('')
+    : team.name.slice(0, 3);
+  return compact.toUpperCase();
+}
+
+function teamLogo(team: TeamRef): string {
+  const image = team.imageUrl
+    ? `<img src="${escapeHtml(team.imageUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
+    : '';
+  return `
+    <span class="index-team-logo ${image ? 'has-image' : 'image-failed'}" aria-hidden="true">
+      ${image}
+      <span>${escapeHtml(initials(team))}</span>
+    </span>`;
+}
+
+function teamSide(team: TeamRef, side: 'left' | 'right'): string {
+  return `
+    <div class="index-match-team ${side}">
+      ${side === 'left' ? teamLogo(team) : ''}
+      <strong>${escapeHtml(team.name)}</strong>
+      ${side === 'right' ? teamLogo(team) : ''}
+    </div>`;
+}
+
 function matchCard(event: ScheduleEvent): string {
-  const [left, right] = event.series.teams;
-  const leftName = left?.name ?? 'TBD';
-  const rightName = right?.name ?? 'TBD';
+  const presentation = matchPresentation.get(event.series.id);
+  const [left, right] = presentation?.teams ?? event.series.teams;
+  const [leftWins, rightWins] = presentation?.score ?? [0, 0];
   const competition = event.series.competition.name || 'League of Legends';
   const stage = event.series.competition.stage ?? `Best of ${event.series.bestOf}`;
   const live = event.series.state === 'live' || event.series.state === 'paused';
@@ -99,16 +135,27 @@ function matchCard(event: ScheduleEvent): string {
         <span class="index-match-competition">${escapeHtml(competition)}</span>
         <span class="match-state ${escapeHtml(event.series.state)}">${escapeHtml(stateLabel(event))}</span>
       </div>
-      <div class="index-match-teams">
-        <strong>${escapeHtml(leftName)}</strong>
-        <span>vs</span>
-        <strong>${escapeHtml(rightName)}</strong>
+      <div class="index-match-matchup">
+        ${teamSide(left, 'left')}
+        <div class="index-series-score" aria-label="Series score ${leftWins} to ${rightWins}">
+          <strong>${leftWins}</strong><span>–</span><strong>${rightWins}</strong>
+        </div>
+        ${teamSide(right, 'right')}
       </div>
       <div class="index-match-card-bottom">
-        <span>${escapeHtml(stage)}</span>
-        <span class="open-match-label">Open match <b aria-hidden="true">→</b></span>
+        <span>${escapeHtml(stage)} · Bo${event.series.bestOf}</span>
+        <span class="open-match-label">Details <b aria-hidden="true">→</b></span>
       </div>
     </a>`;
+}
+
+function bindLogoFallbacks(container: HTMLElement): void {
+  container.querySelectorAll<HTMLImageElement>('.index-team-logo img').forEach(image => {
+    const logo = image.closest('.index-team-logo');
+    const markFailed = (): void => logo?.classList.add('image-failed');
+    image.addEventListener('error', markFailed, { once: true });
+    if (image.complete && image.naturalWidth === 0) markFailed();
+  });
 }
 
 function renderMatches(events: readonly ScheduleEvent[]): void {
@@ -125,6 +172,34 @@ function renderMatches(events: readonly ScheduleEvent[]): void {
   upcomingMatchList.innerHTML = upcoming.length
     ? upcoming.map(matchCard).join('')
     : '<div class="match-index-empty"><strong>No upcoming matches</strong><span>The schedule will refresh automatically.</span></div>';
+
+  bindLogoFallbacks(liveMatchList);
+  bindLogoFallbacks(upcomingMatchList);
+}
+
+async function hydrateLivePresentation(events: readonly ScheduleEvent[]): Promise<void> {
+  const activeIds = new Set(events.map(event => event.series.id));
+  for (const seriesId of matchPresentation.keys()) {
+    if (!activeIds.has(seriesId)) matchPresentation.delete(seriesId);
+  }
+
+  const live = events.filter(event => event.series.state === 'live' || event.series.state === 'paused');
+  await Promise.all(live.map(async event => {
+    try {
+      const context = await api<SeriesContext>(
+        `/v1/lol/series/${encodeURIComponent(event.series.id)}/context?lobby=${Date.now()}`
+      );
+      const history = context.history;
+      if (!history || history.score.length < 2) return;
+      const [left, right] = history.score;
+      matchPresentation.set(event.series.id, {
+        teams: [left.team, right.team],
+        score: [left.wins, right.wins]
+      });
+    } catch {
+      matchPresentation.delete(event.series.id);
+    }
+  }));
 }
 
 function updatePollingCountdown(): void {
@@ -172,6 +247,7 @@ async function performScheduleRefresh(): Promise<void> {
         return liveDifference || Date.parse(left.series.scheduledStart) - Date.parse(right.series.scheduledStart);
       });
 
+    await hydrateLivePresentation(events);
     renderMatches(events);
     const liveCount = events.filter(event => event.series.state === 'live' || event.series.state === 'paused').length;
     connectionDetail.textContent = `${liveCount} live · ${events.length} active matches`;

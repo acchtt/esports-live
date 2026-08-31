@@ -31,6 +31,8 @@ analysisHeader.insertBefore(hero, heroAnchor);
 let activeEvent: ScheduleEvent | null = null;
 let renderFrame: number | null = null;
 let renderKey = '';
+let stableScore: [number, number] = [0, 0];
+let stableProgress = { completed: 0, total: 0 };
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -78,26 +80,66 @@ function scoreFromHeader(): readonly [number, number] {
   if (score.length >= 2) {
     const left = Number(score[0]?.textContent ?? 0);
     const right = Number(score[1]?.textContent ?? 0);
-    if (Number.isFinite(left) && Number.isFinite(right)) return [left, right];
+    if (Number.isFinite(left) && Number.isFinite(right)) {
+      const candidateTotal = left + right;
+      const stableTotal = stableScore[0] + stableScore[1];
+      if (candidateTotal >= stableTotal) stableScore = [left, right];
+    }
   }
-  return [0, 0];
+  return stableScore;
 }
 
-function completedGames(event: ScheduleEvent): { completed: number; total: number } {
+function progressFromHeader(event: ScheduleEvent): { completed: number; total: number } {
   const meta = selectedMeta.textContent ?? '';
   const match = meta.match(/(\d+)\s*\/\s*(\d+)\s+games?\s+completed/i);
-  if (match) return { completed: Number(match[1]), total: Number(match[2]) };
-  const completed = event.series.games.filter(game => game.state === 'completed').length;
-  return { completed, total: Math.max(event.series.bestOf, event.series.games.length) };
+  const fallback = {
+    completed: event.series.games.filter(game => game.state === 'completed').length,
+    total: Math.max(event.series.bestOf, event.series.games.length)
+  };
+  const candidate = match
+    ? { completed: Number(match[1]), total: Number(match[2]) }
+    : fallback;
+
+  if (
+    Number.isFinite(candidate.completed)
+    && Number.isFinite(candidate.total)
+    && candidate.completed >= stableProgress.completed
+  ) {
+    stableProgress = {
+      completed: candidate.completed,
+      total: Math.max(candidate.total, stableProgress.total)
+    };
+  }
+  return stableProgress;
 }
 
-function statusFromHeader(event: ScheduleEvent): string {
+function seriesFinished(
+  event: ScheduleEvent,
+  score: readonly [number, number],
+  progress: { completed: number; total: number }
+): boolean {
+  const winsRequired = Math.floor(event.series.bestOf / 2) + 1;
+  return Math.max(score[0], score[1]) >= winsRequired
+    || (progress.total > 0 && progress.completed >= progress.total);
+}
+
+function statusFromHeader(
+  event: ScheduleEvent,
+  score: readonly [number, number],
+  progress: { completed: number; total: number }
+): string {
+  if (seriesFinished(event, score, progress)) return 'FINAL';
   const first = selectedMeta.textContent?.split('·')[0]?.trim().toUpperCase();
   if (first && ['LIVE', 'PAUSED', 'FINAL', 'IN PROGRESS'].includes(first)) return first;
   return event.series.state === 'scheduled' ? 'SCHEDULED' : event.series.state.toUpperCase();
 }
 
-function activeGameLabel(event: ScheduleEvent): string {
+function activeGameLabel(
+  event: ScheduleEvent,
+  score: readonly [number, number],
+  progress: { completed: number; total: number }
+): string {
+  if (seriesFinished(event, score, progress)) return 'Series completed';
   const active = event.series.games.find(game => ['live', 'draft', 'paused'].includes(game.state));
   if (active) {
     const state = active.state === 'draft' ? 'draft' : active.state === 'paused' ? 'paused' : 'live';
@@ -149,14 +191,16 @@ function render(): void {
   if (!event) return;
 
   const [left, right] = event.series.teams;
-  const [leftWins, rightWins] = scoreFromHeader();
-  const progress = completedGames(event);
-  const status = statusFromHeader(event);
+  const score = scoreFromHeader();
+  const [leftWins, rightWins] = score;
+  const progress = progressFromHeader(event);
+  const status = statusFromHeader(event, score, progress);
   const statusClass = status.toLowerCase().replaceAll(' ', '-');
   const winsRequired = Math.floor(event.series.bestOf / 2) + 1;
   const competition = event.series.competition.stage
     ? `${event.series.competition.name} · ${event.series.competition.stage}`
     : event.series.competition.name;
+  const gameLabel = activeGameLabel(event, score, progress);
   const key = JSON.stringify({
     id: event.series.id,
     left,
@@ -165,7 +209,7 @@ function render(): void {
     progress,
     status,
     competition,
-    game: activeGameLabel(event),
+    game: gameLabel,
     start: event.series.scheduledStart
   });
   if (key === renderKey) return;
@@ -197,7 +241,7 @@ function render(): void {
     </div>
 
     <div class="series-hero-footer">
-      <span class="series-hero-live-context"><i></i>${escapeHtml(activeGameLabel(event))}</span>
+      <span class="series-hero-live-context"><i></i>${escapeHtml(gameLabel)}</span>
       <span>${progress.completed} of ${progress.total} games completed</span>
       <time datetime="${escapeHtml(event.series.scheduledStart)}">${escapeHtml(formatStart(event.series.scheduledStart))}</time>
     </div>`;
@@ -213,7 +257,15 @@ function scheduleRender(): void {
 }
 
 window.addEventListener('esports-live:selection', event => {
-  activeEvent = (event as CustomEvent<ScheduleEvent>).detail;
+  const selection = (event as CustomEvent<ScheduleEvent>).detail;
+  if (activeEvent?.series.id !== selection.series.id) {
+    stableScore = [0, 0];
+    stableProgress = {
+      completed: selection.series.games.filter(game => game.state === 'completed').length,
+      total: Math.max(selection.series.bestOf, selection.series.games.length)
+    };
+  }
+  activeEvent = selection;
   renderKey = '';
   scheduleRender();
 });

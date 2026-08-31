@@ -23,7 +23,7 @@ async function fulfillJson(route: Route, value: unknown): Promise<void> {
   });
 }
 
-function players(side: 'blue' | 'red') {
+function players(side: 'blue' | 'red', itemIds: readonly string[] = ['1001']) {
   const roles = ['top', 'jungle', 'mid', 'bottom', 'support'] as const;
   return roles.map((role, index) => ({
     id: String(index + (side === 'blue' ? 1 : 6)),
@@ -36,11 +36,11 @@ function players(side: 'blue' | 'red') {
     assists: 2,
     creepScore: 100 - index * 10,
     totalGold: 5_000 - index * 100,
-    items: ['1001']
+    items: [...itemIds]
   }));
 }
 
-function teamStats(team: typeof blue, side: 'blue' | 'red') {
+function teamStats(team: typeof blue, side: 'blue' | 'red', itemIds: readonly string[] = ['1001']) {
   return {
     id: team.id,
     name: team.name,
@@ -55,11 +55,11 @@ function teamStats(team: typeof blue, side: 'blue' | 'red') {
       heralds: 1,
       grubs: 3
     },
-    players: players(side)
+    players: players(side, itemIds)
   };
 }
 
-async function installFixtures(page: Page): Promise<void> {
+async function installFixtures(page: Page, itemIds: readonly string[] = ['1001']): Promise<void> {
   await page.route('https://www.riotgames.com/darkroom/original/**', route => route.fulfill({
     status: 200,
     contentType: 'image/svg+xml',
@@ -117,8 +117,8 @@ async function installFixtures(page: Page): Promise<void> {
       stats: {
         gameClockSeconds: 1_200,
         patch: '26.15.1',
-        blue: teamStats(blue, 'blue'),
-        red: teamStats(red, 'red')
+        blue: teamStats(blue, 'blue', itemIds),
+        red: teamStats(red, 'red', itemIds)
       },
       quality: {
         freshness: 'fresh',
@@ -134,7 +134,7 @@ async function installFixtures(page: Page): Promise<void> {
   });
 }
 
-test('shows live champion levels on both matchup-board portraits', async ({ page }) => {
+test('shows live champion levels and only real inventory icons', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await installFixtures(page);
@@ -142,12 +142,31 @@ test('shows live champion levels on both matchup-board portraits', async ({ page
   await page.goto('/');
   await page.locator('[data-series-id="series-levels"]').click();
 
-  const blueLevel = page.locator('.role-matchup-row').first().locator('.role-player.blue .champion-level-badge');
-  const redLevel = page.locator('.role-matchup-row').first().locator('.role-player.red .champion-level-badge');
+  const firstRow = page.locator('.role-matchup-row').first();
+  const blueLevel = firstRow.locator('.role-player.blue .champion-level-badge');
+  const redLevel = firstRow.locator('.role-player.red .champion-level-badge');
 
   await expect(blueLevel).toHaveText('13');
   await expect(blueLevel).toHaveAttribute('aria-label', 'Champion level 13');
   await expect(redLevel).toHaveText('12');
   await expect(redLevel).toHaveAttribute('aria-label', 'Champion level 12');
+  await expect(firstRow.locator('.role-player.blue .telemetry-item-slot img')).toHaveCount(1);
+  await expect(page.locator('.role-player-items .telemetry-item-slot.empty')).toHaveCount(0);
+  await expect(page.locator('.inventory-availability-note')).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
+});
+
+test('collapses empty item rails when inventory is unavailable', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await installFixtures(page, []);
+
+  await page.goto('/');
+  await page.locator('[data-series-id="series-levels"]').click();
+
+  await expect(page.locator('.role-matchup-row')).toHaveCount(5);
+  await expect(page.locator('.role-player-items .telemetry-item-slot.empty')).toHaveCount(0);
+  await expect(page.locator('.role-player-items:not([hidden])')).toHaveCount(0);
+  await expect(page.locator('.inventory-availability-note')).toHaveText('Item data unavailable for this snapshot');
   expect(pageErrors).toEqual([]);
 });

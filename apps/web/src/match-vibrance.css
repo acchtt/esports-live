@@ -1,0 +1,543 @@
+/* Visual identity layer for the flat match page.
+   Keep the one-surface information architecture while adding broadcast-style
+   color fields, hierarchy, and motion cues. Do not reintroduce nested cards. */
+
+.match-flat-frame {
+  --broadcast-cyan: #63e6ff;
+  --broadcast-blue: #38bdf8;
+  --broadcast-red: #fb7185;
+  --broadcast-gold: #e8c66a;
+  --broadcast-green: #55e6a5;
+  --broadcast-ink: #050914;
+  background-image:
+    radial-gradient(circle at 17% 14%, rgba(14, 165, 233, 0.16), transparent 26rem),
+    radial-gradient(circle at 83% 15%, rgba(225, 29, 72, 0.11), transparent 27rem),
+    linear-gradient(rgba(99, 230, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 230, 255, 0.014) 1px, transparent 1px),
+    linear-gradient(180deg, #040813 0%, #060b16 48%, #040711 100%) !important;
+  background-size: auto, auto, 54px 54px, 54px 54px, auto;
+}
+
+.match-flat-frame .match-topbar {
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.05), transparent 28%, transparent 72%, rgba(225, 29, 72, 0.035)) !important;
+}
+
+.match-flat-frame .match-topbar .brand-mark {
+  border-color: rgba(99, 230, 255, 0.38) !important;
+  background-image: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(99, 102, 241, 0.08)) !important;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.09) !important;
+}
+
+.match-flat-frame .match-topbar-back {
+  position: relative;
+  padding-left: 14px;
+}
+
+.match-flat-frame .match-topbar-back::before {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 18px;
+  background: linear-gradient(180deg, transparent, rgba(99, 230, 255, 0.5), transparent);
+  content: '';
+}
+
+body .match-flat-frame .match-workspace .analysis-panel,
+body .match-flat-frame .match-workspace.platform-collapsed .analysis-panel {
+  position: relative;
+  border-color: rgba(112, 163, 211, 0.2) !important;
+  background-color: rgba(6, 12, 24, 0.88) !important;
+  background-image:
+    radial-gradient(circle at 16% 5%, rgba(14, 165, 233, 0.08), transparent 23rem),
+    radial-gradient(circle at 84% 5%, rgba(244, 63, 94, 0.055), transparent 23rem),
+    linear-gradient(180deg, rgba(12, 23, 40, 0.38), rgba(5, 10, 20, 0.08)) !important;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.3),
+    0 0 80px rgba(14, 165, 233, 0.035) !important;
+}
+
+body .match-flat-frame .match-workspace .analysis-panel::before {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #38bdf8 0%, #63e6ff 40%, rgba(99, 230, 255, 0.22) 50%, #fb7185 100%);
+  box-shadow: 0 0 20px rgba(99, 230, 255, 0.2);
+  content: '';
+  pointer-events: none;
+}
+
+/* Competition strip: retain zero box framing, add a broadcast ribbon feel. */
+.match-flat-frame .analysis-header.series-hero-active .series-hero-topline {
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.055), rgba(255, 255, 255, 0.008) 48%, rgba(244, 63, 94, 0.04)) !important;
+}
+
+.match-flat-frame .series-hero-competition span {
+  color: #7c8ea8 !important;
+  letter-spacing: 0.16em !important;
+}
+
+.match-flat-frame .series-hero-competition strong {
+  color: #eef8ff !important;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.085em !important;
+  text-shadow: 0 0 18px rgba(99, 230, 255, 0.08);
+}
+
+.match-flat-frame .series-hero-game-mark {
+  color: var(--broadcast-gold) !important;
+  filter: drop-shadow(0 0 12px rgba(232, 198, 106, 0.11));
+}
+
+.match-flat-frame .series-hero-status.live,
+.match-flat-frame .series-hero-status.in-progress {
+  border-color: rgba(85, 230, 165, 0.46) !important;
+  color: #a5f3c9 !important;
+  background-color: rgba(85, 230, 165, 0.09) !important;
+  box-shadow: 0 0 18px rgba(85, 230, 165, 0.08);
+}
+
+/* Matchup stage: side color fields, no nested team cards. */
+.match-flat-frame .analysis-header.series-hero-active .series-hero-matchup {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: transparent !important;
+  background-image:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.12), transparent 34%, transparent 66%, rgba(225, 29, 72, 0.10)),
+    radial-gradient(circle at 50% 52%, rgba(99, 230, 255, 0.075), transparent 12rem) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-matchup::before,
+.match-flat-frame .analysis-header.series-hero-active .series-hero-matchup::after {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  content: '';
+  pointer-events: none;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-matchup::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.08), transparent);
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-matchup::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(244, 63, 94, 0.065), transparent);
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team-logo {
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.012) 64%, transparent 66%) !important;
+  box-shadow:
+    0 0 0 1px rgba(128, 181, 223, 0.11),
+    0 12px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team.left .series-hero-team-logo {
+  filter: drop-shadow(0 0 15px rgba(56, 189, 248, 0.18));
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team.right .series-hero-team-logo {
+  filter: drop-shadow(0 0 15px rgba(251, 113, 133, 0.14));
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team-copy strong {
+  color: #ffffff !important;
+  font-size: clamp(1.12rem, 1.8vw, 1.48rem) !important;
+  letter-spacing: -0.025em !important;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team.left .series-hero-team-copy > small {
+  color: #7dd3fc !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team.right .series-hero-team-copy > small {
+  color: #fda4af !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score {
+  position: relative;
+  background-color: transparent !important;
+  background-image: radial-gradient(circle at 50% 50%, rgba(99, 230, 255, 0.105), rgba(99, 230, 255, 0.025) 42%, transparent 68%) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score::before {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 112px;
+  height: 112px;
+  border: 1px solid rgba(99, 230, 255, 0.07);
+  border-radius: 50%;
+  box-shadow: inset 0 0 28px rgba(99, 230, 255, 0.025), 0 0 38px rgba(99, 230, 255, 0.035);
+  content: '';
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score > span {
+  color: #73869f !important;
+  letter-spacing: 0.17em !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score strong {
+  color: #ffffff !important;
+  font-size: clamp(2.8rem, 4.8vw, 4.2rem) !important;
+  text-shadow:
+    0 0 28px rgba(99, 230, 255, 0.14),
+    0 8px 26px rgba(0, 0, 0, 0.48) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score i {
+  color: var(--broadcast-gold) !important;
+  opacity: 0.68;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score small {
+  color: #8b9bb0 !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-footer {
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.035), rgba(255,255,255,0.012), rgba(244, 63, 94, 0.025)) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-footer > span,
+.match-flat-frame .analysis-header.series-hero-active .series-hero-footer > time {
+  background-color: transparent !important;
+}
+
+.match-flat-frame .series-hero-live-context {
+  color: #d9f9e8 !important;
+}
+
+.match-flat-frame .series-hero-live-context i {
+  background: var(--broadcast-green) !important;
+  box-shadow: 0 0 0 4px rgba(85, 230, 165, 0.08), 0 0 16px rgba(85, 230, 165, 0.34) !important;
+}
+
+/* Game selection reads as a broadcast timeline. */
+.match-flat-frame .analysis-header.series-hero-active #game-selector {
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.035), rgba(3, 8, 17, 0.1), rgba(244, 63, 94, 0.025)) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button {
+  position: relative;
+  color: #76879d !important;
+  transition: color 140ms ease, text-shadow 140ms ease !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button::after {
+  position: absolute;
+  right: 9px;
+  bottom: -2px;
+  left: 9px;
+  height: 2px;
+  background: transparent;
+  content: '';
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button.active {
+  color: #e9fbff !important;
+  text-shadow: 0 0 14px rgba(99, 230, 255, 0.2);
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button.active::after {
+  background: linear-gradient(90deg, transparent, var(--broadcast-cyan), transparent);
+  box-shadow: 0 0 10px rgba(99, 230, 255, 0.24);
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button.live {
+  color: #80efb6 !important;
+}
+
+/* Series history: stronger scan lines, still not individual cards. */
+.match-flat-frame #series-history .completed-section-heading {
+  position: relative;
+}
+
+.match-flat-frame #series-history .completed-section-heading::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(99, 230, 255, 0.24), rgba(137, 173, 214, 0.08) 42%, transparent);
+  content: '';
+}
+
+.match-flat-frame #series-history .completed-section-heading .eyebrow {
+  color: var(--broadcast-cyan) !important;
+}
+
+.match-flat-frame #series-history .completed-section-heading h3 {
+  color: #edf7ff !important;
+  font-size: 0.92rem !important;
+  letter-spacing: -0.01em;
+}
+
+.match-flat-frame #series-history .completed-game {
+  background-color: transparent !important;
+  background-image: linear-gradient(180deg, rgba(255,255,255,0.012), transparent) !important;
+  transition: background-image 140ms ease, color 140ms ease !important;
+}
+
+.match-flat-frame #series-history .completed-game.live,
+.match-flat-frame #series-history .completed-game.draft,
+.match-flat-frame #series-history .completed-game.paused {
+  background-image: linear-gradient(180deg, rgba(34, 197, 94, 0.035), transparent) !important;
+}
+
+.match-flat-frame #series-history .completed-game-state {
+  letter-spacing: 0.075em !important;
+}
+
+.match-flat-frame #series-history .completed-game.live .completed-game-state {
+  box-shadow: 0 0 14px rgba(85, 230, 165, 0.08);
+}
+
+/* Player board toolbar becomes a broadcast strip rather than another card. */
+.match-flat-frame .player-board-toolbar {
+  margin: -2px 0 12px !important;
+  padding: 9px 0 10px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(112, 163, 211, 0.13) !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.045), transparent 42%, rgba(244, 63, 94, 0.025)) !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .player-board-toolbar-copy strong {
+  color: #e8f7ff !important;
+  letter-spacing: 0.12em !important;
+}
+
+.match-flat-frame .player-board-toolbar-copy small {
+  color: #71839b !important;
+}
+
+.match-flat-frame .player-board-refresh-button {
+  border-color: rgba(99, 230, 255, 0.28) !important;
+  color: #c4f4ff !important;
+  background-color: rgba(56, 189, 248, 0.08) !important;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.045) !important;
+}
+
+/* Live game header and team comparison are full-width fields, not boxes. */
+.match-flat-frame .completed-final-game-header,
+.match-flat-frame .live-match-clock-header {
+  position: relative;
+  padding-block: 13px !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.055), rgba(255,255,255,0.006) 50%, rgba(244, 63, 94, 0.04)) !important;
+}
+
+.match-flat-frame .completed-final-game-header::after,
+.match-flat-frame .live-match-clock-header::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.24), rgba(137, 173, 214, 0.08), rgba(251, 113, 133, 0.2));
+  content: '';
+}
+
+.match-flat-frame .completed-final-game-header > strong,
+.match-flat-frame .live-match-clock-header > strong {
+  color: #f5fbff !important;
+  letter-spacing: -0.015em;
+}
+
+.match-flat-frame #live-game-clock {
+  color: #ffffff !important;
+  font-size: 1.25em;
+  text-shadow: 0 0 18px rgba(99, 230, 255, 0.22);
+}
+
+.match-flat-frame .completed-team-comparison {
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.065), transparent 43%, transparent 57%, rgba(225, 29, 72, 0.052)) !important;
+}
+
+.match-flat-frame .completed-comparison-team.blue strong,
+.match-flat-frame .role-team-name.blue,
+.match-flat-frame .role-match-team.blue {
+  color: #c6f3ff !important;
+  text-shadow: 0 0 14px rgba(56, 189, 248, 0.1);
+}
+
+.match-flat-frame .completed-comparison-team.red strong,
+.match-flat-frame .role-team-name.red,
+.match-flat-frame .role-match-team.red {
+  color: #ffd7df !important;
+  text-shadow: 0 0 14px rgba(251, 113, 133, 0.08);
+}
+
+.match-flat-frame .completed-team-metric-label {
+  color: #71839c !important;
+  font-size: 0.53rem !important;
+  letter-spacing: 0.1em !important;
+}
+
+.match-flat-frame .completed-team-values strong:first-child {
+  color: #a9ecff !important;
+}
+
+.match-flat-frame .completed-team-values strong.red {
+  color: #ffb4c0 !important;
+}
+
+.match-flat-frame .completed-team-single-value {
+  color: #d7f7ff !important;
+}
+
+/* Player matchup table: lane bands and a luminous center delta, no cards. */
+.match-flat-frame .role-matchup-list,
+.match-flat-frame .completed-final-matchups {
+  position: relative;
+}
+
+.match-flat-frame .role-matchup-row {
+  position: relative;
+  border-color: rgba(112, 163, 211, 0.095) !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.026), transparent 36%, transparent 64%, rgba(244, 63, 94, 0.022)) !important;
+  transition: background-image 140ms ease !important;
+}
+
+.match-flat-frame .role-matchup-row:hover {
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.055), rgba(255,255,255,0.01) 50%, rgba(244, 63, 94, 0.045)) !important;
+}
+
+.match-flat-frame .role-player-name strong {
+  color: #eef7ff !important;
+  font-weight: 850 !important;
+}
+
+.match-flat-frame .role-player-name small {
+  color: #74859b !important;
+}
+
+.match-flat-frame .role-player-stats strong {
+  color: #d9e7f7 !important;
+}
+
+.match-flat-frame .role-gold-delta {
+  position: relative;
+}
+
+.match-flat-frame .role-gold-delta::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1px;
+  height: 62%;
+  background: linear-gradient(180deg, transparent, rgba(99, 230, 255, 0.22), transparent);
+  content: '';
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.match-flat-frame .role-gold-delta strong {
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 0 12px currentColor;
+}
+
+.match-flat-frame .role-gold-delta.blue strong {
+  color: #67dcff !important;
+}
+
+.match-flat-frame .role-gold-delta.red strong {
+  color: #ff8da0 !important;
+}
+
+.match-flat-frame .role-edge-track {
+  opacity: 0.86;
+}
+
+/* Item/champion art should read as deliberate visual content. */
+.match-flat-frame .role-player img,
+.match-flat-frame .completed-final-game img {
+  filter: saturate(1.08) contrast(1.03);
+}
+
+.match-flat-frame .role-player img:hover,
+.match-flat-frame .completed-final-game img:hover {
+  filter: saturate(1.16) contrast(1.05) brightness(1.06);
+}
+
+/* Data quality remains secondary but no longer feels unfinished. */
+body .match-flat-frame .match-workspace .platform-panel,
+body .match-flat-frame .match-workspace.platform-collapsed .platform-panel {
+  border-top-color: rgba(112, 163, 211, 0.14) !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(180deg, rgba(10, 20, 35, 0.24), transparent) !important;
+}
+
+.match-flat-frame .platform-panel-heading {
+  background-color: transparent !important;
+  background-image: linear-gradient(90deg, rgba(14, 165, 233, 0.025), transparent) !important;
+}
+
+.match-flat-frame .platform-panel-title .eyebrow,
+.match-flat-frame .match-policy-card .eyebrow {
+  color: var(--broadcast-cyan) !important;
+}
+
+.match-flat-frame .platform-panel-toggle {
+  color: #8ca0ba !important;
+}
+
+.match-flat-frame .match-footer {
+  border-top-color: rgba(112, 163, 211, 0.08) !important;
+}
+
+@media (max-width: 760px) {
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-matchup {
+    background-image:
+      linear-gradient(90deg, rgba(14, 165, 233, 0.09), transparent 38%, transparent 62%, rgba(225, 29, 72, 0.075)),
+      radial-gradient(circle at 50% 45%, rgba(99, 230, 255, 0.055), transparent 8rem) !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team-copy strong {
+    font-size: 0.82rem !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-score strong {
+    font-size: 2.4rem !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-score::before {
+    width: 78px;
+    height: 78px;
+  }
+
+  .match-flat-frame .player-board-toolbar {
+    padding-inline: 0 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-flat-frame .analysis-header.series-hero-active .game-button,
+  .match-flat-frame .role-matchup-row,
+  .match-flat-frame .role-player img,
+  .match-flat-frame .completed-final-game img {
+    transition: none !important;
+  }
+}

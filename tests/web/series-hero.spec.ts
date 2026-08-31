@@ -112,7 +112,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('renders team logos and a flat live series hero', async ({ page }) => {
+test('renders team logos and a vivid flat live series hero', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -152,23 +152,31 @@ test('renders team logos and a flat live series hero', async ({ page }) => {
 
   const surfaces = await hero.evaluate(element => {
     const top = element.querySelector<HTMLElement>('.series-hero-topline');
+    const matchup = element.querySelector<HTMLElement>('.series-hero-matchup');
     const team = element.querySelector<HTMLElement>('.series-hero-team');
     const scorePanel = element.querySelector<HTMLElement>('.series-hero-score');
+    const scoreValue = scorePanel?.querySelector<HTMLElement>('strong');
     const footerCell = element.querySelector<HTMLElement>('.series-hero-footer > *');
     const footerGrid = element.querySelector<HTMLElement>('.series-hero-footer');
-    if (!top || !team || !scorePanel || !footerCell || !footerGrid) return null;
+    if (!top || !matchup || !team || !scorePanel || !scoreValue || !footerCell || !footerGrid) return null;
     const topStyle = getComputedStyle(top);
+    const matchupStyle = getComputedStyle(matchup);
     const teamStyle = getComputedStyle(team);
     const scoreStyle = getComputedStyle(scorePanel);
+    const scoreValueStyle = getComputedStyle(scoreValue);
     const footerStyle = getComputedStyle(footerCell);
     const footerGridStyle = getComputedStyle(footerGrid);
     return {
       topBackground: topStyle.backgroundColor,
+      topBackgroundImage: topStyle.backgroundImage,
       topBorderLeftWidth: topStyle.borderLeftWidth,
+      matchupBackgroundImage: matchupStyle.backgroundImage,
       teamBackground: teamStyle.backgroundColor,
       teamBorderTopWidth: teamStyle.borderTopWidth,
       scoreBackground: scoreStyle.backgroundColor,
+      scoreBackgroundImage: scoreStyle.backgroundImage,
       scoreBorderTopWidth: scoreStyle.borderTopWidth,
+      scoreTextShadow: scoreValueStyle.textShadow,
       footerBackground: footerStyle.backgroundColor,
       footerBorderTopWidth: footerStyle.borderTopWidth,
       footerDisplay: footerGridStyle.display
@@ -176,11 +184,15 @@ test('renders team logos and a flat live series hero', async ({ page }) => {
   });
   expect(surfaces).not.toBeNull();
   expect(surfaces?.topBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.topBackgroundImage).not.toBe('none');
   expect(surfaces?.topBorderLeftWidth).toBe('0px');
+  expect(surfaces?.matchupBackgroundImage).not.toBe('none');
   expect(surfaces?.teamBackground).toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.teamBorderTopWidth).toBe('0px');
   expect(surfaces?.scoreBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.scoreBackgroundImage).not.toBe('none');
   expect(surfaces?.scoreBorderTopWidth).toBe('0px');
+  expect(surfaces?.scoreTextShadow).not.toBe('none');
   expect(surfaces?.footerBackground).toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerBorderTopWidth).toBe('0px');
   expect(surfaces?.footerDisplay).toBe('flex');

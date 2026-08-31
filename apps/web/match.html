@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Full esports match analysis, series context, and live telemetry." />
-    <meta name="theme-color" content="#050812" />
+    <meta name="description" content="Live League of Legends series scores, game telemetry, player builds, and match history." />
+    <meta name="theme-color" content="#050912" />
     <title>Match · Esports Live</title>
     <style>
       #completed-match-list[hidden],
@@ -20,13 +20,9 @@
     <link rel="stylesheet" href="/src/workspace-layout.css" />
     <link rel="stylesheet" href="/src/main-page-shell.css" />
     <link rel="stylesheet" href="/src/match-page.css" />
-    <link rel="stylesheet" href="/src/visual-polish.css" />
-    <link rel="stylesheet" href="/src/match-density.css" />
-    <link rel="stylesheet" href="/src/match-flat.css" />
-    <link rel="stylesheet" href="/src/match-vibrance.css" />
   </head>
   <body>
-    <div class="app-frame match-detail-frame match-flat-frame">
+    <div class="app-frame match-detail-frame match-flat-frame match-broadcast-frame">
       <header class="topbar match-topbar">
         <div class="topbar-inner match-topbar-inner">
           <a class="brand" href="/" aria-label="Back to Esports Live matches">
@@ -43,7 +39,7 @@
           </a>
 
           <div class="match-topbar-actions">
-            <div class="connection" aria-live="polite">
+            <div class="connection match-connection" aria-live="polite">
               <span id="status-dot" class="status-dot"></span>
               <div class="connection-copy">
                 <strong id="platform-status">Connecting</strong>
@@ -54,7 +50,7 @@
             <span id="polling-countdown" class="match-refresh-status" aria-live="polite">Starting…</span>
             <button id="refresh-schedule" class="match-refresh-button" type="button" aria-label="Refresh">
               <span aria-hidden="true">↻</span>
-              Refresh
+              <span>Refresh</span>
             </button>
           </div>
         </div>
@@ -68,7 +64,7 @@
       <main id="workspace" class="workspace match-workspace platform-collapsed">
         <section class="panel analysis-panel match-info-panel" aria-labelledby="selected-series">
           <div class="analysis-header match-series-header">
-            <div>
+            <div class="match-legacy-summary">
               <p id="selected-competition" class="eyebrow">MATCH</p>
               <h1 id="selected-series">Loading match…</h1>
               <p id="selected-meta" class="selected-meta">Resolving the requested series.</p>
@@ -76,14 +72,35 @@
             <div id="game-selector" class="game-selector" aria-label="Series games"></div>
           </div>
 
-          <section id="series-history" class="series-history" aria-live="polite" hidden></section>
-          <div id="quality-banner" class="match-quality-banner" hidden aria-hidden="true"></div>
-          <div id="game-content" class="game-content match-game-content">
-            <div class="analysis-empty">
-              <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
-              <h3>Loading match</h3>
-              <p>Series context and verified game telemetry will appear here.</p>
-            </div>
+          <div class="match-content-shell">
+            <section class="match-primary-column" aria-label="Selected game">
+              <div class="match-section-heading match-current-game-heading">
+                <div>
+                  <span class="match-section-kicker">SELECTED GAME</span>
+                  <strong>Game center</strong>
+                </div>
+                <small>Live stats · objectives · players · builds</small>
+              </div>
+              <div id="quality-banner" class="match-quality-banner" hidden aria-hidden="true"></div>
+              <div id="game-content" class="game-content match-game-content">
+                <div class="analysis-empty">
+                  <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
+                  <h3>Loading match</h3>
+                  <p>Series context and verified game telemetry will appear here.</p>
+                </div>
+              </div>
+            </section>
+
+            <aside class="match-series-rail" aria-label="Series games">
+              <div class="match-section-heading">
+                <div>
+                  <span class="match-section-kicker">SERIES</span>
+                  <strong>Game map</strong>
+                </div>
+                <small>Open any game</small>
+              </div>
+              <section id="series-history" class="series-history" aria-live="polite" hidden></section>
+            </aside>
           </div>
         </section>
 
@@ -92,7 +109,7 @@
             <div class="platform-panel-title">
               <p class="eyebrow">DATA HEALTH</p>
               <h2 id="platform-heading">Sources &amp; quality</h2>
-              <p class="match-data-panel-copy">Provider availability, freshness rules, and telemetry trust state.</p>
+              <p class="match-data-panel-copy">Provider availability and telemetry freshness.</p>
             </div>
             <button
               id="platform-panel-toggle"
@@ -102,8 +119,8 @@
               aria-controls="platform-panel-content"
               aria-label="Expand platform status"
             >
-              <span class="platform-panel-toggle-icon" aria-hidden="true">‹</span>
-              <span class="platform-panel-toggle-label" aria-hidden="true">Platform</span>
+              <span class="platform-panel-toggle-icon" aria-hidden="true">⌄</span>
+              <span class="platform-panel-toggle-label" aria-hidden="true">Data health</span>
             </button>
           </div>
 
@@ -128,7 +145,7 @@
 
       <footer class="match-footer">
         <span><a class="match-footer-link" href="/">← Back to matches</a></span>
-        <span>Live values remain explicitly quality-gated.</span>
+        <span>Live values remain quality-gated.</span>
       </footer>
     </div>
 

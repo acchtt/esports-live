@@ -1,121 +1,136 @@
-/* Match detail is a focused information page, not the schedule workspace. */
+/* Dedicated match experience. Keep data/rendering contracts stable; own the full visual shell here. */
+
+:root {
+  --match-bg: #050912;
+  --match-surface: #09111d;
+  --match-surface-2: #0c1624;
+  --match-line: rgba(148, 163, 184, 0.14);
+  --match-line-soft: rgba(148, 163, 184, 0.085);
+  --match-copy: #edf5ff;
+  --match-muted: #7f8ea3;
+  --match-cyan: #22d3ee;
+  --match-blue: #38bdf8;
+  --match-red: #fb7185;
+  --match-green: #34d399;
+}
+
 .match-route-data {
   display: none !important;
 }
 
-.match-detail-frame {
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.11), transparent 30rem),
-    radial-gradient(circle at 88% 28%, rgba(99, 102, 241, 0.065), transparent 28rem),
-    linear-gradient(180deg, #050914 0%, #070c17 42%, #050914 100%);
+html {
+  background: var(--match-bg);
 }
 
-.match-detail-frame .topbar .brand,
-.match-detail-frame .primary-nav a,
-.match-route-back,
-.match-footer-link {
+body {
+  min-width: 320px;
+}
+
+.match-detail-frame {
+  position: relative;
+  min-height: 100vh;
+  overflow: clip;
+  color: var(--match-copy);
+  background:
+    radial-gradient(circle at 15% 12%, rgba(14, 165, 233, 0.08), transparent 24rem),
+    radial-gradient(circle at 84% 18%, rgba(244, 63, 94, 0.055), transparent 26rem),
+    linear-gradient(180deg, #050912 0%, #060b14 42%, #040811 100%);
+}
+
+.match-detail-frame::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 78%);
+}
+
+.match-detail-frame > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Top utility bar */
+.match-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: 58px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(4, 8, 17, 0.84);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+.match-topbar-inner,
+.match-detail-frame .topbar-inner {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  width: min(1320px, calc(100% - 40px));
+  min-height: 58px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.match-detail-frame .brand {
   color: inherit;
   text-decoration: none;
 }
 
-.match-detail-frame .topbar-inner {
-  width: min(1480px, calc(100% - 36px));
+.match-detail-frame .brand-mark {
+  border-color: rgba(56, 189, 248, 0.26);
+  background: linear-gradient(145deg, rgba(56, 189, 248, 0.16), rgba(14, 165, 233, 0.04));
 }
 
-.match-detail-frame .primary-nav .back-to-matches {
-  color: #8ddcff;
-}
-
-.match-primary-nav {
-  gap: 3px;
-}
-
-.match-primary-nav a {
-  min-height: 34px;
-  padding-inline: 12px;
-  border-radius: 9px;
-}
-
-.match-primary-nav a[aria-current='page'] {
-  color: #f8fbff;
-  background: rgba(56, 189, 248, 0.075);
-}
-
-.match-route-bar {
-  position: relative;
-  z-index: 8;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-  background: rgba(5, 9, 20, 0.72);
-  backdrop-filter: blur(18px);
-}
-
-.match-route-bar-inner {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 18px;
-  width: min(1480px, calc(100% - 36px));
-  min-height: 66px;
-  margin: 0 auto;
-}
-
-.match-route-back {
+.match-topbar-back {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 10px;
-  color: #d9e5f4;
-  background: rgba(255, 255, 255, 0.025);
-  font-size: 0.72rem;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-left: 1px solid rgba(148, 163, 184, 0.13);
+  color: #9aabc0;
+  text-decoration: none;
+  font-size: 0.66rem;
   font-weight: 850;
 }
 
-.match-route-back:hover,
-.match-route-back:focus-visible {
-  border-color: rgba(56, 189, 248, 0.34);
-  color: #f8fbff;
-  background: rgba(56, 189, 248, 0.07);
+.match-topbar-back:hover,
+.match-topbar-back:focus-visible {
+  color: #e7f7ff;
 }
 
-.match-route-context {
+.match-topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   min-width: 0;
 }
 
-.match-route-context span,
-.match-data-block-label {
-  display: block;
-  margin-bottom: 3px;
-  color: #6f8098;
-  font-size: 0.54rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.match-connection {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
-.match-route-context strong {
-  display: block;
+.match-connection .connection-copy small {
+  max-width: 230px;
   overflow: hidden;
-  color: #dce7f5;
-  font-size: 0.76rem;
-  letter-spacing: 0.025em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.match-route-tools {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
 .match-refresh-status {
-  color: #7f8da2;
-  font-size: 0.63rem;
+  color: #65758b;
+  font-size: 0.57rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -124,639 +139,1102 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 13px;
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 10px;
-  color: #dff7ff;
-  background: rgba(14, 165, 233, 0.065);
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  color: #ccefff;
+  background: rgba(14, 165, 233, 0.07);
   font: inherit;
-  font-size: 0.68rem;
+  font-size: 0.61rem;
   font-weight: 900;
   cursor: pointer;
 }
 
 .match-refresh-button:hover:not(:disabled),
 .match-refresh-button:focus-visible:not(:disabled) {
-  border-color: rgba(56, 189, 248, 0.48);
-  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(56, 189, 248, 0.42);
+  background: rgba(14, 165, 233, 0.13);
 }
 
 .match-refresh-button:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: progress;
 }
 
+/* Page width / main shell */
 body .workspace.match-workspace,
 body .workspace.match-workspace.platform-collapsed {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  width: min(1480px, calc(100% - 36px));
-  padding-top: 22px;
+  display: block;
+  width: min(1320px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 22px 0 48px;
 }
 
 body .match-workspace .analysis-panel,
-body .match-workspace.platform-collapsed .analysis-panel {
-  grid-column: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: clip;
-  border: 1px solid rgba(148, 163, 184, 0.13);
-  border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(10, 17, 31, 0.97), rgba(7, 12, 23, 0.98));
-  box-shadow:
-    0 28px 90px rgba(0, 0, 0, 0.26),
-    inset 0 1px rgba(255, 255, 255, 0.025);
-}
-
-body .match-workspace .analysis-header {
-  min-height: 0;
-  padding: 22px 24px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-}
-
-body .match-workspace .analysis-header h1 {
-  font-size: clamp(1.45rem, 2.2vw, 2.1rem);
-  letter-spacing: -0.035em;
-}
-
-/* Series hero becomes the page's primary match identity surface. */
-.match-detail-frame .analysis-header.series-hero-active {
-  overflow: visible;
-  border-bottom: 0;
-  background:
-    radial-gradient(circle at 50% 25%, rgba(56, 189, 248, 0.065), transparent 28rem),
-    linear-gradient(180deg, rgba(9, 16, 29, 0.99), rgba(7, 12, 23, 0.99));
-}
-
-.match-detail-frame .series-hero-topline {
-  margin: 20px 24px 0;
-  padding: 12px 14px;
-  border-color: rgba(148, 163, 184, 0.12);
-  background: rgba(14, 23, 39, 0.72);
-  box-shadow: none;
-}
-
-.match-detail-frame .series-hero-matchup {
-  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.48fr) minmax(0, 1fr);
-  gap: 24px;
-  padding: 30px 34px 24px;
-}
-
-.match-detail-frame .series-hero-team {
-  min-height: 116px;
-  gap: 18px;
-  padding: 20px;
-  border-color: rgba(148, 163, 184, 0.11);
-  border-radius: 18px;
-  background: rgba(13, 22, 38, 0.62);
-}
-
-.match-detail-frame .series-hero-team.left {
-  box-shadow: inset 3px 0 rgba(56, 189, 248, 0.48);
-}
-
-.match-detail-frame .series-hero-team.right {
-  box-shadow: inset -3px 0 rgba(251, 113, 133, 0.44);
-}
-
-.match-detail-frame .series-hero-team-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.match-detail-frame .series-hero-team-logo img {
-  width: 56px;
-  height: 56px;
-}
-
-.match-detail-frame .series-hero-team-copy strong {
-  max-width: 420px;
-  font-size: clamp(1rem, 1.65vw, 1.34rem);
-}
-
-.match-detail-frame .series-hero-score {
-  min-height: 116px;
-  padding: 14px;
-}
-
-.match-detail-frame .series-hero-score strong {
-  font-size: clamp(2.9rem, 5vw, 4.4rem);
-}
-
-.match-detail-frame .series-hero-score small {
-  margin-top: 2px;
-  color: #8190a4;
-}
-
-.match-detail-frame .series-hero-footer {
-  gap: 12px;
-  padding: 0 24px 20px;
-}
-
-.match-detail-frame .series-hero-footer > span,
-.match-detail-frame .series-hero-footer > time {
-  min-height: 48px;
-  border-color: rgba(148, 163, 184, 0.12);
-  background: rgba(14, 23, 39, 0.72);
-  box-shadow: none;
-}
-
-.match-detail-frame .analysis-header.series-hero-active #game-selector {
-  justify-content: flex-start;
-  gap: 8px;
-  width: auto;
-  margin: 0;
-  padding: 14px 24px 20px;
-  overflow-x: auto;
-  border: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.09);
-  border-radius: 0;
-  background: rgba(5, 10, 20, 0.52);
-  box-shadow: none;
-  scrollbar-width: thin;
-}
-
-.match-detail-frame .game-button {
-  flex: 0 0 auto;
-  min-width: 84px;
-  min-height: 44px;
-  border-radius: 11px;
-}
-
-.match-detail-frame .game-button.active {
-  border-color: rgba(56, 189, 248, 0.46);
-  background: rgba(56, 189, 248, 0.1);
-  box-shadow: inset 0 -2px rgba(56, 189, 248, 0.55);
-}
-
-.match-content-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 56px;
-  padding: 8px 18px;
-  overflow-x: auto;
-  border-top: 1px solid rgba(148, 163, 184, 0.08);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-  background: rgba(6, 11, 21, 0.82);
-  scrollbar-width: none;
-}
-
-.match-content-nav::-webkit-scrollbar {
-  display: none;
-}
-
-.match-content-nav a {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 0 11px;
-  border-radius: 9px;
-  color: #98a7bb;
-  text-decoration: none;
-  font-size: 0.67rem;
-  font-weight: 850;
-}
-
-.match-content-nav a span {
-  color: #52637b;
-  font-size: 0.53rem;
-  font-weight: 950;
-  letter-spacing: 0.08em;
-}
-
-.match-content-nav a:hover,
-.match-content-nav a:focus-visible {
-  color: #e8f6ff;
-  background: rgba(56, 189, 248, 0.065);
-}
-
-body .match-workspace .series-history {
-  margin: 20px 22px 0;
-  overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 16px;
-  background: rgba(13, 22, 38, 0.46);
-}
-
-body .match-workspace .game-content {
-  min-height: 520px;
-  padding: 22px;
-  background: transparent;
-}
-
-body .match-workspace .game-content > :first-child {
-  margin-top: 0;
-}
-
-.match-detail-frame .analysis-empty {
-  min-height: 420px;
-  border: 1px dashed rgba(148, 163, 184, 0.14);
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.055), transparent 18rem),
-    rgba(255, 255, 255, 0.012);
-}
-
-.match-detail-frame .analysis-empty h3 {
-  font-size: 1rem;
-}
-
-.match-detail-frame .analysis-empty p {
-  max-width: 620px;
-  line-height: 1.65;
-}
-
-/* Live scoreboard: one clean information surface inside the page. */
-.match-detail-frame .role-scoreboard-board {
-  overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.13);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(12, 21, 36, 0.82), rgba(6, 11, 21, 0.88));
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.16);
-}
-
-.match-detail-frame .role-match-header {
-  padding: 20px;
-  border-bottom-color: rgba(148, 163, 184, 0.1);
-}
-
-.match-detail-frame .role-match-team {
-  min-width: 0;
-}
-
-.match-detail-frame .role-match-clock {
-  min-width: 150px;
-}
-
-.match-detail-frame .role-objective-comparison {
-  background: rgba(4, 9, 18, 0.48);
-}
-
-.match-detail-frame .role-matchup-list {
-  padding: 0 16px 16px;
-}
-
-.match-detail-frame .role-matchup-row {
-  border-color: rgba(148, 163, 184, 0.1);
-  background: rgba(255, 255, 255, 0.012);
-}
-
-/* Pre-match detail uses the same page rhythm as live data. */
-body .match-detail-frame .prematch-overview {
-  min-height: 0;
-  gap: 18px;
-  padding: 0;
-}
-
-body .match-detail-frame .prematch-versus {
-  gap: 14px;
-}
-
-body .match-detail-frame .prematch-team {
-  min-height: 180px;
-  padding: 24px 20px;
-  border-color: rgba(148, 163, 184, 0.12);
-  background: rgba(13, 22, 38, 0.5);
-}
-
-body .match-detail-frame .prematch-fact,
-body .match-detail-frame .prematch-roster,
-body .match-detail-frame .prematch-standings {
-  border-color: rgba(148, 163, 184, 0.12);
-  background: rgba(13, 22, 38, 0.42);
-}
-
-body .match-detail-frame .prematch-notice {
-  border-radius: 14px;
-}
-
-/* Data quality is a secondary expandable section below match information. */
-body .match-workspace .platform-panel,
-body .match-workspace.platform-collapsed .platform-panel {
+body .match-workspace.platform-collapsed .analysis-panel,
+body .match-workspace .match-info-panel {
   display: block;
-  grid-column: 1;
-  position: static;
-  inset: auto;
-  z-index: auto;
-  width: auto;
   min-width: 0;
-  max-height: none;
-  overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.13);
-  border-radius: 18px;
-  background: rgba(8, 14, 26, 0.9);
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.18);
+  min-height: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-body .match-workspace .platform-panel-heading,
-body .match-workspace.platform-collapsed .platform-panel-heading {
+/* Hero: one full-width broadcast stage, no nested cards. */
+body .match-broadcast-frame .analysis-header.match-series-header,
+body .match-broadcast-frame .analysis-header.series-hero-active {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 24px;
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.055), transparent 34%, transparent 66%, rgba(244, 63, 94, 0.045)),
+    linear-gradient(180deg, rgba(12, 21, 35, 0.98), rgba(6, 12, 22, 0.985));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.24);
+}
+
+body .match-broadcast-frame .analysis-header.match-series-header::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, var(--match-blue), rgba(56, 189, 248, 0.08) 38%, rgba(251, 113, 133, 0.08) 62%, var(--match-red));
+  pointer-events: none;
+}
+
+body .match-broadcast-frame .analysis-header.series-hero-active > .series-hero-legacy,
+body .match-broadcast-frame .match-legacy-summary.series-hero-legacy {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+body .match-broadcast-frame .series-hero {
+  width: 100%;
+  min-width: 0;
+  color: #eaf3ff;
+}
+
+body .match-broadcast-frame .series-hero-topline {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  min-height: 0;
-  padding: 18px 20px;
+  margin: 0;
+  padding: 20px 24px 13px;
   border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-body .match-workspace .platform-panel-title,
-body .match-workspace.platform-collapsed .platform-panel-title {
-  display: block;
-  min-width: 0;
+body .match-broadcast-frame .series-hero-competition {
+  gap: 10px;
 }
 
-.match-data-panel-copy {
-  margin: 5px 0 0;
-  color: #7f8da2;
-  font-size: 0.68rem;
-  line-height: 1.5;
+body .match-broadcast-frame .series-hero-game-mark {
+  min-height: 30px;
+  padding: 3px 8px 3px 5px;
+  border-color: rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.05);
+  box-shadow: none;
 }
 
-body .match-workspace .platform-panel-toggle,
-body .match-workspace.platform-collapsed .platform-panel-toggle {
-  flex-direction: row;
-  width: auto;
-  min-width: 96px;
-  min-height: 38px;
-  padding: 0 11px;
-  border-color: rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.025);
+body .match-broadcast-frame .series-hero-competition span {
+  color: #617188;
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
 }
 
-body .match-workspace.platform-collapsed .platform-panel-toggle-label {
-  writing-mode: initial;
-  transform: none;
+body .match-broadcast-frame .series-hero-competition strong {
+  color: #dce8f8;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
 }
 
-body .match-workspace .platform-panel-content {
-  padding: 0 20px 20px;
-  border-top: 1px solid rgba(148, 163, 184, 0.09);
+body .match-broadcast-frame .series-hero-status {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
 }
 
-body .match-workspace .platform-panel-content[aria-hidden='false'] {
+body .match-broadcast-frame .series-hero-status.live,
+body .match-broadcast-frame .series-hero-status.in-progress {
+  border-color: rgba(52, 211, 153, 0.28);
+  color: #9ff5c7;
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.08);
+}
+
+body .match-broadcast-frame .series-hero-matchup {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr);
-  gap: 16px;
-  padding-top: 20px;
+  grid-template-columns: minmax(0, 1fr) 210px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  min-height: 176px;
+  padding: 22px 30px 24px;
+  overflow: hidden;
+  border-top: 1px solid rgba(148, 163, 184, 0.075);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.075);
+  background:
+    radial-gradient(circle at 0% 50%, rgba(14, 165, 233, 0.16), transparent 34%),
+    radial-gradient(circle at 100% 50%, rgba(244, 63, 94, 0.13), transparent 34%),
+    rgba(3, 8, 16, 0.32);
 }
 
-.match-data-source-block,
-.match-policy-card {
+body .match-broadcast-frame .series-hero-matchup::after {
+  content: 'VS';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  color: rgba(148, 163, 184, 0.035);
+  font-size: 8rem;
+  font-weight: 1000;
+  letter-spacing: -0.08em;
+  pointer-events: none;
+}
+
+body .match-broadcast-frame .series-hero-team,
+body .match-broadcast-frame .series-hero-team.left,
+body .match-broadcast-frame .series-hero-team.right {
+  position: relative;
+  z-index: 1;
+  min-height: 110px;
+  gap: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body .match-broadcast-frame .series-hero-team.right {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+body .match-broadcast-frame .series-hero-team-logo {
+  width: 84px;
+  height: 84px;
+  border: 0;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.2);
+}
+
+body .match-broadcast-frame .series-hero-team.left .series-hero-team-logo {
+  box-shadow: 0 14px 38px rgba(14, 165, 233, 0.13);
+}
+
+body .match-broadcast-frame .series-hero-team.right .series-hero-team-logo {
+  box-shadow: 0 14px 38px rgba(244, 63, 94, 0.11);
+}
+
+body .match-broadcast-frame .series-hero-team-logo img {
+  width: 68px;
+  height: 68px;
+}
+
+body .match-broadcast-frame .series-hero-team-copy strong {
+  max-width: 390px;
+  margin: 3px 0;
+  color: #ffffff;
+  font-size: clamp(1.35rem, 2.2vw, 2rem);
+  letter-spacing: -0.035em;
+}
+
+body .match-broadcast-frame .series-hero-team-copy > small {
+  color: #7291aa;
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+}
+
+body .match-broadcast-frame .series-hero-score {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 118px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body .match-broadcast-frame .series-hero-score > span {
+  color: #6e7e95;
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+}
+
+body .match-broadcast-frame .series-hero-score > div {
+  gap: 14px;
+  margin: 3px 0 5px;
+}
+
+body .match-broadcast-frame .series-hero-score strong {
+  color: #fff;
+  font-size: clamp(3.2rem, 6vw, 5.25rem);
+  font-weight: 950;
+  letter-spacing: -0.075em;
+  line-height: 0.95;
+  text-shadow:
+    0 0 30px rgba(255, 255, 255, 0.08),
+    0 10px 36px rgba(0, 0, 0, 0.4);
+}
+
+body .match-broadcast-frame .series-hero-score i {
+  color: #405168;
+  font-size: 1.15rem;
+}
+
+body .match-broadcast-frame .series-hero-score small {
+  color: #718198;
+  font-size: 0.6rem;
+}
+
+body .match-broadcast-frame .series-hero-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 11px 20px;
+  border: 0;
+  background: rgba(2, 7, 14, 0.34);
+  color: #8b99ad;
+  font-size: 0.61rem;
+}
+
+body .match-broadcast-frame .series-hero-footer > span,
+body .match-broadcast-frame .series-hero-footer > time {
+  min-height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body .match-broadcast-frame .series-hero-footer > * + * {
+  border-left: 1px solid rgba(148, 163, 184, 0.11);
+}
+
+body .match-broadcast-frame .series-hero-footer > span:nth-child(2)::before,
+body .match-broadcast-frame .series-hero-footer time::before {
+  color: #4f6077;
+  font-size: 0.46rem;
+}
+
+body .match-broadcast-frame .series-hero-live-context {
+  color: #d6e2f0;
+}
+
+/* Game switcher is part of the hero, not a second card. */
+body .match-broadcast-frame .analysis-header.series-hero-active #game-selector,
+body .match-broadcast-frame .analysis-header.history-summary-active #game-selector {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  width: auto;
+  margin: 0;
+  padding: 9px 14px 11px;
+  overflow-x: auto;
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  border-radius: 0;
+  background: rgba(4, 9, 18, 0.56);
+  box-shadow: none;
+  scrollbar-width: none;
+}
+
+body .match-broadcast-frame #game-selector::-webkit-scrollbar {
+  display: none;
+}
+
+body .match-broadcast-frame .game-button {
+  flex: 0 0 auto;
+  min-width: 82px;
+  min-height: 38px;
+  padding: 5px 13px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #8291a6;
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.66rem;
+}
+
+body .match-broadcast-frame .game-button span {
+  color: #53647c;
+  font-size: 0.45rem;
+}
+
+body .match-broadcast-frame .game-button:hover,
+body .match-broadcast-frame .game-button:focus-visible {
+  color: #e7f7ff;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+body .match-broadcast-frame .game-button.active {
+  border-color: rgba(56, 189, 248, 0.2);
+  color: #eafaff;
+  background: rgba(14, 165, 233, 0.11);
+  box-shadow: inset 0 -2px rgba(34, 211, 238, 0.7);
+}
+
+/* Main content: game canvas + compact series rail. */
+.match-content-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.match-primary-column,
+.match-series-rail {
   min-width: 0;
-  padding: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.11);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.018);
 }
 
-.match-data-source-block .adapter-list {
+.match-primary-column {
+  display: grid;
+  gap: 10px;
+}
+
+.match-series-rail {
+  position: sticky;
+  top: 78px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 18px;
+  background: rgba(8, 14, 25, 0.76);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.14);
+}
+
+.match-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 54px;
+  padding: 0 14px;
+  color: #91a0b4;
+}
+
+.match-current-game-heading {
+  min-height: 44px;
+  padding: 0 4px 0 2px;
+}
+
+.match-section-heading > div {
+  min-width: 0;
+}
+
+.match-section-kicker {
+  display: block;
+  margin-bottom: 2px;
+  color: #4f718b;
+  font-size: 0.45rem;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.match-section-heading strong {
+  color: #dce8f6;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.match-section-heading small {
+  color: #5f6f84;
+  font-size: 0.53rem;
+  white-space: nowrap;
+}
+
+/* Series history becomes a vertical timeline inside the rail. */
+body .match-broadcast-frame #series-history,
+body .match-broadcast-frame #series-history.live-series-results,
+body .match-broadcast-frame .live-series-message-panel {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.09);
+  border-radius: 0;
+  background: transparent;
+}
+
+body .match-broadcast-frame #series-history .completed-section-heading {
+  display: none;
+}
+
+body .match-broadcast-frame #series-history .completed-games {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+body .match-broadcast-frame #series-history .completed-game {
+  width: 100%;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.075);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body .match-broadcast-frame #series-history .completed-game:last-child {
+  border-bottom: 0;
+}
+
+body .match-broadcast-frame #series-history .completed-game:hover,
+body .match-broadcast-frame #series-history .completed-game:focus-visible {
+  background: rgba(255, 255, 255, 0.026);
+}
+
+body .match-broadcast-frame #series-history .completed-game.live,
+body .match-broadcast-frame #series-history .completed-game.paused,
+body .match-broadcast-frame #series-history .completed-game.draft {
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.07), transparent 78%);
+  box-shadow: inset 2px 0 var(--match-cyan);
+}
+
+body .match-broadcast-frame #series-history .completed-game-top {
+  margin-bottom: 9px;
+}
+
+body .match-broadcast-frame #series-history .completed-game-top strong {
+  color: #edf6ff;
+  font-size: 0.72rem;
+}
+
+body .match-broadcast-frame #series-history .completed-game-state {
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 0.43rem;
+}
+
+body .match-broadcast-frame #series-history .completed-side {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 5px;
+}
+
+body .match-broadcast-frame #series-history .completed-side span {
+  font-size: 0.42rem;
+}
+
+body .match-broadcast-frame #series-history .completed-side b {
+  overflow: hidden;
+  color: #bfcbd9;
+  font-size: 0.61rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body .match-broadcast-frame #series-history .completed-result {
   margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(148, 163, 184, 0.06);
 }
 
-.match-policy-card {
+body .match-broadcast-frame #series-history .completed-result strong {
+  font-size: 0.56rem;
+}
+
+body .match-broadcast-frame #series-history .completed-result span {
+  font-size: 0.5rem;
+}
+
+body .match-broadcast-frame .live-series-message-panel {
+  padding: 14px;
+}
+
+/* Game canvas itself stays open. Only the actual scoreboard is framed. */
+body .match-broadcast-frame .game-content,
+body .match-broadcast-frame .match-game-content {
+  min-height: 520px;
+  padding: 0;
+  background: transparent;
+}
+
+body .match-broadcast-frame .game-content > :first-child {
+  margin-top: 0;
+}
+
+body .match-broadcast-frame .analysis-empty {
+  min-height: 420px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(56, 189, 248, 0.055), transparent 18rem),
+    rgba(8, 14, 25, 0.48);
+}
+
+.match-quality-banner {
   margin: 0;
 }
 
-.match-detail-frame footer,
-.match-footer {
-  width: min(1480px, calc(100% - 36px));
-  margin: 0 auto;
+/* Toolbar should read as a control strip, not another card. */
+body .match-broadcast-frame .player-board-toolbar {
+  min-height: 48px;
+  margin: 0 0 8px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.09);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
+body .match-broadcast-frame .player-board-toolbar-copy strong {
+  color: #dce7f5;
+  font-size: 0.7rem;
+}
+
+body .match-broadcast-frame .player-board-toolbar-copy small {
+  color: #62738a;
+  font-size: 0.5rem;
+}
+
+/* Live scoreboard: one strong broadcast surface. */
+body .match-broadcast-frame .role-scoreboard-board {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 20px;
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.035), transparent 28%, transparent 72%, rgba(244, 63, 94, 0.03)),
+    rgba(7, 13, 23, 0.9);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.19);
+}
+
+body .match-broadcast-frame .role-match-header {
+  min-height: 94px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.09);
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.085), transparent 38%, transparent 62%, rgba(244, 63, 94, 0.07));
+}
+
+body .match-broadcast-frame .role-match-team strong {
+  color: #f5f9ff;
+  font-size: 0.9rem;
+}
+
+body .match-broadcast-frame .role-match-clock {
+  min-width: 136px;
+}
+
+body .match-broadcast-frame .role-match-clock strong {
+  font-size: 1.35rem;
+}
+
+body .match-broadcast-frame .role-objective-comparison {
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  background: rgba(2, 7, 14, 0.28);
+}
+
+body .match-broadcast-frame .objective-stat,
+body .match-broadcast-frame .role-objective-comparison > * {
+  border-radius: 0;
+}
+
+body .match-broadcast-frame .role-matchup-list {
+  padding: 0;
+}
+
+body .match-broadcast-frame .role-matchup-row {
+  min-height: 96px;
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.075);
+  border-radius: 0;
+  background: transparent;
+}
+
+body .match-broadcast-frame .role-matchup-row:last-child {
+  border-bottom: 0;
+}
+
+body .match-broadcast-frame .role-matchup-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.008);
+}
+
+body .match-broadcast-frame .role-player,
+body .match-broadcast-frame .role-player.red {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+body .match-broadcast-frame .role-player .role-player-stats > span,
+body .match-broadcast-frame .role-player.red .role-player-stats > span {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body .match-broadcast-frame .role-player .role-player-stats small {
+  color: #53657d;
+}
+
+body .match-broadcast-frame .role-player .role-player-stats strong {
+  color: #dbe7f5;
+}
+
+body .match-broadcast-frame .role-player-items .telemetry-inventory {
+  min-height: 24px;
+}
+
+body .match-broadcast-frame .role-player-items .telemetry-item-slot {
+  border-color: rgba(148, 163, 184, 0.12);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.14);
+}
+
+body .match-broadcast-frame .item-inventory-unavailable-note {
+  margin: 10px 0 0;
+  border: 0;
+  background: transparent;
+  color: #5f7086;
+  text-align: left;
+}
+
+/* Prematch should use the same open canvas. */
+body .match-broadcast-frame .prematch-overview {
+  min-height: 0;
+  gap: 14px;
+  padding: 0;
+}
+
+body .match-broadcast-frame .prematch-versus {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 20px;
+}
+
+body .match-broadcast-frame .prematch-team {
+  min-height: 180px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body .match-broadcast-frame .prematch-team:first-child {
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.09), transparent);
+}
+
+body .match-broadcast-frame .prematch-team:last-child {
+  background: linear-gradient(270deg, rgba(244, 63, 94, 0.08), transparent);
+}
+
+body .match-broadcast-frame .prematch-fact,
+body .match-broadcast-frame .prematch-roster,
+body .match-broadcast-frame .prematch-standings {
+  border-color: rgba(148, 163, 184, 0.11);
+  background: rgba(8, 14, 25, 0.55);
+}
+
+/* Completed-game views inherit the canvas rather than adding a second page inside the page. */
+body .match-broadcast-frame .completed-final-telemetry,
+body .match-broadcast-frame #completed-final-telemetry {
+  padding: 0;
+}
+
+body .match-broadcast-frame .completed-game-tabs {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.09);
+  border-radius: 0;
+  background: transparent;
+}
+
+body .match-broadcast-frame .completed-final-game {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Data health becomes a quiet drawer below the match. */
+body .match-workspace .platform-panel,
+body .match-workspace.platform-collapsed .platform-panel,
+body .match-workspace .match-data-panel {
+  display: block;
+  position: static;
+  width: 100%;
+  max-height: none;
+  margin-top: 18px;
+  overflow: hidden;
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body .match-workspace .platform-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 56px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+}
+
+body .match-workspace .platform-panel-title {
+  min-width: 0;
+}
+
+body .match-workspace .platform-panel-title .eyebrow {
+  margin-bottom: 2px;
+  color: #4f6077;
+  font-size: 0.45rem;
+}
+
+body .match-workspace .platform-panel-title h2 {
+  margin: 0;
+  color: #9aa9bc;
+  font-size: 0.7rem;
+}
+
+body .match-workspace .match-data-panel-copy {
+  display: none;
+}
+
+body .match-workspace .platform-panel-toggle {
+  min-width: 30px;
+  min-height: 30px;
+  border: 0;
+  border-radius: 8px;
+  color: #718198;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+body .match-workspace .platform-panel[data-collapsed='false'] .platform-panel-toggle-icon {
+  transform: rotate(180deg);
+}
+
+body .match-workspace .platform-panel[data-collapsed='true'] .platform-panel-content {
+  display: none;
+}
+
+body .match-workspace .platform-panel-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  gap: 30px;
+  padding: 18px 4px 22px;
+  border-top: 1px solid rgba(148, 163, 184, 0.07);
+  background: transparent;
+}
+
+body .match-workspace .adapter-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body .match-workspace .adapter-row {
+  min-height: 58px;
+  border: 0;
+  background: transparent;
+}
+
+body .match-workspace .policy-card,
+body .match-workspace .match-policy-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.match-data-block-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #4f6077;
+  font-size: 0.47rem;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+/* Footer */
 .match-footer {
-  padding-block: 22px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(1320px, calc(100% - 40px));
+  min-height: 76px;
+  margin: 0 auto;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  color: #4f6077;
+  font-size: 0.55rem;
 }
 
 .match-footer-link {
-  color: #8ddcff;
-  font-weight: 800;
+  color: #8ccfeb;
+  text-decoration: none;
+  font-weight: 850;
 }
 
-@media (max-width: 980px) {
-  .match-detail-frame .series-hero-matchup {
-    grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr);
-    gap: 12px;
-    padding-inline: 22px;
+.match-footer-link:hover,
+.match-footer-link:focus-visible {
+  color: #dff8ff;
+}
+
+@media (max-width: 1120px) {
+  .match-content-shell {
+    grid-template-columns: minmax(0, 1fr) 260px;
   }
 
-  .match-detail-frame .series-hero-team {
-    min-height: 130px;
-    justify-items: center;
-    text-align: center;
+  body .match-broadcast-frame .series-hero-matchup {
+    grid-template-columns: minmax(0, 1fr) 170px minmax(0, 1fr);
+    gap: 18px;
   }
 
-  .match-detail-frame .series-hero-team.right {
-    text-align: center;
+  body .match-broadcast-frame .series-hero-team-logo {
+    width: 72px;
+    height: 72px;
   }
 
-  body .match-workspace .platform-panel-content[aria-hidden='false'] {
+  body .match-broadcast-frame .series-hero-team-logo img {
+    width: 58px;
+    height: 58px;
+  }
+}
+
+@media (max-width: 960px) {
+  .match-content-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .match-series-rail {
+    position: static;
+    order: -1;
+  }
+
+  body .match-broadcast-frame #series-history .completed-games {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  body .match-broadcast-frame #series-history .completed-game {
+    border-right: 1px solid rgba(148, 163, 184, 0.06);
+  }
+
+  body .match-workspace .platform-panel-content {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
-  .match-detail-frame .topbar-inner {
-    grid-template-columns: minmax(0, 1fr) auto;
-    width: min(100% - 20px, 1480px);
-    gap: 10px;
-  }
-
-  .match-detail-frame .primary-nav {
-    display: none;
-  }
-
-  .match-detail-frame .connection {
-    justify-content: flex-end;
-  }
-
-  .match-detail-frame .connection-copy {
-    display: none;
-  }
-
-  .match-route-bar-inner {
-    grid-template-columns: minmax(0, 1fr) auto;
-    width: min(100% - 20px, 1480px);
-    min-height: 60px;
-  }
-
-  .match-route-context {
-    display: none;
-  }
-
-  .match-route-tools {
-    gap: 8px;
-  }
-
-  .match-refresh-status {
-    display: none;
-  }
-
-  .match-refresh-button {
-    min-width: 42px;
-    padding-inline: 10px;
-    font-size: 0;
-  }
-
-  .match-refresh-button span {
-    font-size: 1rem;
-  }
-
+  .match-topbar-inner,
+  .match-detail-frame .topbar-inner,
   body .workspace.match-workspace,
-  body .workspace.match-workspace.platform-collapsed {
-    width: min(100% - 12px, 1480px);
+  body .workspace.match-workspace.platform-collapsed,
+  .match-footer {
+    width: min(100% - 24px, 1320px);
+  }
+
+  .match-topbar-inner,
+  .match-detail-frame .topbar-inner {
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 10px;
-    padding-top: 10px;
   }
 
-  body .match-workspace .analysis-panel {
-    border-radius: 16px;
+  .match-topbar-back {
+    display: none;
   }
 
-  .match-detail-frame .series-hero-topline {
-    margin: 12px 12px 0;
+  .match-connection .connection-copy,
+  .match-refresh-status,
+  .match-topbar-actions .badge {
+    display: none;
   }
 
-  .match-detail-frame .series-hero-matchup {
-    grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr);
-    gap: 6px;
-    padding: 18px 10px 14px;
+  body .match-broadcast-frame .series-hero-topline {
+    padding: 14px 14px 10px;
   }
 
-  .match-detail-frame .series-hero-team {
-    min-height: 116px;
-    padding: 9px 5px;
-    border: 0;
-    background: transparent;
+  body .match-broadcast-frame .series-hero-matchup {
+    grid-template-columns: minmax(0, 1fr) 94px minmax(0, 1fr);
+    gap: 7px;
+    min-height: 142px;
+    padding: 16px 12px;
   }
 
-  .match-detail-frame .series-hero-team.left,
-  .match-detail-frame .series-hero-team.right {
-    box-shadow: none;
+  body .match-broadcast-frame .series-hero-matchup::after {
+    display: none;
   }
 
-  .match-detail-frame .series-hero-team-logo {
-    width: 54px;
-    height: 54px;
-    border-radius: 16px;
-  }
-
-  .match-detail-frame .series-hero-team-logo img {
-    width: 42px;
-    height: 42px;
-  }
-
-  .match-detail-frame .series-hero-team-copy strong {
-    max-width: 31vw;
-    font-size: 0.78rem;
-    white-space: normal;
-  }
-
-  .match-detail-frame .series-hero-score {
-    min-height: 116px;
-    padding-inline: 2px;
-  }
-
-  .match-detail-frame .series-hero-score strong {
-    font-size: 2.5rem;
-  }
-
-  .match-detail-frame .series-hero-footer {
-    padding: 0 12px 12px;
-  }
-
-  .match-detail-frame .analysis-header.series-hero-active #game-selector {
-    padding: 12px;
-  }
-
-  .match-content-nav {
-    padding-inline: 10px;
-  }
-
-  body .match-workspace .series-history {
-    margin: 12px 12px 0;
-  }
-
-  body .match-workspace .game-content {
-    min-height: 440px;
-    padding: 12px;
-  }
-
-  .match-detail-frame .role-match-header {
-    padding: 14px 10px;
-  }
-
-  .match-detail-frame .role-matchup-list {
-    padding: 0 8px 8px;
-  }
-
-  body .match-detail-frame .prematch-versus,
-  body .match-detail-frame .prematch-rosters {
-    grid-template-columns: 1fr;
-  }
-
-  body .match-detail-frame .prematch-team {
+  body .match-broadcast-frame .series-hero-team,
+  body .match-broadcast-frame .series-hero-team.left,
+  body .match-broadcast-frame .series-hero-team.right {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 8px;
     min-height: 0;
+    text-align: center;
   }
 
-  body .match-workspace .platform-panel,
-  body .match-workspace.platform-collapsed .platform-panel {
+  body .match-broadcast-frame .series-hero-team.right {
+    text-align: center;
+  }
+
+  body .match-broadcast-frame .series-hero-team-logo {
+    width: 56px;
+    height: 56px;
     border-radius: 15px;
   }
 
-  body .match-workspace .platform-panel-heading,
-  body .match-workspace.platform-collapsed .platform-panel-heading {
-    padding: 15px;
+  body .match-broadcast-frame .series-hero-team-logo img {
+    width: 46px;
+    height: 46px;
   }
 
-  .match-data-panel-copy {
+  body .match-broadcast-frame .series-hero-team-copy strong {
+    max-width: 31vw;
+    font-size: 0.78rem;
+    line-height: 1.15;
+    white-space: normal;
+  }
+
+  body .match-broadcast-frame .series-hero-team-copy > small {
     display: none;
   }
 
-  body .match-workspace .platform-panel-content {
-    padding-inline: 12px;
-    padding-bottom: 12px;
+  body .match-broadcast-frame .series-hero-score strong {
+    font-size: 2.6rem;
   }
 
-  .match-detail-frame footer,
-  .match-footer {
-    width: min(100% - 16px, 1480px);
-  }
-}
-
-@media (max-width: 520px) {
-  .match-route-back span:last-child {
+  body .match-broadcast-frame .series-hero-score > span,
+  body .match-broadcast-frame .series-hero-score small {
     display: none;
   }
 
-  .match-route-back {
-    width: 40px;
-    padding: 0;
-    justify-content: center;
+  body .match-broadcast-frame .series-hero-footer {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-inline: 8px;
+    scrollbar-width: none;
   }
 
-  .match-detail-frame .series-hero-footer {
+  body .match-broadcast-frame .series-hero-footer::-webkit-scrollbar {
+    display: none;
+  }
+
+  body .match-broadcast-frame .series-hero-footer > span,
+  body .match-broadcast-frame .series-hero-footer > time {
+    flex: 0 0 auto;
+    padding-inline: 10px;
+  }
+
+  .match-current-game-heading small,
+  .match-series-rail > .match-section-heading small {
+    display: none;
+  }
+
+  body .match-broadcast-frame #series-history .completed-games {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body .match-workspace .adapter-list {
     grid-template-columns: 1fr;
   }
 
-  .match-detail-frame .series-hero-live-context {
-    grid-column: auto;
+  .match-footer {
+    min-height: 64px;
   }
 
-  .match-content-nav a {
+  .match-footer > span:last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 540px) {
+  body .workspace.match-workspace,
+  body .workspace.match-workspace.platform-collapsed {
+    padding-top: 12px;
+  }
+
+  body .match-broadcast-frame .analysis-header.match-series-header,
+  body .match-broadcast-frame .analysis-header.series-hero-active,
+  .match-series-rail,
+  body .match-broadcast-frame .role-scoreboard-board,
+  body .match-broadcast-frame .prematch-versus {
+    border-radius: 14px;
+  }
+
+  body .match-broadcast-frame .series-hero-competition span,
+  body .match-broadcast-frame .series-hero-game-mark b {
+    display: none;
+  }
+
+  body .match-broadcast-frame .series-hero-topline {
+    padding-inline: 10px;
+  }
+
+  body .match-broadcast-frame .game-button {
+    min-width: 68px;
     padding-inline: 9px;
   }
 
-  .match-content-nav a span {
-    display: none;
+  .match-content-shell {
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .match-section-heading {
+    min-height: 48px;
+    padding-inline: 11px;
+  }
+
+  .match-current-game-heading {
+    padding-inline: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-detail-frame *,
+  .match-detail-frame *::before,
+  .match-detail-frame *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
   }
 }

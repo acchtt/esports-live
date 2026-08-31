@@ -112,7 +112,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('renders team logos and a vivid flat live series hero', async ({ page }) => {
+test('renders the broadcast match shell with team logos, score, game canvas, and series rail', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -122,6 +122,9 @@ test('renders team logos and a vivid flat live series hero', async ({ page }) =>
   await expect(hero).toBeVisible();
   await expect(page.locator('.match-route-bar')).toHaveCount(0);
   await expect(page.locator('.match-content-nav')).toHaveCount(0);
+  await expect(page.locator('.match-content-shell')).toBeVisible();
+  await expect(page.locator('.match-primary-column')).toBeVisible();
+  await expect(page.locator('.match-series-rail')).toBeVisible();
 
   const gameMark = hero.locator('.series-hero-game-mark');
   await expect(gameMark).toContainText('LoL');
@@ -150,6 +153,9 @@ test('renders team logos and a vivid flat live series hero', async ({ page }) =>
   await expect(footer).toContainText('1 of 3 games completed');
   await expect(footer.locator(':scope > *')).toHaveCount(3);
 
+  await expect(page.locator('#game-selector')).toBeVisible();
+  await expect(page.locator('#game-selector .game-button')).toHaveCount(3);
+
   const surfaces = await hero.evaluate(element => {
     const top = element.querySelector<HTMLElement>('.series-hero-topline');
     const matchup = element.querySelector<HTMLElement>('.series-hero-matchup');
@@ -168,13 +174,11 @@ test('renders team logos and a vivid flat live series hero', async ({ page }) =>
     const footerGridStyle = getComputedStyle(footerGrid);
     return {
       topBackground: topStyle.backgroundColor,
-      topBackgroundImage: topStyle.backgroundImage,
       topBorderLeftWidth: topStyle.borderLeftWidth,
       matchupBackgroundImage: matchupStyle.backgroundImage,
       teamBackground: teamStyle.backgroundColor,
       teamBorderTopWidth: teamStyle.borderTopWidth,
       scoreBackground: scoreStyle.backgroundColor,
-      scoreBackgroundImage: scoreStyle.backgroundImage,
       scoreBorderTopWidth: scoreStyle.borderTopWidth,
       scoreTextShadow: scoreValueStyle.textShadow,
       footerBackground: footerStyle.backgroundColor,
@@ -184,27 +188,41 @@ test('renders team logos and a vivid flat live series hero', async ({ page }) =>
   });
   expect(surfaces).not.toBeNull();
   expect(surfaces?.topBackground).toBe('rgba(0, 0, 0, 0)');
-  expect(surfaces?.topBackgroundImage).not.toBe('none');
   expect(surfaces?.topBorderLeftWidth).toBe('0px');
   expect(surfaces?.matchupBackgroundImage).not.toBe('none');
   expect(surfaces?.teamBackground).toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.teamBorderTopWidth).toBe('0px');
   expect(surfaces?.scoreBackground).toBe('rgba(0, 0, 0, 0)');
-  expect(surfaces?.scoreBackgroundImage).not.toBe('none');
   expect(surfaces?.scoreBorderTopWidth).toBe('0px');
   expect(surfaces?.scoreTextShadow).not.toBe('none');
   expect(surfaces?.footerBackground).toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerBorderTopWidth).toBe('0px');
   expect(surfaces?.footerDisplay).toBe('flex');
 
-  const headerBox = await page.locator('.analysis-header').boundingBox();
-  const scoreBox = await hero.locator('.series-hero-score').boundingBox();
-  expect(headerBox).not.toBeNull();
-  expect(scoreBox).not.toBeNull();
-  if (headerBox && scoreBox) {
-    const headerCenter = headerBox.x + headerBox.width / 2;
-    const scoreCenter = scoreBox.x + scoreBox.width / 2;
-    expect(Math.abs(headerCenter - scoreCenter)).toBeLessThan(3);
+  const geometry = await page.evaluate(() => {
+    const header = document.querySelector<HTMLElement>('.analysis-header');
+    const score = document.querySelector<HTMLElement>('.series-hero-score');
+    const primary = document.querySelector<HTMLElement>('.match-primary-column');
+    const rail = document.querySelector<HTMLElement>('.match-series-rail');
+    if (!header || !score || !primary || !rail) return null;
+    const headerBox = header.getBoundingClientRect();
+    const scoreBox = score.getBoundingClientRect();
+    const primaryBox = primary.getBoundingClientRect();
+    const railBox = rail.getBoundingClientRect();
+    return {
+      headerCenter: headerBox.left + headerBox.width / 2,
+      scoreCenter: scoreBox.left + scoreBox.width / 2,
+      primaryRight: primaryBox.right,
+      railLeft: railBox.left,
+      primaryWidth: primaryBox.width,
+      railWidth: railBox.width
+    };
+  });
+  expect(geometry).not.toBeNull();
+  if (geometry) {
+    expect(Math.abs(geometry.headerCenter - geometry.scoreCenter)).toBeLessThan(3);
+    expect(geometry.primaryRight).toBeLessThanOrEqual(geometry.railLeft + 1);
+    expect(geometry.primaryWidth).toBeGreaterThan(geometry.railWidth * 2);
   }
 
   expect(errors).toEqual([]);

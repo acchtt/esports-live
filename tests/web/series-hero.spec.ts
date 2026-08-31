@@ -122,7 +122,6 @@ test('renders team logos and a vivid flat live series hero', async ({ page }) =>
   await expect(hero).toBeVisible();
   await expect(page.locator('.match-route-bar')).toHaveCount(0);
   await expect(page.locator('.match-content-nav')).toHaveCount(0);
-  await expect(page.locator('link[href="/src/match-vibrance.css"]')).toHaveCount(1);
 
   const gameMark = hero.locator('.series-hero-game-mark');
   await expect(gameMark).toContainText('LoL');

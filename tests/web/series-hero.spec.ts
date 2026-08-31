@@ -112,7 +112,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('renders team logos and a cohesive live series hero', async ({ page }) => {
+test('renders team logos and a flat live series hero', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -120,6 +120,8 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
 
   const hero = page.locator('#series-hero');
   await expect(hero).toBeVisible();
+  await expect(page.locator('.match-route-bar')).toHaveCount(0);
+  await expect(page.locator('.match-content-nav')).toHaveCount(0);
 
   const gameMark = hero.locator('.series-hero-game-mark');
   await expect(gameMark).toContainText('LoL');
@@ -150,26 +152,38 @@ test('renders team logos and a cohesive live series hero', async ({ page }) => {
 
   const surfaces = await hero.evaluate(element => {
     const top = element.querySelector<HTMLElement>('.series-hero-topline');
+    const team = element.querySelector<HTMLElement>('.series-hero-team');
+    const scorePanel = element.querySelector<HTMLElement>('.series-hero-score');
     const footerCell = element.querySelector<HTMLElement>('.series-hero-footer > *');
     const footerGrid = element.querySelector<HTMLElement>('.series-hero-footer');
-    if (!top || !footerCell || !footerGrid) return null;
+    if (!top || !team || !scorePanel || !footerCell || !footerGrid) return null;
     const topStyle = getComputedStyle(top);
+    const teamStyle = getComputedStyle(team);
+    const scoreStyle = getComputedStyle(scorePanel);
     const footerStyle = getComputedStyle(footerCell);
-    const gridStyle = getComputedStyle(footerGrid);
+    const footerGridStyle = getComputedStyle(footerGrid);
     return {
       topBackground: topStyle.backgroundColor,
+      topBorderLeftWidth: topStyle.borderLeftWidth,
+      teamBackground: teamStyle.backgroundColor,
+      teamBorderTopWidth: teamStyle.borderTopWidth,
+      scoreBackground: scoreStyle.backgroundColor,
+      scoreBorderTopWidth: scoreStyle.borderTopWidth,
       footerBackground: footerStyle.backgroundColor,
-      topBorder: topStyle.borderTopColor,
-      footerBorder: footerStyle.borderTopColor,
-      footerDisplay: gridStyle.display,
-      footerColumns: gridStyle.gridTemplateColumns.split(' ').length
+      footerBorderTopWidth: footerStyle.borderTopWidth,
+      footerDisplay: footerGridStyle.display
     };
   });
   expect(surfaces).not.toBeNull();
-  expect(surfaces?.topBackground).toBe(surfaces?.footerBackground);
-  expect(surfaces?.topBorder).toBe(surfaces?.footerBorder);
-  expect(surfaces?.footerDisplay).toBe('grid');
-  expect(surfaces?.footerColumns).toBe(3);
+  expect(surfaces?.topBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.topBorderLeftWidth).toBe('0px');
+  expect(surfaces?.teamBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.teamBorderTopWidth).toBe('0px');
+  expect(surfaces?.scoreBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.scoreBorderTopWidth).toBe('0px');
+  expect(surfaces?.footerBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.footerBorderTopWidth).toBe('0px');
+  expect(surfaces?.footerDisplay).toBe('flex');
 
   const headerBox = await page.locator('.analysis-header').boundingBox();
   const scoreBox = await hero.locator('.series-hero-score').boundingBox();

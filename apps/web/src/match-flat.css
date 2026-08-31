@@ -1,0 +1,707 @@
+/* Flat match-page composition.
+   The match route intentionally uses one primary surface with separators instead of
+   stacking cards inside cards. Keep selectors route-scoped because legacy view
+   modules still inject their own component styles at runtime. */
+
+.match-flat-frame {
+  --match-flat-line: rgba(137, 173, 214, 0.12);
+  --match-flat-line-strong: rgba(93, 220, 255, 0.24);
+  --match-flat-muted: #7f8ea4;
+  --match-flat-panel: rgba(8, 14, 27, 0.78);
+  --match-flat-blue: #5ddcff;
+  --match-flat-red: #fb7185;
+  --match-flat-green: #34d399;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.10), transparent 32rem),
+    linear-gradient(180deg, #050914 0%, #060b15 54%, #050812 100%);
+}
+
+.match-flat-frame::after {
+  opacity: 0.38;
+}
+
+/* One compact application bar. */
+.match-flat-frame .match-topbar {
+  min-height: 58px !important;
+  padding: 0 !important;
+  border-bottom: 1px solid var(--match-flat-line) !important;
+  background: rgba(4, 8, 17, 0.90) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(18px) saturate(120%);
+}
+
+.match-flat-frame .match-topbar-inner {
+  display: grid !important;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+  width: min(1240px, calc(100% - 28px)) !important;
+  min-height: 58px;
+  margin: 0 auto;
+}
+
+.match-flat-frame .match-topbar .brand {
+  gap: 9px;
+}
+
+.match-flat-frame .match-topbar .brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+}
+
+.match-flat-frame .match-topbar .brand strong {
+  font-size: 0.82rem;
+}
+
+.match-flat-frame .match-topbar .brand small {
+  font-size: 0.58rem;
+}
+
+.match-flat-frame .match-topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #9cb0c8;
+  text-decoration: none;
+  font-size: 0.69rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.match-flat-frame .match-topbar-back:hover,
+.match-flat-frame .match-topbar-back:focus-visible {
+  color: #e9f8ff;
+}
+
+.match-flat-frame .match-topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.match-flat-frame .match-topbar .connection {
+  gap: 8px;
+  min-width: 0;
+}
+
+.match-flat-frame .match-topbar .connection-copy strong {
+  font-size: 0.68rem;
+}
+
+.match-flat-frame .match-topbar .connection-copy small {
+  max-width: 210px;
+  overflow: hidden;
+  font-size: 0.56rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-flat-frame .match-topbar .status-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.match-flat-frame .match-topbar .badge {
+  min-height: 22px;
+  margin-left: 0;
+  padding-inline: 8px;
+  font-size: 0.53rem;
+}
+
+.match-flat-frame .match-refresh-status {
+  color: #718198;
+  font-size: 0.57rem;
+}
+
+.match-flat-frame .match-refresh-button {
+  min-height: 30px !important;
+  padding: 0 9px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  color: #9fdff5 !important;
+  background: rgba(56, 189, 248, 0.07) !important;
+  box-shadow: none !important;
+  font-size: 0.62rem !important;
+}
+
+.match-flat-frame .match-refresh-button:hover:not(:disabled),
+.match-flat-frame .match-refresh-button:focus-visible:not(:disabled) {
+  color: #e8f9ff !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+}
+
+/* One match surface. */
+body .match-flat-frame .workspace.match-workspace,
+body .match-flat-frame .workspace.match-workspace.platform-collapsed {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
+  width: min(1240px, calc(100% - 28px)) !important;
+  margin: 0 auto !important;
+  padding: 18px 0 28px !important;
+}
+
+body .match-flat-frame .match-workspace .analysis-panel,
+body .match-flat-frame .match-workspace.platform-collapsed .analysis-panel {
+  min-width: 0;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid var(--match-flat-line) !important;
+  border-radius: 14px !important;
+  background: var(--match-flat-panel) !important;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.18) !important;
+}
+
+body .match-flat-frame .match-workspace .analysis-header {
+  min-height: 0 !important;
+  padding: 16px 18px !important;
+  border-bottom: 1px solid var(--match-flat-line) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Series header: open composition, no team cards inside an outer card. */
+.match-flat-frame .analysis-header.series-hero-active {
+  overflow: visible !important;
+  padding: 0 !important;
+  border-bottom: 0 !important;
+  background:
+    radial-gradient(circle at 50% 14%, rgba(56, 189, 248, 0.055), transparent 26rem),
+    transparent !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero {
+  background: transparent !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-topline {
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 !important;
+  padding: 13px 18px 11px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--match-flat-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .series-hero-game-mark {
+  min-height: 28px !important;
+  padding: 2px 5px 2px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .series-hero-game-mark img {
+  max-width: 34px;
+  max-height: 22px;
+}
+
+.match-flat-frame .series-hero-status {
+  min-height: 24px !important;
+  padding-inline: 9px !important;
+  border-radius: 999px !important;
+  font-size: 0.56rem !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-matchup {
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.34fr) minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 18px !important;
+  padding: 24px 26px 20px !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team {
+  min-height: 0 !important;
+  gap: 13px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team.left,
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team.right {
+  box-shadow: none !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team-logo {
+  width: 62px !important;
+  height: 62px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team-logo img {
+  width: 50px !important;
+  height: 50px !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-team-copy strong {
+  margin-block: 2px !important;
+  max-width: 440px;
+  font-size: clamp(1rem, 1.5vw, 1.28rem) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score {
+  min-height: 0 !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score > div {
+  gap: 10px !important;
+  margin: 1px 0 3px !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-score strong {
+  font-size: clamp(2.45rem, 4vw, 3.55rem) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-footer {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 0 !important;
+  padding: 10px 18px !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  color: #8f9db2 !important;
+  background: rgba(3, 8, 17, 0.22) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-footer > span,
+.match-flat-frame .analysis-header.series-hero-active .series-hero-footer > time {
+  min-height: 24px !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 0.62rem !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .series-hero-footer > * + * {
+  border-left: 1px solid var(--match-flat-line) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active #game-selector {
+  justify-content: center !important;
+  gap: 4px !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 7px 12px 9px !important;
+  border: 0 !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  border-radius: 0 !important;
+  background: rgba(3, 8, 17, 0.30) !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button {
+  min-width: 64px !important;
+  min-height: 32px !important;
+  padding: 5px 9px !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button:hover,
+.match-flat-frame .analysis-header.series-hero-active .game-button:focus-visible {
+  color: #dff6ff !important;
+  background: rgba(56, 189, 248, 0.035) !important;
+}
+
+.match-flat-frame .analysis-header.series-hero-active .game-button.active {
+  border-bottom-color: var(--match-flat-blue) !important;
+  color: #f3fbff !important;
+  background: transparent !important;
+}
+
+/* Series results are a list, not another panel. */
+body .match-flat-frame .match-workspace #series-history,
+body .match-flat-frame .match-workspace #series-history.live-series-results {
+  margin: 0 !important;
+  padding: 0 18px 12px !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame #series-history .completed-section-heading {
+  padding: 12px 0 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.match-flat-frame #series-history .completed-games {
+  gap: 0 !important;
+}
+
+.match-flat-frame #series-history .completed-game {
+  border: 0 !important;
+  border-top: 1px solid rgba(137, 173, 214, 0.09) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame #series-history .completed-game:hover,
+.match-flat-frame #series-history .completed-game:focus-visible {
+  border-color: rgba(137, 173, 214, 0.12) !important;
+  background: rgba(56, 189, 248, 0.025) !important;
+}
+
+.match-flat-frame .history-header-score {
+  min-height: 0 !important;
+  padding: 0 3px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.match-flat-frame .live-series-message-panel {
+  margin: 0 !important;
+  padding: 13px 18px !important;
+  border: 0 !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+/* The game board is the content area of the same primary card. */
+body .match-flat-frame .match-workspace .game-content {
+  min-height: 380px !important;
+  padding: 16px 18px 20px !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  background: transparent !important;
+}
+
+.match-flat-frame .analysis-empty {
+  min-height: 320px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.match-flat-frame .analysis-empty-icon {
+  border: 0 !important;
+  background: rgba(56, 189, 248, 0.045) !important;
+}
+
+.match-flat-frame .quality-banner,
+.match-flat-frame .match-quality-banner {
+  margin: 0 !important;
+  padding: 9px 18px !important;
+  border: 0 !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  border-radius: 0 !important;
+  background: rgba(251, 191, 36, 0.025) !important;
+}
+
+/* Live/final boards: retain information hierarchy, remove nested card framing. */
+.match-flat-frame .completed-final-game,
+.match-flat-frame .role-scoreboard-board,
+.match-flat-frame .completed-team-comparison {
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .completed-final-game-header,
+.match-flat-frame .role-match-header {
+  padding: 10px 0 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--match-flat-line) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .completed-team-scoreline,
+.match-flat-frame .completed-team-objectives,
+.match-flat-frame .role-objective-comparison,
+.match-flat-frame .role-team-summary-grid {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .completed-team-scoreline,
+.match-flat-frame .completed-team-objectives {
+  padding-inline: 0 !important;
+}
+
+.match-flat-frame .completed-team-metric,
+.match-flat-frame .completed-comparison-team,
+.match-flat-frame .role-team-summary,
+.match-flat-frame .role-gold-delta,
+.match-flat-frame .role-player {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .role-matchup-list,
+.match-flat-frame .completed-final-matchups {
+  padding: 0 !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  background: transparent !important;
+}
+
+.match-flat-frame .role-matchup-row {
+  margin: 0 !important;
+  padding-block: 10px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(137, 173, 214, 0.08) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .role-matchup-row:last-child {
+  border-bottom: 0 !important;
+}
+
+/* Prematch uses open columns and separators. */
+body .match-flat-frame .prematch-overview,
+body .match-flat-frame .prematch-versus {
+  gap: 0 !important;
+  background: transparent !important;
+}
+
+body .match-flat-frame .prematch-team {
+  min-height: 132px !important;
+  padding: 16px 22px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body .match-flat-frame .prematch-team + .prematch-team {
+  border-left: 1px solid var(--match-flat-line) !important;
+}
+
+body .match-flat-frame .prematch-fact,
+body .match-flat-frame .prematch-roster,
+body .match-flat-frame .prematch-standings,
+body .match-flat-frame .prematch-notice {
+  border: 0 !important;
+  border-top: 1px solid var(--match-flat-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Data health is a quiet disclosure below the match instead of another floating card. */
+body .match-flat-frame .match-workspace .platform-panel,
+body .match-flat-frame .match-workspace.platform-collapsed .platform-panel {
+  display: block !important;
+  position: static !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-height: none !important;
+  margin: 0 14px !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--match-flat-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .platform-panel-heading {
+  min-height: 48px !important;
+  padding: 10px 4px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.match-flat-frame .platform-panel-title .eyebrow,
+.match-flat-frame .match-data-panel-copy {
+  display: none !important;
+}
+
+.match-flat-frame .platform-panel-title h2 {
+  color: #8595aa !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+}
+
+.match-flat-frame .platform-panel-toggle {
+  min-width: 0 !important;
+  min-height: 28px !important;
+  padding: 0 6px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .platform-panel-content {
+  padding: 0 4px 14px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.match-flat-frame .match-policy-card,
+.match-flat-frame .policy-card,
+.match-flat-frame .match-data-source-block,
+.match-flat-frame .adapter-row {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.match-flat-frame .match-policy-card,
+.match-flat-frame .policy-card {
+  border-top: 1px solid var(--match-flat-line) !important;
+}
+
+.match-flat-frame .match-footer {
+  width: min(1240px, calc(100% - 28px));
+  margin-inline: auto;
+  padding-top: 0;
+}
+
+@media (max-width: 900px) {
+  .match-flat-frame .match-topbar-inner {
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+  }
+
+  .match-flat-frame .match-topbar-back {
+    display: none;
+  }
+
+  .match-flat-frame .match-topbar-actions {
+    gap: 8px;
+  }
+
+  .match-flat-frame .match-topbar .connection-copy small,
+  .match-flat-frame .match-topbar .badge,
+  .match-flat-frame .match-refresh-status {
+    display: none;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-matchup {
+    grid-template-columns: minmax(0, 1fr) 94px minmax(0, 1fr) !important;
+    gap: 8px !important;
+    padding: 18px 14px 16px !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team {
+    display: grid !important;
+    justify-items: center !important;
+    gap: 7px !important;
+    text-align: center !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team.right {
+    text-align: center !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team-copy strong {
+    max-width: 28vw !important;
+    white-space: normal !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .match-flat-frame .match-topbar-inner,
+  body .match-flat-frame .workspace.match-workspace,
+  body .match-flat-frame .workspace.match-workspace.platform-collapsed,
+  .match-flat-frame .match-footer {
+    width: min(100% - 16px, 1240px) !important;
+  }
+
+  .match-flat-frame .match-topbar .brand small,
+  .match-flat-frame .match-topbar .connection-copy {
+    display: none;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-topline {
+    padding: 10px 12px 9px !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-matchup {
+    grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr) !important;
+    gap: 4px !important;
+    padding: 14px 8px 12px !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team-logo {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team-logo img {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team-copy strong {
+    max-width: 32vw !important;
+    font-size: 0.72rem !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-team-copy > small,
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-score > span,
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-score small {
+    display: none !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-score strong {
+    font-size: 2rem !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-footer {
+    justify-content: flex-start !important;
+    padding: 8px 10px !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-footer > span,
+  .match-flat-frame .analysis-header.series-hero-active .series-hero-footer > time {
+    padding: 0 8px !important;
+    font-size: 0.55rem !important;
+  }
+
+  .match-flat-frame .analysis-header.series-hero-active #game-selector {
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+  }
+
+  body .match-flat-frame .match-workspace .game-content {
+    padding: 12px !important;
+  }
+
+  body .match-flat-frame .prematch-team + .prematch-team {
+    border-left: 0 !important;
+    border-top: 1px solid var(--match-flat-line) !important;
+  }
+}

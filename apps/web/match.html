@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Full esports match analysis, series context, and live telemetry." />
+    <meta name="theme-color" content="#050812" />
     <title>Match · Esports Live</title>
     <style>
       #completed-match-list[hidden],
@@ -19,23 +20,33 @@
     <link rel="stylesheet" href="/src/workspace-layout.css" />
     <link rel="stylesheet" href="/src/main-page-shell.css" />
     <link rel="stylesheet" href="/src/match-page.css" />
+    <link rel="stylesheet" href="/src/visual-polish.css" />
+    <style>
+      .match-detail-frame .analysis-header.series-hero-active .series-hero-topline,
+      .match-detail-frame .analysis-header.series-hero-active .series-hero-footer > span,
+      .match-detail-frame .analysis-header.series-hero-active .series-hero-footer > time {
+        border-color: rgba(126, 163, 207, 0.13) !important;
+        background: rgba(4, 10, 21, 0.52) !important;
+      }
+    </style>
   </head>
   <body>
     <div class="app-frame match-detail-frame">
-      <header class="topbar">
+      <header class="topbar match-topbar">
         <div class="topbar-inner">
           <a class="brand" href="/" aria-label="Back to Esports Live matches">
             <span class="brand-mark" aria-hidden="true">EL</span>
             <div>
               <strong>Esports Live</strong>
-              <small>Match detail</small>
+              <small>Match center</small>
             </div>
           </a>
 
-          <nav class="primary-nav" aria-label="Primary navigation">
-            <a class="back-to-matches" href="/">← All matches</a>
-            <a href="#selected-series" aria-current="page">Match</a>
-            <a href="#platform-panel">Platform</a>
+          <nav class="primary-nav match-primary-nav" aria-label="Match navigation">
+            <a class="back-to-matches" href="/">Matches</a>
+            <a href="#series-hero" aria-current="page">Overview</a>
+            <a href="#game-content">Game board</a>
+            <a href="#platform-panel">Data</a>
           </nav>
 
           <div class="connection" aria-live="polite">
@@ -49,31 +60,51 @@
         </div>
       </header>
 
+      <section class="match-route-bar" aria-label="Match controls">
+        <div class="match-route-bar-inner">
+          <a class="match-route-back" href="/">
+            <span aria-hidden="true">←</span>
+            <span>All matches</span>
+          </a>
+          <div class="match-route-context">
+            <span>League of Legends</span>
+            <strong>Series intelligence</strong>
+          </div>
+          <div class="match-route-tools">
+            <span id="polling-countdown" class="match-refresh-status" aria-live="polite">Starting…</span>
+            <button id="refresh-schedule" class="match-refresh-button" type="button" aria-label="Refresh">
+              <span aria-hidden="true">↻</span>
+              Refresh data
+            </button>
+          </div>
+        </div>
+      </section>
+
       <aside class="match-route-data schedule-panel" aria-hidden="true">
         <div class="sport-tabs"></div>
         <div id="schedule-list"></div>
       </aside>
 
       <main id="workspace" class="workspace match-workspace platform-collapsed">
-        <section class="panel analysis-panel" aria-labelledby="selected-series">
-          <div class="analysis-header">
+        <section class="panel analysis-panel match-info-panel" aria-labelledby="selected-series">
+          <div class="analysis-header match-series-header">
             <div>
               <p id="selected-competition" class="eyebrow">MATCH</p>
               <h1 id="selected-series">Loading match…</h1>
               <p id="selected-meta" class="selected-meta">Resolving the requested series.</p>
             </div>
-            <div class="match-detail-header-actions">
-              <div class="refresh-controls">
-                <span id="polling-countdown" aria-live="polite">Starting…</span>
-                <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
-              </div>
-              <div id="game-selector" class="game-selector" aria-label="Series games"></div>
-            </div>
+            <div id="game-selector" class="game-selector" aria-label="Series games"></div>
           </div>
 
+          <nav class="match-content-nav" aria-label="Match sections">
+            <a href="#series-history"><span>01</span> Series</a>
+            <a href="#game-content"><span>02</span> Game board</a>
+            <a href="#platform-panel"><span>03</span> Data quality</a>
+          </nav>
+
           <section id="series-history" class="series-history" aria-live="polite" hidden></section>
-          <div id="quality-banner" hidden aria-hidden="true"></div>
-          <div id="game-content" class="game-content">
+          <div id="quality-banner" class="match-quality-banner" hidden aria-hidden="true"></div>
+          <div id="game-content" class="game-content match-game-content">
             <div class="analysis-empty">
               <span class="analysis-empty-icon" aria-hidden="true">⌁</span>
               <h3>Loading match</h3>
@@ -82,11 +113,12 @@
           </div>
         </section>
 
-        <aside id="platform-panel" class="panel platform-panel" aria-labelledby="platform-heading" data-collapsed="true">
+        <aside id="platform-panel" class="panel platform-panel match-data-panel" aria-labelledby="platform-heading" data-collapsed="true">
           <div class="panel-heading compact platform-panel-heading">
             <div class="platform-panel-title">
-              <p class="eyebrow">PLATFORM</p>
-              <h2 id="platform-heading">Adapter status</h2>
+              <p class="eyebrow">DATA HEALTH</p>
+              <h2 id="platform-heading">Sources &amp; quality</h2>
+              <p class="match-data-panel-copy">Provider availability, freshness rules, and telemetry trust state.</p>
             </div>
             <button
               id="platform-panel-toggle"
@@ -102,9 +134,12 @@
           </div>
 
           <div id="platform-panel-content" class="platform-panel-content" aria-hidden="true">
-            <div id="adapter-list" class="adapter-list"></div>
+            <div class="match-data-source-block">
+              <span class="match-data-block-label">Adapters</span>
+              <div id="adapter-list" class="adapter-list"></div>
+            </div>
 
-            <section class="policy-card">
+            <section class="policy-card match-policy-card">
               <p class="eyebrow">QUALITY POLICY</p>
               <dl>
                 <div><dt>0–30s</dt><dd>Fresh</dd></div>
@@ -117,9 +152,9 @@
         </aside>
       </main>
 
-      <footer>
+      <footer class="match-footer">
         <span><a class="match-footer-link" href="/">← Back to matches</a></span>
-        <span>Provider status and telemetry quality are reported separately.</span>
+        <span>Live values remain explicitly quality-gated.</span>
       </footer>
     </div>
 

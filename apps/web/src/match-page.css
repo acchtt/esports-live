@@ -1,60 +1,540 @@
-/* Dedicated match-detail layout. Match schedule data remains off-canvas for the existing controller. */
+/* Match detail is a focused information page, not the schedule workspace. */
 .match-route-data {
   display: none !important;
 }
 
+.match-detail-frame {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.11), transparent 30rem),
+    radial-gradient(circle at 88% 28%, rgba(99, 102, 241, 0.065), transparent 28rem),
+    linear-gradient(180deg, #050914 0%, #070c17 42%, #050914 100%);
+}
+
 .match-detail-frame .topbar .brand,
 .match-detail-frame .primary-nav a,
+.match-route-back,
 .match-footer-link {
   color: inherit;
   text-decoration: none;
+}
+
+.match-detail-frame .topbar-inner {
+  width: min(1480px, calc(100% - 36px));
 }
 
 .match-detail-frame .primary-nav .back-to-matches {
   color: #8ddcff;
 }
 
-body .workspace.match-workspace,
-body .workspace.match-workspace.platform-collapsed {
-  grid-template-columns: minmax(0, 1fr) 58px;
-  width: min(1760px, calc(100% - 28px));
-  padding-top: 18px;
+.match-primary-nav {
+  gap: 3px;
 }
 
-body .match-workspace .analysis-panel {
+.match-primary-nav a {
+  min-height: 34px;
+  padding-inline: 12px;
+  border-radius: 9px;
+}
+
+.match-primary-nav a[aria-current='page'] {
+  color: #f8fbff;
+  background: rgba(56, 189, 248, 0.075);
+}
+
+.match-route-bar {
+  position: relative;
+  z-index: 8;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(5, 9, 20, 0.72);
+  backdrop-filter: blur(18px);
+}
+
+.match-route-bar-inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  width: min(1480px, calc(100% - 36px));
+  min-height: 66px;
+  margin: 0 auto;
+}
+
+.match-route-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  color: #d9e5f4;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.match-route-back:hover,
+.match-route-back:focus-visible {
+  border-color: rgba(56, 189, 248, 0.34);
+  color: #f8fbff;
+  background: rgba(56, 189, 248, 0.07);
+}
+
+.match-route-context {
+  min-width: 0;
+}
+
+.match-route-context span,
+.match-data-block-label {
+  display: block;
+  margin-bottom: 3px;
+  color: #6f8098;
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.match-route-context strong {
+  display: block;
+  overflow: hidden;
+  color: #dce7f5;
+  font-size: 0.76rem;
+  letter-spacing: 0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-route-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.match-refresh-status {
+  color: #7f8da2;
+  font-size: 0.63rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.match-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 10px;
+  color: #dff7ff;
+  background: rgba(14, 165, 233, 0.065);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.match-refresh-button:hover:not(:disabled),
+.match-refresh-button:focus-visible:not(:disabled) {
+  border-color: rgba(56, 189, 248, 0.48);
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.match-refresh-button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+body .workspace.match-workspace,
+body .workspace.match-workspace.platform-collapsed {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  width: min(1480px, calc(100% - 36px));
+  padding-top: 22px;
+}
+
+body .match-workspace .analysis-panel,
+body .match-workspace.platform-collapsed .analysis-panel {
   grid-column: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: clip;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(10, 17, 31, 0.97), rgba(7, 12, 23, 0.98));
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.26),
+    inset 0 1px rgba(255, 255, 255, 0.025);
 }
 
 body .match-workspace .analysis-header {
-  min-height: 106px;
+  min-height: 0;
+  padding: 22px 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
 }
 
 body .match-workspace .analysis-header h1 {
-  font-size: clamp(1.35rem, 2.2vw, 2rem);
-  letter-spacing: -0.025em;
+  font-size: clamp(1.45rem, 2.2vw, 2.1rem);
+  letter-spacing: -0.035em;
 }
 
-.match-detail-header-actions {
-  display: grid;
-  justify-items: end;
+/* Series hero becomes the page's primary match identity surface. */
+.match-detail-frame .analysis-header.series-hero-active {
+  overflow: visible;
+  border-bottom: 0;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(56, 189, 248, 0.065), transparent 28rem),
+    linear-gradient(180deg, rgba(9, 16, 29, 0.99), rgba(7, 12, 23, 0.99));
+}
+
+.match-detail-frame .series-hero-topline {
+  margin: 20px 24px 0;
+  padding: 12px 14px;
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(14, 23, 39, 0.72);
+  box-shadow: none;
+}
+
+.match-detail-frame .series-hero-matchup {
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.48fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 30px 34px 24px;
+}
+
+.match-detail-frame .series-hero-team {
+  min-height: 116px;
+  gap: 18px;
+  padding: 20px;
+  border-color: rgba(148, 163, 184, 0.11);
+  border-radius: 18px;
+  background: rgba(13, 22, 38, 0.62);
+}
+
+.match-detail-frame .series-hero-team.left {
+  box-shadow: inset 3px 0 rgba(56, 189, 248, 0.48);
+}
+
+.match-detail-frame .series-hero-team.right {
+  box-shadow: inset -3px 0 rgba(251, 113, 133, 0.44);
+}
+
+.match-detail-frame .series-hero-team-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.match-detail-frame .series-hero-team-logo img {
+  width: 56px;
+  height: 56px;
+}
+
+.match-detail-frame .series-hero-team-copy strong {
+  max-width: 420px;
+  font-size: clamp(1rem, 1.65vw, 1.34rem);
+}
+
+.match-detail-frame .series-hero-score {
+  min-height: 116px;
+  padding: 14px;
+}
+
+.match-detail-frame .series-hero-score strong {
+  font-size: clamp(2.9rem, 5vw, 4.4rem);
+}
+
+.match-detail-frame .series-hero-score small {
+  margin-top: 2px;
+  color: #8190a4;
+}
+
+.match-detail-frame .series-hero-footer {
   gap: 12px;
+  padding: 0 24px 20px;
+}
+
+.match-detail-frame .series-hero-footer > span,
+.match-detail-frame .series-hero-footer > time {
+  min-height: 48px;
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(14, 23, 39, 0.72);
+  box-shadow: none;
+}
+
+.match-detail-frame .analysis-header.series-hero-active #game-selector {
+  justify-content: flex-start;
+  gap: 8px;
+  width: auto;
+  margin: 0;
+  padding: 14px 24px 20px;
+  overflow-x: auto;
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.09);
+  border-radius: 0;
+  background: rgba(5, 10, 20, 0.52);
+  box-shadow: none;
+  scrollbar-width: thin;
+}
+
+.match-detail-frame .game-button {
+  flex: 0 0 auto;
+  min-width: 84px;
+  min-height: 44px;
+  border-radius: 11px;
+}
+
+.match-detail-frame .game-button.active {
+  border-color: rgba(56, 189, 248, 0.46);
+  background: rgba(56, 189, 248, 0.1);
+  box-shadow: inset 0 -2px rgba(56, 189, 248, 0.55);
+}
+
+.match-content-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 8px 18px;
+  overflow-x: auto;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(6, 11, 21, 0.82);
+  scrollbar-width: none;
+}
+
+.match-content-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.match-content-nav a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 11px;
+  border-radius: 9px;
+  color: #98a7bb;
+  text-decoration: none;
+  font-size: 0.67rem;
+  font-weight: 850;
+}
+
+.match-content-nav a span {
+  color: #52637b;
+  font-size: 0.53rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.match-content-nav a:hover,
+.match-content-nav a:focus-visible {
+  color: #e8f6ff;
+  background: rgba(56, 189, 248, 0.065);
+}
+
+body .match-workspace .series-history {
+  margin: 20px 22px 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 16px;
+  background: rgba(13, 22, 38, 0.46);
+}
+
+body .match-workspace .game-content {
+  min-height: 520px;
+  padding: 22px;
+  background: transparent;
+}
+
+body .match-workspace .game-content > :first-child {
+  margin-top: 0;
+}
+
+.match-detail-frame .analysis-empty {
+  min-height: 420px;
+  border: 1px dashed rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.055), transparent 18rem),
+    rgba(255, 255, 255, 0.012);
+}
+
+.match-detail-frame .analysis-empty h3 {
+  font-size: 1rem;
+}
+
+.match-detail-frame .analysis-empty p {
+  max-width: 620px;
+  line-height: 1.65;
+}
+
+/* Live scoreboard: one clean information surface inside the page. */
+.match-detail-frame .role-scoreboard-board {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(12, 21, 36, 0.82), rgba(6, 11, 21, 0.88));
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.16);
+}
+
+.match-detail-frame .role-match-header {
+  padding: 20px;
+  border-bottom-color: rgba(148, 163, 184, 0.1);
+}
+
+.match-detail-frame .role-match-team {
   min-width: 0;
 }
 
-.match-detail-header-actions .refresh-controls {
-  grid-auto-flow: column;
+.match-detail-frame .role-match-clock {
+  min-width: 150px;
+}
+
+.match-detail-frame .role-objective-comparison {
+  background: rgba(4, 9, 18, 0.48);
+}
+
+.match-detail-frame .role-matchup-list {
+  padding: 0 16px 16px;
+}
+
+.match-detail-frame .role-matchup-row {
+  border-color: rgba(148, 163, 184, 0.1);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+/* Pre-match detail uses the same page rhythm as live data. */
+body .match-detail-frame .prematch-overview {
+  min-height: 0;
+  gap: 18px;
+  padding: 0;
+}
+
+body .match-detail-frame .prematch-versus {
+  gap: 14px;
+}
+
+body .match-detail-frame .prematch-team {
+  min-height: 180px;
+  padding: 24px 20px;
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(13, 22, 38, 0.5);
+}
+
+body .match-detail-frame .prematch-fact,
+body .match-detail-frame .prematch-roster,
+body .match-detail-frame .prematch-standings {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(13, 22, 38, 0.42);
+}
+
+body .match-detail-frame .prematch-notice {
+  border-radius: 14px;
+}
+
+/* Data quality is a secondary expandable section below match information. */
+body .match-workspace .platform-panel,
+body .match-workspace.platform-collapsed .platform-panel {
+  display: block;
+  grid-column: 1;
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  min-width: 0;
+  max-height: none;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 18px;
+  background: rgba(8, 14, 26, 0.9);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.18);
+}
+
+body .match-workspace .platform-panel-heading,
+body .match-workspace.platform-collapsed .platform-panel-heading {
+  display: flex;
   align-items: center;
-  gap: 9px;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 0;
+  padding: 18px 20px;
+  border: 0;
 }
 
-.match-detail-header-actions .game-selector {
-  justify-content: flex-end;
+body .match-workspace .platform-panel-title,
+body .match-workspace.platform-collapsed .platform-panel-title {
+  display: block;
+  min-width: 0;
 }
 
-.match-detail-frame footer {
-  width: min(1760px, calc(100% - 28px));
+.match-data-panel-copy {
+  margin: 5px 0 0;
+  color: #7f8da2;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+body .match-workspace .platform-panel-toggle,
+body .match-workspace.platform-collapsed .platform-panel-toggle {
+  flex-direction: row;
+  width: auto;
+  min-width: 96px;
+  min-height: 38px;
+  padding: 0 11px;
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+body .match-workspace.platform-collapsed .platform-panel-toggle-label {
+  writing-mode: initial;
+  transform: none;
+}
+
+body .match-workspace .platform-panel-content {
+  padding: 0 20px 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.09);
+}
+
+body .match-workspace .platform-panel-content[aria-hidden='false'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr);
+  gap: 16px;
+  padding-top: 20px;
+}
+
+.match-data-source-block,
+.match-policy-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.11);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.match-data-source-block .adapter-list {
+  margin-top: 10px;
+}
+
+.match-policy-card {
+  margin: 0;
+}
+
+.match-detail-frame footer,
+.match-footer {
+  width: min(1480px, calc(100% - 36px));
   margin: 0 auto;
+}
+
+.match-footer {
+  padding-block: 22px 28px;
 }
 
 .match-footer-link {
@@ -62,53 +542,221 @@ body .match-workspace .analysis-header h1 {
   font-weight: 800;
 }
 
-@media (max-width: 1180px) {
-  body .workspace.match-workspace,
-  body .workspace.match-workspace.platform-collapsed {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 980px) {
+  .match-detail-frame .series-hero-matchup {
+    grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr);
+    gap: 12px;
+    padding-inline: 22px;
   }
 
-  body .match-workspace .platform-panel,
-  body .match-workspace.platform-collapsed .platform-panel {
-    grid-column: 1;
+  .match-detail-frame .series-hero-team {
+    min-height: 130px;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .match-detail-frame .series-hero-team.right {
+    text-align: center;
+  }
+
+  body .match-workspace .platform-panel-content[aria-hidden='false'] {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
   .match-detail-frame .topbar-inner {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: min(100% - 20px, 1480px);
     gap: 10px;
   }
 
   .match-detail-frame .primary-nav {
-    justify-content: flex-start;
-    overflow-x: auto;
+    display: none;
   }
 
   .match-detail-frame .connection {
-    justify-content: space-between;
+    justify-content: flex-end;
+  }
+
+  .match-detail-frame .connection-copy {
+    display: none;
+  }
+
+  .match-route-bar-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: min(100% - 20px, 1480px);
+    min-height: 60px;
+  }
+
+  .match-route-context {
+    display: none;
+  }
+
+  .match-route-tools {
+    gap: 8px;
+  }
+
+  .match-refresh-status {
+    display: none;
+  }
+
+  .match-refresh-button {
+    min-width: 42px;
+    padding-inline: 10px;
+    font-size: 0;
+  }
+
+  .match-refresh-button span {
+    font-size: 1rem;
   }
 
   body .workspace.match-workspace,
   body .workspace.match-workspace.platform-collapsed {
-    width: min(100% - 12px, 1760px);
+    width: min(100% - 12px, 1480px);
+    gap: 10px;
     padding-top: 10px;
   }
 
-  body .match-workspace .analysis-header {
+  body .match-workspace .analysis-panel {
+    border-radius: 16px;
+  }
+
+  .match-detail-frame .series-hero-topline {
+    margin: 12px 12px 0;
+  }
+
+  .match-detail-frame .series-hero-matchup {
+    grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr);
+    gap: 6px;
+    padding: 18px 10px 14px;
+  }
+
+  .match-detail-frame .series-hero-team {
+    min-height: 116px;
+    padding: 9px 5px;
+    border: 0;
+    background: transparent;
+  }
+
+  .match-detail-frame .series-hero-team.left,
+  .match-detail-frame .series-hero-team.right {
+    box-shadow: none;
+  }
+
+  .match-detail-frame .series-hero-team-logo {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+  }
+
+  .match-detail-frame .series-hero-team-logo img {
+    width: 42px;
+    height: 42px;
+  }
+
+  .match-detail-frame .series-hero-team-copy strong {
+    max-width: 31vw;
+    font-size: 0.78rem;
+    white-space: normal;
+  }
+
+  .match-detail-frame .series-hero-score {
+    min-height: 116px;
+    padding-inline: 2px;
+  }
+
+  .match-detail-frame .series-hero-score strong {
+    font-size: 2.5rem;
+  }
+
+  .match-detail-frame .series-hero-footer {
+    padding: 0 12px 12px;
+  }
+
+  .match-detail-frame .analysis-header.series-hero-active #game-selector {
+    padding: 12px;
+  }
+
+  .match-content-nav {
+    padding-inline: 10px;
+  }
+
+  body .match-workspace .series-history {
+    margin: 12px 12px 0;
+  }
+
+  body .match-workspace .game-content {
+    min-height: 440px;
+    padding: 12px;
+  }
+
+  .match-detail-frame .role-match-header {
+    padding: 14px 10px;
+  }
+
+  .match-detail-frame .role-matchup-list {
+    padding: 0 8px 8px;
+  }
+
+  body .match-detail-frame .prematch-versus,
+  body .match-detail-frame .prematch-rosters {
+    grid-template-columns: 1fr;
+  }
+
+  body .match-detail-frame .prematch-team {
     min-height: 0;
   }
 
-  .match-detail-header-actions {
-    width: 100%;
-    justify-items: start;
+  body .match-workspace .platform-panel,
+  body .match-workspace.platform-collapsed .platform-panel {
+    border-radius: 15px;
   }
 
-  .match-detail-header-actions .game-selector {
-    justify-content: flex-start;
+  body .match-workspace .platform-panel-heading,
+  body .match-workspace.platform-collapsed .platform-panel-heading {
+    padding: 15px;
   }
 
-  .match-detail-frame footer {
-    width: min(100% - 16px, 1760px);
+  .match-data-panel-copy {
+    display: none;
+  }
+
+  body .match-workspace .platform-panel-content {
+    padding-inline: 12px;
+    padding-bottom: 12px;
+  }
+
+  .match-detail-frame footer,
+  .match-footer {
+    width: min(100% - 16px, 1480px);
+  }
+}
+
+@media (max-width: 520px) {
+  .match-route-back span:last-child {
+    display: none;
+  }
+
+  .match-route-back {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .match-detail-frame .series-hero-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .match-detail-frame .series-hero-live-context {
+    grid-column: auto;
+  }
+
+  .match-content-nav a {
+    padding-inline: 9px;
+  }
+
+  .match-content-nav a span {
+    display: none;
   }
 }

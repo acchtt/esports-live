@@ -1,0 +1,945 @@
+/* Shared visual identity pass for the match lobby and match detail pages. */
+
+:root {
+  --el-ink: #050812;
+  --el-panel: rgba(8, 14, 28, 0.86);
+  --el-panel-strong: rgba(10, 18, 35, 0.96);
+  --el-line: rgba(137, 173, 214, 0.14);
+  --el-line-hot: rgba(56, 189, 248, 0.42);
+  --el-cyan: #5ddcff;
+  --el-blue: #38bdf8;
+  --el-red: #fb7185;
+  --el-green: #34d399;
+}
+
+.match-index-frame,
+.match-detail-frame {
+  isolation: isolate;
+  position: relative;
+  overflow-x: clip;
+}
+
+.match-index-frame::before,
+.match-detail-frame::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(125, 170, 220, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 170, 220, 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black 0%, rgba(0, 0, 0, 0.7) 46%, transparent 100%);
+}
+
+.match-index-frame::after,
+.match-detail-frame::after {
+  content: '';
+  position: fixed;
+  left: 50%;
+  top: -34rem;
+  z-index: -2;
+  width: 74rem;
+  height: 74rem;
+  border: 1px solid rgba(93, 220, 255, 0.06);
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translateX(-50%);
+  box-shadow:
+    0 0 0 8rem rgba(56, 189, 248, 0.012),
+    0 0 0 18rem rgba(99, 102, 241, 0.009);
+}
+
+/* ---------- Match lobby ---------- */
+
+.match-index-frame {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(14, 165, 233, 0.16), transparent 27rem),
+    radial-gradient(circle at 92% 24%, rgba(99, 102, 241, 0.10), transparent 30rem),
+    radial-gradient(circle at 46% 90%, rgba(15, 118, 110, 0.06), transparent 34rem),
+    linear-gradient(180deg, #050812 0%, #070c18 47%, #050812 100%);
+}
+
+.match-index-frame .match-index-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid rgba(93, 220, 255, 0.11);
+  background: rgba(4, 8, 18, 0.78);
+  backdrop-filter: blur(22px) saturate(135%);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.16);
+}
+
+.match-index-frame .brand-mark,
+.match-detail-frame .brand-mark {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(93, 220, 255, 0.34);
+  background:
+    linear-gradient(145deg, rgba(93, 220, 255, 0.17), rgba(99, 102, 241, 0.09)),
+    rgba(5, 12, 25, 0.94);
+  box-shadow:
+    0 0 30px rgba(56, 189, 248, 0.10),
+    inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.match-index-frame .brand-mark::after,
+.match-detail-frame .brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: -40% 55% -40% -30%;
+  transform: skewX(-24deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+}
+
+.match-index-frame .brand strong,
+.match-detail-frame .brand strong {
+  letter-spacing: -0.025em;
+}
+
+.match-index-frame .match-index-main {
+  position: relative;
+  padding-top: 28px;
+}
+
+.match-index-frame .match-index-hero {
+  position: relative;
+  min-height: 310px;
+  padding: clamp(30px, 4vw, 54px);
+  overflow: hidden;
+  border: 1px solid rgba(93, 220, 255, 0.16);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 78% 50%, rgba(56, 189, 248, 0.13), transparent 21rem),
+    linear-gradient(112deg, rgba(13, 25, 47, 0.97), rgba(7, 13, 27, 0.88) 58%, rgba(7, 15, 31, 0.98));
+  box-shadow:
+    0 35px 100px rgba(0, 0, 0, 0.28),
+    inset 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.match-index-frame .match-index-hero::before {
+  content: '';
+  position: absolute;
+  right: clamp(26px, 7vw, 100px);
+  top: 50%;
+  width: clamp(160px, 20vw, 280px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(93, 220, 255, 0.17);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background:
+    radial-gradient(circle, rgba(56, 189, 248, 0.11) 0 2px, transparent 3px),
+    radial-gradient(circle, transparent 0 34%, rgba(93, 220, 255, 0.08) 34.4% 35%, transparent 35.4% 58%, rgba(93, 220, 255, 0.06) 58.4% 59%, transparent 59.4%);
+  box-shadow:
+    0 0 70px rgba(56, 189, 248, 0.07),
+    inset 0 0 60px rgba(56, 189, 248, 0.035);
+  opacity: 0.9;
+}
+
+.match-index-frame .match-index-hero::after {
+  content: 'LIVE  •  SERIES  •  TELEMETRY';
+  position: absolute;
+  right: 26px;
+  bottom: 18px;
+  color: rgba(128, 197, 227, 0.22);
+  font-size: 0.58rem;
+  font-weight: 950;
+  letter-spacing: 0.25em;
+  white-space: nowrap;
+}
+
+.match-index-frame .match-index-hero > div:first-child {
+  position: relative;
+  z-index: 2;
+  max-width: min(760px, 68%);
+}
+
+.match-index-frame .match-index-hero .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 16px;
+  color: #82e8ff;
+}
+
+.match-index-frame .match-index-hero .eyebrow::before {
+  content: '';
+  width: 24px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--el-cyan), transparent);
+  box-shadow: 0 0 14px rgba(93, 220, 255, 0.42);
+}
+
+.match-index-frame .match-index-hero h1 {
+  max-width: 690px;
+  color: #f7fbff;
+  font-size: clamp(2.55rem, 5vw, 4.8rem);
+  line-height: 0.91;
+  letter-spacing: -0.068em;
+  text-wrap: balance;
+  text-shadow: 0 8px 45px rgba(0, 0, 0, 0.26);
+}
+
+.match-index-frame .match-index-hero > div:first-child > p:last-child {
+  max-width: 650px;
+  color: #a8b8cd;
+  font-size: clamp(0.88rem, 1.2vw, 1rem);
+  line-height: 1.7;
+}
+
+.match-index-frame .match-index-actions {
+  position: relative;
+  z-index: 3;
+  align-self: end;
+  min-width: 175px;
+  padding: 14px;
+  border: 1px solid rgba(93, 220, 255, 0.13);
+  border-radius: 14px;
+  background: rgba(4, 10, 22, 0.58);
+  backdrop-filter: blur(16px);
+}
+
+.match-index-frame .match-index-actions .icon-button {
+  min-width: 112px;
+  border-color: rgba(93, 220, 255, 0.25);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.13), rgba(56, 189, 248, 0.055));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.match-index-frame .match-index-sportbar {
+  position: relative;
+  margin-top: 18px;
+  padding: 9px;
+  border-color: rgba(93, 220, 255, 0.11);
+  border-radius: 14px;
+  background: rgba(5, 10, 22, 0.76);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.15);
+}
+
+.match-index-frame .match-index-sportbar::before {
+  content: 'GAMES';
+  display: grid;
+  place-items: center;
+  min-width: 58px;
+  padding: 0 8px;
+  color: #60738e;
+  font-size: 0.53rem;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+}
+
+.match-index-frame .match-index-sportbar .sport-tab {
+  position: relative;
+  min-height: 42px;
+  border-radius: 10px;
+}
+
+.match-index-frame .match-index-sportbar .sport-tab.active {
+  border-color: rgba(93, 220, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(56, 189, 248, 0.15), rgba(56, 189, 248, 0.06));
+  box-shadow:
+    inset 0 -2px rgba(56, 189, 248, 0.45),
+    0 8px 20px rgba(14, 165, 233, 0.07);
+}
+
+.match-index-frame .match-index-lists {
+  gap: 28px;
+  margin-top: 28px;
+}
+
+.match-index-frame .match-index-section {
+  position: relative;
+  border-color: rgba(113, 149, 191, 0.15);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(9, 17, 33, 0.93), rgba(6, 12, 25, 0.95));
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.20),
+    inset 0 1px rgba(255, 255, 255, 0.024);
+}
+
+.match-index-frame .match-index-section::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(93, 220, 255, 0.55), transparent 42%);
+  opacity: 0.65;
+}
+
+.match-index-frame .match-index-section:first-child::before {
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.74), transparent 48%);
+}
+
+.match-index-frame .match-index-section-heading {
+  position: relative;
+  min-height: 86px;
+  padding: 20px 24px 18px 28px;
+  border-bottom-color: rgba(113, 149, 191, 0.11);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.018), transparent 62%);
+}
+
+.match-index-frame .match-index-section-heading::after {
+  content: 'MATCH FEED';
+  position: absolute;
+  right: 74px;
+  bottom: 18px;
+  color: rgba(112, 142, 181, 0.18);
+  font-size: 0.5rem;
+  font-weight: 950;
+  letter-spacing: 0.2em;
+}
+
+.match-index-frame .match-index-section-heading h2 {
+  margin-top: 3px;
+  color: #edf7ff;
+  font-size: 1.28rem;
+  letter-spacing: -0.025em;
+}
+
+.match-index-frame .match-count {
+  min-width: 42px;
+  min-height: 34px;
+  border-color: rgba(93, 220, 255, 0.18);
+  background: rgba(56, 189, 248, 0.055);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.match-index-frame .match-index-section:first-child .match-count {
+  border-color: rgba(52, 211, 153, 0.22);
+  color: #9cf0c7;
+  background: rgba(52, 211, 153, 0.055);
+}
+
+.match-index-frame .match-grid {
+  gap: 14px;
+  padding: 20px;
+}
+
+.match-index-frame .index-match-card {
+  position: relative;
+  gap: 22px;
+  min-height: 198px;
+  padding: 20px;
+  overflow: hidden;
+  border-color: rgba(115, 151, 194, 0.15);
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 18% 25%, rgba(56, 189, 248, 0.06), transparent 12rem),
+    linear-gradient(145deg, rgba(13, 24, 44, 0.82), rgba(7, 14, 28, 0.88));
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.13),
+    inset 0 1px rgba(255, 255, 255, 0.025);
+  transform: translateZ(0);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.match-index-frame .index-match-card::before {
+  content: '';
+  position: absolute;
+  top: -48px;
+  right: -48px;
+  width: 116px;
+  height: 116px;
+  border: 1px solid rgba(93, 220, 255, 0.09);
+  border-radius: 50%;
+  box-shadow: 0 0 0 22px rgba(93, 220, 255, 0.018);
+  pointer-events: none;
+}
+
+.match-index-frame .index-match-card::after {
+  content: '';
+  position: absolute;
+  inset: auto 20px 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(93, 220, 255, 0.18), transparent);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.match-index-frame .index-match-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(93, 220, 255, 0.38);
+  background:
+    radial-gradient(circle at 18% 25%, rgba(56, 189, 248, 0.11), transparent 13rem),
+    linear-gradient(145deg, rgba(16, 31, 56, 0.9), rgba(8, 16, 31, 0.94));
+  box-shadow:
+    0 22px 44px rgba(0, 0, 0, 0.22),
+    0 0 34px rgba(14, 165, 233, 0.055),
+    inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.match-index-frame .index-match-card:hover::after {
+  opacity: 1;
+}
+
+.match-index-frame .index-match-card.is-live {
+  border-color: rgba(52, 211, 153, 0.22);
+  background:
+    radial-gradient(circle at 18% 25%, rgba(52, 211, 153, 0.085), transparent 13rem),
+    linear-gradient(145deg, rgba(11, 35, 37, 0.68), rgba(7, 16, 28, 0.92));
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.17),
+    inset 3px 0 rgba(52, 211, 153, 0.48),
+    inset 0 1px rgba(255, 255, 255, 0.028);
+}
+
+.match-index-frame .index-match-card.is-live:hover {
+  border-color: rgba(52, 211, 153, 0.42);
+  box-shadow:
+    0 24px 50px rgba(0, 0, 0, 0.22),
+    0 0 36px rgba(52, 211, 153, 0.055),
+    inset 3px 0 rgba(52, 211, 153, 0.72);
+}
+
+.match-index-frame .index-match-card-top {
+  position: relative;
+  z-index: 2;
+}
+
+.match-index-frame .index-match-competition {
+  color: #a8b6ca;
+  font-size: 0.7rem;
+  letter-spacing: 0.025em;
+}
+
+.match-index-frame .index-match-card .match-state {
+  min-height: 26px;
+  padding-inline: 9px;
+  border-radius: 999px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.match-index-frame .index-match-card.is-live .match-state {
+  position: relative;
+  padding-left: 22px;
+}
+
+.match-index-frame .index-match-card.is-live .match-state::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: var(--el-green);
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.08), 0 0 13px rgba(52, 211, 153, 0.38);
+  animation: el-live-pulse 1.8s ease-in-out infinite;
+}
+
+.match-index-frame .index-match-teams {
+  position: relative;
+  z-index: 2;
+  gap: 16px;
+  min-height: 66px;
+}
+
+.match-index-frame .index-match-teams strong {
+  color: #f5f9ff;
+  font-size: clamp(1rem, 1.25vw, 1.18rem);
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+}
+
+.match-index-frame .index-match-teams span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid rgba(112, 147, 190, 0.14);
+  border-radius: 50%;
+  color: #70829b;
+  background: rgba(4, 9, 20, 0.48);
+  font-size: 0.52rem;
+}
+
+.match-index-frame .index-match-card-bottom {
+  position: relative;
+  z-index: 2;
+  min-height: 36px;
+  border-top-color: rgba(115, 151, 194, 0.10);
+}
+
+.match-index-frame .open-match-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid rgba(93, 220, 255, 0.14);
+  border-radius: 8px;
+  color: #a9edff;
+  background: rgba(56, 189, 248, 0.045);
+}
+
+.match-index-frame .match-index-empty {
+  border-color: rgba(113, 149, 191, 0.16);
+  background:
+    radial-gradient(circle at 50% 10%, rgba(56, 189, 248, 0.04), transparent 10rem),
+    rgba(255, 255, 255, 0.009);
+}
+
+/* ---------- Match detail ---------- */
+
+.match-detail-frame {
+  background:
+    radial-gradient(circle at 13% 16%, rgba(14, 165, 233, 0.15), transparent 28rem),
+    radial-gradient(circle at 88% 17%, rgba(244, 63, 94, 0.095), transparent 27rem),
+    radial-gradient(circle at 50% 85%, rgba(99, 102, 241, 0.05), transparent 34rem),
+    linear-gradient(180deg, #040812 0%, #070c18 42%, #050812 100%);
+}
+
+.match-detail-frame .match-topbar {
+  border-bottom: 1px solid rgba(93, 220, 255, 0.10);
+  background: rgba(4, 8, 18, 0.80);
+  backdrop-filter: blur(22px) saturate(135%);
+}
+
+.match-detail-frame .match-route-bar {
+  border-bottom-color: rgba(112, 148, 191, 0.12);
+  background:
+    linear-gradient(90deg, rgba(14, 165, 233, 0.035), transparent 42%, rgba(244, 63, 94, 0.025)),
+    rgba(5, 10, 21, 0.78);
+}
+
+.match-detail-frame .match-route-bar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: min(680px, 54vw);
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(93, 220, 255, 0.28), transparent);
+}
+
+.match-detail-frame .match-route-back,
+.match-detail-frame .match-refresh-button {
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.match-detail-frame .match-refresh-button {
+  border-color: rgba(93, 220, 255, 0.30);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.14), rgba(56, 189, 248, 0.055));
+}
+
+.match-detail-frame .match-info-panel {
+  position: relative;
+  border-color: rgba(113, 150, 194, 0.16) !important;
+  background:
+    linear-gradient(180deg, rgba(9, 17, 33, 0.97), rgba(5, 11, 23, 0.985)) !important;
+  box-shadow:
+    0 38px 110px rgba(0, 0, 0, 0.30),
+    inset 0 1px rgba(255, 255, 255, 0.03) !important;
+}
+
+.match-detail-frame .match-info-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  height: 2px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.76), rgba(56, 189, 248, 0.10) 40%, rgba(251, 113, 133, 0.10) 60%, rgba(251, 113, 133, 0.68));
+}
+
+.match-detail-frame .analysis-header.series-hero-active {
+  position: relative;
+  background:
+    radial-gradient(circle at 18% 50%, rgba(56, 189, 248, 0.13), transparent 23rem),
+    radial-gradient(circle at 82% 50%, rgba(251, 113, 133, 0.105), transparent 23rem),
+    radial-gradient(circle at 50% 30%, rgba(124, 195, 255, 0.035), transparent 18rem),
+    linear-gradient(180deg, rgba(9, 18, 35, 0.99), rgba(6, 12, 24, 0.99)) !important;
+}
+
+.match-detail-frame .analysis-header.series-hero-active::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 82px;
+  bottom: 74px;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(138, 170, 210, 0.16) 20%, rgba(138, 170, 210, 0.16) 80%, transparent);
+}
+
+.match-detail-frame .series-hero-topline {
+  position: relative;
+  z-index: 3;
+  border-color: rgba(126, 163, 207, 0.15) !important;
+  background: rgba(4, 10, 21, 0.55) !important;
+  backdrop-filter: blur(14px);
+}
+
+.match-detail-frame .series-hero-status.live,
+.match-detail-frame .series-hero-status.in-progress {
+  box-shadow: 0 0 20px rgba(52, 211, 153, 0.08), inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.match-detail-frame .series-hero-matchup {
+  position: relative;
+  z-index: 2;
+  padding-top: 34px !important;
+  padding-bottom: 30px !important;
+}
+
+.match-detail-frame .series-hero-team {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(122, 159, 202, 0.16) !important;
+  background: rgba(7, 15, 29, 0.66) !important;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.18),
+    inset 0 1px rgba(255, 255, 255, 0.035) !important;
+}
+
+.match-detail-frame .series-hero-team::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.match-detail-frame .series-hero-team.left::before {
+  background: linear-gradient(105deg, rgba(56, 189, 248, 0.12), transparent 50%);
+}
+
+.match-detail-frame .series-hero-team.right::before {
+  background: linear-gradient(255deg, rgba(251, 113, 133, 0.11), transparent 50%);
+}
+
+.match-detail-frame .series-hero-team.left {
+  border-left-color: rgba(56, 189, 248, 0.46) !important;
+  box-shadow:
+    inset 3px 0 rgba(56, 189, 248, 0.74),
+    0 18px 44px rgba(0, 0, 0, 0.18) !important;
+}
+
+.match-detail-frame .series-hero-team.right {
+  border-right-color: rgba(251, 113, 133, 0.42) !important;
+  box-shadow:
+    inset -3px 0 rgba(251, 113, 133, 0.68),
+    0 18px 44px rgba(0, 0, 0, 0.18) !important;
+}
+
+.match-detail-frame .series-hero-team-logo,
+.match-detail-frame .series-hero-team-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.match-detail-frame .series-hero-team-logo {
+  border-color: rgba(142, 177, 218, 0.19) !important;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.07), transparent 70%),
+    rgba(3, 8, 18, 0.56) !important;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.22),
+    inset 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+.match-detail-frame .series-hero-team-copy > small {
+  color: #7589a4;
+}
+
+.match-detail-frame .series-hero-team-copy strong {
+  color: #f7fbff;
+  text-shadow: 0 8px 30px rgba(0, 0, 0, 0.26);
+}
+
+.match-detail-frame .series-hero-score {
+  position: relative;
+  z-index: 4;
+}
+
+.match-detail-frame .series-hero-score::before,
+.match-detail-frame .series-hero-score::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.match-detail-frame .series-hero-score::before {
+  width: 142px;
+  height: 142px;
+  border: 1px solid rgba(123, 164, 208, 0.09);
+  box-shadow: 0 0 0 18px rgba(56, 189, 248, 0.012), inset 0 0 45px rgba(56, 189, 248, 0.025);
+}
+
+.match-detail-frame .series-hero-score::after {
+  width: 92px;
+  height: 92px;
+  border-top: 1px solid rgba(93, 220, 255, 0.18);
+  border-bottom: 1px solid rgba(251, 113, 133, 0.15);
+}
+
+.match-detail-frame .series-hero-score > * {
+  position: relative;
+  z-index: 2;
+}
+
+.match-detail-frame .series-hero-score strong {
+  color: #ffffff;
+  font-size: clamp(3.15rem, 5.4vw, 4.8rem) !important;
+  letter-spacing: -0.075em;
+  text-shadow:
+    0 0 28px rgba(93, 220, 255, 0.08),
+    0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.match-detail-frame .series-hero-footer > span,
+.match-detail-frame .series-hero-footer > time {
+  border-color: rgba(126, 163, 207, 0.13) !important;
+  background: rgba(4, 10, 21, 0.52) !important;
+}
+
+.match-detail-frame .analysis-header.series-hero-active #game-selector {
+  border-top-color: rgba(126, 163, 207, 0.11) !important;
+  background:
+    linear-gradient(90deg, rgba(56, 189, 248, 0.025), transparent 45%, rgba(251, 113, 133, 0.02)),
+    rgba(3, 8, 17, 0.66) !important;
+}
+
+.match-detail-frame .game-button {
+  border-color: rgba(123, 159, 201, 0.15);
+  background: rgba(10, 18, 34, 0.78);
+}
+
+.match-detail-frame .game-button:hover {
+  border-color: rgba(93, 220, 255, 0.31);
+  background: rgba(56, 189, 248, 0.065);
+}
+
+.match-detail-frame .game-button.active {
+  border-color: rgba(93, 220, 255, 0.50) !important;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.17), rgba(56, 189, 248, 0.07)) !important;
+  box-shadow:
+    inset 0 -2px rgba(93, 220, 255, 0.68),
+    0 8px 24px rgba(14, 165, 233, 0.08) !important;
+}
+
+.match-detail-frame .match-content-nav {
+  padding-block: 10px;
+  background:
+    linear-gradient(90deg, rgba(56, 189, 248, 0.02), transparent 50%, rgba(251, 113, 133, 0.015)),
+    rgba(3, 8, 17, 0.82) !important;
+}
+
+.match-detail-frame .match-content-nav a {
+  min-height: 38px;
+  border: 1px solid transparent;
+}
+
+.match-detail-frame .match-content-nav a:hover,
+.match-detail-frame .match-content-nav a:focus-visible {
+  border-color: rgba(93, 220, 255, 0.14);
+  background: rgba(56, 189, 248, 0.065);
+}
+
+.match-detail-frame .match-game-content {
+  position: relative;
+}
+
+.match-detail-frame .match-game-content::before {
+  content: '';
+  position: absolute;
+  inset: 22px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 18px;
+  background:
+    linear-gradient(rgba(125, 170, 220, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 170, 220, 0.018) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(to bottom, black, transparent 92%);
+}
+
+.match-detail-frame .match-game-content > * {
+  position: relative;
+  z-index: 1;
+}
+
+.match-detail-frame .role-scoreboard-board {
+  border-color: rgba(124, 159, 201, 0.16) !important;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(56, 189, 248, 0.06), transparent 18rem),
+    radial-gradient(circle at 85% 0%, rgba(251, 113, 133, 0.05), transparent 18rem),
+    linear-gradient(180deg, rgba(10, 19, 36, 0.91), rgba(5, 11, 23, 0.95)) !important;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.20),
+    inset 0 1px rgba(255, 255, 255, 0.028) !important;
+}
+
+.match-detail-frame .role-match-header {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.035), transparent 40%, transparent 60%, rgba(251, 113, 133, 0.03));
+}
+
+.match-detail-frame .role-match-clock strong {
+  text-shadow: 0 0 25px rgba(93, 220, 255, 0.10);
+}
+
+.match-detail-frame .role-objective-comparison {
+  border-top: 1px solid rgba(126, 163, 207, 0.08);
+  border-bottom: 1px solid rgba(126, 163, 207, 0.08);
+  background: rgba(3, 8, 17, 0.63) !important;
+}
+
+.match-detail-frame .role-matchup-row {
+  border-color: rgba(126, 163, 207, 0.11) !important;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.025), rgba(255, 255, 255, 0.009) 48%, rgba(251, 113, 133, 0.02)) !important;
+}
+
+.match-detail-frame .prematch-team {
+  position: relative;
+  overflow: hidden;
+}
+
+.match-detail-frame .prematch-team:first-child {
+  background:
+    linear-gradient(120deg, rgba(56, 189, 248, 0.09), transparent 55%),
+    rgba(10, 18, 34, 0.70) !important;
+}
+
+.match-detail-frame .prematch-team:last-child {
+  background:
+    linear-gradient(240deg, rgba(251, 113, 133, 0.075), transparent 55%),
+    rgba(10, 18, 34, 0.70) !important;
+}
+
+.match-detail-frame .prematch-team-mark,
+.match-detail-frame .prematch-team-logo {
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.20);
+}
+
+.match-detail-frame .match-data-panel {
+  border-color: rgba(113, 150, 194, 0.14) !important;
+  background:
+    linear-gradient(90deg, rgba(56, 189, 248, 0.025), transparent 56%),
+    rgba(6, 12, 24, 0.90) !important;
+}
+
+.match-detail-frame .platform-panel-toggle {
+  border-color: rgba(93, 220, 255, 0.18);
+  background: rgba(56, 189, 248, 0.045);
+}
+
+@keyframes el-live-pulse {
+  0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
+  50% { opacity: 0.55; transform: translateY(-50%) scale(0.78); }
+}
+
+@media (max-width: 980px) {
+  .match-index-frame .match-index-hero::before {
+    right: -76px;
+    opacity: 0.6;
+  }
+
+  .match-index-frame .match-index-hero > div:first-child {
+    max-width: 72%;
+  }
+
+  .match-detail-frame .series-hero-score::before {
+    width: 116px;
+    height: 116px;
+  }
+
+  .match-detail-frame .series-hero-score::after {
+    width: 76px;
+    height: 76px;
+  }
+}
+
+@media (max-width: 760px) {
+  .match-index-frame::before,
+  .match-detail-frame::before {
+    background-size: 36px 36px;
+  }
+
+  .match-index-frame .match-index-main {
+    padding-top: 14px;
+  }
+
+  .match-index-frame .match-index-hero {
+    min-height: 0;
+    padding: 28px 22px;
+    border-radius: 20px;
+  }
+
+  .match-index-frame .match-index-hero::before {
+    right: -100px;
+    top: 38%;
+    width: 220px;
+    opacity: 0.42;
+  }
+
+  .match-index-frame .match-index-hero::after {
+    display: none;
+  }
+
+  .match-index-frame .match-index-hero > div:first-child {
+    max-width: 100%;
+  }
+
+  .match-index-frame .match-index-hero h1 {
+    font-size: clamp(2.35rem, 12vw, 3.45rem);
+  }
+
+  .match-index-frame .match-index-actions {
+    align-self: stretch;
+    width: 100%;
+  }
+
+  .match-index-frame .match-index-sportbar::before {
+    display: none;
+  }
+
+  .match-index-frame .match-index-section-heading::after {
+    display: none;
+  }
+
+  .match-index-frame .match-grid {
+    padding: 12px;
+  }
+
+  .match-index-frame .index-match-card {
+    min-height: 182px;
+  }
+
+  .match-detail-frame .analysis-header.series-hero-active::before {
+    display: none;
+  }
+
+  .match-detail-frame .series-hero-score::before,
+  .match-detail-frame .series-hero-score::after {
+    display: none;
+  }
+
+  .match-detail-frame .match-game-content::before {
+    inset: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .match-index-frame .index-match-card,
+  .match-index-frame .open-match-label b {
+    transition: none;
+  }
+
+  .match-index-frame .index-match-card.is-live .match-state::before {
+    animation: none;
+  }
+}

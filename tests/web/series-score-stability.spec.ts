@@ -89,7 +89,7 @@ test('does not regress a resolved 3-2 series score to 0-0 during schedule refres
   await expect(hero.locator('.series-hero-status')).toHaveText('FINAL');
   await expect(hero.locator('.series-hero-live-context')).toContainText('Series completed');
 
-  await page.evaluate(({ series }) => {
+  await page.evaluate(({ series, provider }) => {
     const selectedSeries = document.querySelector<HTMLElement>('#selected-series');
     const selectedMeta = document.querySelector<HTMLElement>('#selected-meta');
     if (selectedSeries) selectedSeries.textContent = 'NS Challengers vs DNS Challengers';
@@ -97,11 +97,15 @@ test('does not regress a resolved 3-2 series score to 0-0 during schedule refres
 
     window.dispatchEvent(new CustomEvent('esports-live:selection', {
       detail: {
-        ...series,
-        state: 'scheduled'
+        series: {
+          ...series,
+          state: 'scheduled'
+        },
+        provider,
+        observedAt: new Date().toISOString()
       }
     }));
-  }, { series });
+  }, { series, provider });
 
   await expect(score.nth(0)).toHaveText('3');
   await expect(score.nth(1)).toHaveText('2');

@@ -108,6 +108,42 @@ test('retries a completed snapshot until player inventories are available', asyn
   assert.deepEqual(afterValues, ['cursor', undefined]);
 });
 
+test('treats empty item arrays as unresolved completed inventory', async () => {
+  const afterValues: (string | undefined)[] = [];
+  const provider = createCompletedInventoryProvider(
+    sequenceProvider([
+      snapshot('completed', [], []),
+      snapshot('completed', ['3078'], ['3157'])
+    ], afterValues),
+    { retryDelaysMs: [0], sleep: async () => {} }
+  );
+
+  const result = await provider.getSnapshot('game-1', 'cursor');
+
+  assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
+  assert.deepEqual(result.stats?.red.players[0]?.items, ['3157']);
+  assert.deepEqual(afterValues, ['cursor', undefined]);
+});
+
+test('retains the last verified live build when the final frame clears item arrays', async () => {
+  const afterValues: (string | undefined)[] = [];
+  const provider = createCompletedInventoryProvider(
+    sequenceProvider([
+      snapshot('live', ['3078', '3006'], ['3157']),
+      snapshot('completed', [], [])
+    ], afterValues),
+    { retryDelaysMs: [0], sleep: async () => {} }
+  );
+
+  const live = await provider.getSnapshot('game-1', 'live-cursor');
+  const final = await provider.getSnapshot('game-1', 'final-cursor');
+
+  assert.deepEqual(live.stats?.blue.players[0]?.items, ['3078', '3006']);
+  assert.deepEqual(final.stats?.blue.players[0]?.items, ['3078', '3006']);
+  assert.deepEqual(final.stats?.red.players[0]?.items, ['3157']);
+  assert.deepEqual(afterValues, ['live-cursor', 'final-cursor']);
+});
+
 test('does not add inventory retries to live snapshots', async () => {
   const afterValues: (string | undefined)[] = [];
   const provider = createCompletedInventoryProvider(
@@ -130,7 +166,7 @@ test('preserves a usable completed snapshot when optional retries fail', async (
 
   const result = await provider.getSnapshot('game-1');
 
-  assert.equal(result, initial);
+  assert.equal(result.game.state, initial.game.state);
   assert.deepEqual(result.stats?.blue.players[0]?.items, ['3078']);
   assert.equal(result.stats?.red.players[0]?.items, null);
 });

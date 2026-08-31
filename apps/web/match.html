@@ -22,19 +22,12 @@
     <link rel="stylesheet" href="/src/match-page.css" />
     <link rel="stylesheet" href="/src/visual-polish.css" />
     <link rel="stylesheet" href="/src/match-density.css" />
-    <style>
-      .match-detail-frame .analysis-header.series-hero-active .series-hero-topline,
-      .match-detail-frame .analysis-header.series-hero-active .series-hero-footer > span,
-      .match-detail-frame .analysis-header.series-hero-active .series-hero-footer > time {
-        border-color: rgba(126, 163, 207, 0.13) !important;
-        background: rgba(4, 10, 21, 0.52) !important;
-      }
-    </style>
+    <link rel="stylesheet" href="/src/match-flat.css" />
   </head>
   <body>
-    <div class="app-frame match-detail-frame">
+    <div class="app-frame match-detail-frame match-flat-frame">
       <header class="topbar match-topbar">
-        <div class="topbar-inner">
+        <div class="topbar-inner match-topbar-inner">
           <a class="brand" href="/" aria-label="Back to Esports Live matches">
             <span class="brand-mark" aria-hidden="true">EL</span>
             <div>
@@ -43,43 +36,28 @@
             </div>
           </a>
 
-          <nav class="primary-nav match-primary-nav" aria-label="Match navigation">
-            <a class="back-to-matches" href="/">Matches</a>
-            <a href="#series-hero" aria-current="page">Overview</a>
-            <a href="#game-content">Game board</a>
-            <a href="#platform-panel">Data</a>
-          </nav>
-
-          <div class="connection" aria-live="polite">
-            <span id="status-dot" class="status-dot"></span>
-            <div class="connection-copy">
-              <strong id="platform-status">Connecting</strong>
-              <small id="connection-detail">Loading match data</small>
-            </div>
-            <span id="status-badge" class="badge">CHECKING</span>
-          </div>
-        </div>
-      </header>
-
-      <section class="match-route-bar" aria-label="Match controls">
-        <div class="match-route-bar-inner">
-          <a class="match-route-back" href="/">
+          <a class="match-topbar-back" href="/">
             <span aria-hidden="true">←</span>
             <span>All matches</span>
           </a>
-          <div class="match-route-context">
-            <span>League of Legends</span>
-            <strong>Series intelligence</strong>
-          </div>
-          <div class="match-route-tools">
+
+          <div class="match-topbar-actions">
+            <div class="connection" aria-live="polite">
+              <span id="status-dot" class="status-dot"></span>
+              <div class="connection-copy">
+                <strong id="platform-status">Connecting</strong>
+                <small id="connection-detail">Loading match data</small>
+              </div>
+              <span id="status-badge" class="badge">CHECKING</span>
+            </div>
             <span id="polling-countdown" class="match-refresh-status" aria-live="polite">Starting…</span>
             <button id="refresh-schedule" class="match-refresh-button" type="button" aria-label="Refresh">
               <span aria-hidden="true">↻</span>
-              Refresh data
+              Refresh
             </button>
           </div>
         </div>
-      </section>
+      </header>
 
       <aside class="match-route-data schedule-panel" aria-hidden="true">
         <div class="sport-tabs"></div>
@@ -96,12 +74,6 @@
             </div>
             <div id="game-selector" class="game-selector" aria-label="Series games"></div>
           </div>
-
-          <nav class="match-content-nav" aria-label="Match sections">
-            <a href="#series-history"><span>01</span> Series</a>
-            <a href="#game-content"><span>02</span> Game board</a>
-            <a href="#platform-panel"><span>03</span> Data quality</a>
-          </nav>
 
           <section id="series-history" class="series-history" aria-live="polite" hidden></section>
           <div id="quality-banner" class="match-quality-banner" hidden aria-hidden="true"></div>

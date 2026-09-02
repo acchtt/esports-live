@@ -1,0 +1,17 @@
+/* Narrow compatibility rules for existing match components. */
+body .series-hero-footer {
+  background: transparent !important;
+  border-top: 0 !important;
+}
+
+body .completed-match-detail[data-completed-board-merged="true"] {
+  gap: 0 !important;
+}
+
+body .completed-match-detail[data-completed-board-merged="true"] > .completed-games-panel {
+  margin-bottom: 0 !important;
+}
+
+body .completed-match-detail[data-completed-board-merged="true"] > #completed-final-telemetry {
+  margin-top: 0 !important;
+}

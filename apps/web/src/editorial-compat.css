@@ -1,0 +1,4 @@
+/* Compatibility for state-owned regions that can be empty between renders. */
+body .match-broadcast-frame #series-history.live-series-results {
+  min-height: 1px !important;
+}

@@ -26,7 +26,7 @@ function series(id: string, state: 'live' | 'scheduled', teams: readonly [typeof
   };
 }
 
-test('renders compact match cards with team logos and series scores', async ({ page }) => {
+test('renders editorial match rows with team logos and series scores', async ({ page }) => {
   const live = series('series-live-card', 'live', [left, right]);
   const upcoming = series('series-upcoming-card', 'scheduled', [upcomingLeft, upcomingRight] as unknown as readonly [typeof left, typeof right]);
 
@@ -76,8 +76,21 @@ test('renders compact match cards with team logos and series scores', async ({ p
   await expect(liveCard.locator('.index-series-score')).toHaveText(/1\s*–\s*0/);
   await expect(upcomingCard.locator('.index-series-score')).toHaveText(/0\s*–\s*0/);
 
-  const box = await liveCard.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.height).toBeLessThan(165);
-  expect(box!.width).toBeLessThan(380);
+  const presentation = await liveCard.evaluate(element => {
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    return {
+      width: box.width,
+      height: box.height,
+      radius: style.borderTopLeftRadius,
+      backgroundImage: style.backgroundImage,
+      boxShadow: style.boxShadow
+    };
+  });
+
+  expect(presentation.height).toBeLessThan(110);
+  expect(presentation.width).toBeGreaterThan(800);
+  expect(presentation.radius).toBe('0px');
+  expect(presentation.backgroundImage).toBe('none');
+  expect(presentation.boxShadow).toBe('none');
 });

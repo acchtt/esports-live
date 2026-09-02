@@ -183,13 +183,21 @@ body .match-broadcast-frame .series-hero-team.right {
 }
 
 body .match-broadcast-frame .series-hero-score {
-  border: 2px solid var(--acid-lime) !important;
-  background: #0a0d12 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+body .match-broadcast-frame .series-hero-score > span {
+  color: var(--acid-lime) !important;
 }
 
 body .match-broadcast-frame .series-hero-score strong {
   color: #fff !important;
   text-shadow: none !important;
+}
+
+body .match-broadcast-frame .series-hero-score i {
+  color: var(--signal-red) !important;
 }
 
 body .match-broadcast-frame .game-selector button[aria-pressed='true'],

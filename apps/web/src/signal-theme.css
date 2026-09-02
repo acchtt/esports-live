@@ -1,0 +1,253 @@
+/* ArenaSignal color-block brand layer. No gradients, no glow. */
+:root {
+  --signal-red: #ff1744;
+  --electric-cyan: #00e5ff;
+  --acid-lime: #c6ff00;
+  --signal-ink: #090b0f;
+  --signal-panel: #10141a;
+  --signal-panel-2: #151a21;
+  --signal-rule: #2b323c;
+}
+
+html,
+body {
+  background: var(--signal-ink) !important;
+}
+
+.brand {
+  gap: 9px !important;
+}
+
+.brand-mark {
+  width: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.brand strong {
+  color: #fff !important;
+  font-weight: 800 !important;
+}
+
+.brand small {
+  color: #8d96a3 !important;
+}
+
+.status-dot.connected {
+  background: var(--acid-lime) !important;
+}
+
+.match-index-nav a[aria-current='page'] {
+  text-decoration-color: var(--electric-cyan) !important;
+}
+
+.match-index-frame .match-index-main .match-index-hero,
+.match-index-hero {
+  border-left-color: var(--signal-red) !important;
+  border-top: 4px solid var(--electric-cyan) !important;
+  background: var(--signal-panel) !important;
+}
+
+.match-index-hero .eyebrow {
+  color: var(--acid-lime) !important;
+}
+
+.match-index-frame .match-index-main .match-index-hero h1,
+.match-index-hero h1 {
+  color: #fff !important;
+}
+
+.match-index-actions .icon-button,
+.match-refresh-button {
+  border-color: var(--electric-cyan) !important;
+  background: #0c171b !important;
+  color: var(--electric-cyan) !important;
+}
+
+.match-index-actions .icon-button:hover,
+.match-refresh-button:hover:not(:disabled) {
+  background: var(--electric-cyan) !important;
+  color: var(--signal-ink) !important;
+}
+
+.match-index-sportbar .sport-tab.active {
+  border-bottom-color: transparent !important;
+  background: var(--electric-cyan) !important;
+  color: var(--signal-ink) !important;
+  font-weight: 800 !important;
+}
+
+.match-index-sportbar .sport-tab.active span {
+  color: var(--signal-ink) !important;
+}
+
+.match-index-section:first-child {
+  border-top: 3px solid var(--acid-lime) !important;
+}
+
+.match-index-section:nth-child(2) {
+  border-top: 3px solid var(--signal-red) !important;
+}
+
+.match-index-section:first-child .match-index-section-heading,
+.match-index-section:nth-child(2) .match-index-section-heading {
+  border-left: 0 !important;
+}
+
+.match-index-section:first-child .match-count {
+  border-color: var(--acid-lime) !important;
+  color: var(--acid-lime) !important;
+}
+
+.match-index-section:nth-child(2) .match-count {
+  border-color: var(--signal-red) !important;
+  color: #ff6b87 !important;
+}
+
+.index-match-card.is-live,
+.match-index-frame .match-index-main .index-match-card.is-live {
+  border-left: 3px solid var(--acid-lime) !important;
+  background: #101714 !important;
+}
+
+.index-match-card:not(.is-live):hover {
+  border-left: 3px solid var(--electric-cyan) !important;
+  padding-left: 15px !important;
+}
+
+.match-state.live,
+.match-state.paused,
+.index-match-card.is-live .match-state {
+  color: var(--acid-lime) !important;
+  font-weight: 800 !important;
+}
+
+.index-team-logo {
+  border-color: #39424e !important;
+  background: #0b0e13 !important;
+}
+
+.index-series-score,
+.match-index-frame .match-index-main .index-series-score,
+.index-match-card.is-live .index-series-score {
+  border-color: #3a434f !important;
+  background: #0a0d12 !important;
+}
+
+.index-match-card.is-live .index-series-score {
+  border-color: var(--acid-lime) !important;
+}
+
+.open-match-label {
+  color: var(--electric-cyan) !important;
+}
+
+/* Match page: team association is expressed as hard blocks, never glow. */
+.match-topbar-back {
+  border-left-color: var(--signal-red) !important;
+}
+
+body .match-broadcast-frame .analysis-header.match-series-header,
+body .match-broadcast-frame .analysis-header.series-hero-active {
+  border-top: 4px solid var(--electric-cyan) !important;
+}
+
+body .match-broadcast-frame .series-hero-topline {
+  border-bottom: 1px solid var(--signal-rule) !important;
+}
+
+body .match-broadcast-frame .series-hero-status.live,
+body .match-broadcast-frame .series-hero-status.in-progress {
+  border-color: var(--acid-lime) !important;
+  background: var(--acid-lime) !important;
+  color: var(--signal-ink) !important;
+}
+
+body .match-broadcast-frame .series-hero-team.left {
+  border-left: 5px solid var(--electric-cyan) !important;
+  padding-left: 16px !important;
+}
+
+body .match-broadcast-frame .series-hero-team.right {
+  border-right: 5px solid var(--signal-red) !important;
+  padding-right: 16px !important;
+}
+
+body .match-broadcast-frame .series-hero-score {
+  border: 2px solid var(--acid-lime) !important;
+  background: #0a0d12 !important;
+}
+
+body .match-broadcast-frame .series-hero-score strong {
+  color: #fff !important;
+  text-shadow: none !important;
+}
+
+body .match-broadcast-frame .game-selector button[aria-pressed='true'],
+body .match-broadcast-frame .game-selector button.active {
+  border-bottom-color: var(--electric-cyan) !important;
+  color: #fff !important;
+}
+
+.match-current-game-heading {
+  border-left: 4px solid var(--signal-red) !important;
+  padding-left: 12px !important;
+}
+
+.match-series-rail > .match-section-heading {
+  border-left: 4px solid var(--acid-lime) !important;
+  padding-left: 12px !important;
+}
+
+body .match-broadcast-frame #series-history .completed-game.live,
+body .match-broadcast-frame #series-history .completed-game.paused,
+body .match-broadcast-frame #series-history .completed-game.draft {
+  border-left: 3px solid var(--acid-lime) !important;
+  background: #101714 !important;
+}
+
+body .match-broadcast-frame .role-scoreboard-board {
+  border-top: 3px solid var(--signal-red) !important;
+}
+
+body .match-broadcast-frame .role-matchup-row:nth-child(odd) {
+  background: #0d1116 !important;
+}
+
+body .match-broadcast-frame .role-matchup-row:nth-child(even) {
+  background: #11161d !important;
+}
+
+body .match-broadcast-frame .role-player-delta.positive,
+body .match-broadcast-frame .gold-diff.positive {
+  color: var(--acid-lime) !important;
+}
+
+body .match-broadcast-frame .role-player-delta.negative,
+body .match-broadcast-frame .gold-diff.negative {
+  color: #ff6b87 !important;
+}
+
+body .match-workspace .platform-panel-toggle[aria-expanded='true'] {
+  border-color: var(--electric-cyan) !important;
+  color: var(--electric-cyan) !important;
+}
+
+@media (max-width: 700px) {
+  body .match-broadcast-frame .series-hero-team.left,
+  body .match-broadcast-frame .series-hero-team.right {
+    border-left: 0 !important;
+    border-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}

@@ -68,7 +68,7 @@
   min-height: 42px !important;
   padding: 0 18px !important;
   border-right: 1px solid var(--depth-rule-soft) !important;
-  border-bottom: 0 !important;
+  border-bottom: 2px solid transparent !important;
 }
 
 .match-index-sportbar .sport-tab:last-child {
@@ -78,7 +78,7 @@
 .match-index-sportbar .sport-tab.active {
   color: #f4f1e8 !important;
   background: #18170f !important;
-  box-shadow: inset 0 -2px var(--depth-gold) !important;
+  border-bottom-color: var(--depth-gold) !important;
 }
 
 .match-index-frame .match-index-main .match-index-lists,
@@ -102,11 +102,11 @@
 }
 
 .match-index-section:first-child .match-index-section-heading {
-  box-shadow: inset 3px 0 #4fae82 !important;
+  border-left: 3px solid #4fae82 !important;
 }
 
 .match-index-section:nth-child(2) .match-index-section-heading {
-  box-shadow: inset 3px 0 var(--depth-gold) !important;
+  border-left: 3px solid var(--depth-gold) !important;
 }
 
 .match-index-frame .match-index-main .match-index-section-heading h2,
@@ -131,8 +131,10 @@
   grid-template-columns: 190px minmax(0, 1fr) 180px !important;
   min-height: 86px !important;
   padding: 13px 18px !important;
+  border-left: 3px solid transparent !important;
   border-bottom-color: var(--depth-rule-soft) !important;
   background: #0e1217 !important;
+  box-shadow: none !important;
 }
 
 .match-index-frame .match-index-main .index-match-card:nth-child(even),
@@ -142,14 +144,16 @@
 
 .match-index-frame .match-index-main .index-match-card:hover,
 .index-match-card:hover {
+  border-left-color: var(--depth-gold-soft) !important;
   background: var(--depth-surface-3) !important;
-  box-shadow: inset 3px 0 var(--depth-gold-soft) !important;
+  box-shadow: none !important;
 }
 
 .index-match-card.is-live,
 .match-index-frame .match-index-main .index-match-card.is-live {
+  border-left-color: #4fae82 !important;
   background: #0f1716 !important;
-  box-shadow: inset 3px 0 #4fae82 !important;
+  box-shadow: none !important;
 }
 
 .index-match-card.is-live:hover {

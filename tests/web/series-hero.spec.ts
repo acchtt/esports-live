@@ -112,7 +112,7 @@ async function installFixtures(page: Page): Promise<void> {
   }));
 }
 
-test('renders the broadcast match shell with team logos, score, game canvas, and series rail', async ({ page }) => {
+test('renders an editorial match shell with team logos, score, game canvas, and series rail', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await installFixtures(page);
@@ -127,7 +127,6 @@ test('renders the broadcast match shell with team logos, score, game canvas, and
   await expect(page.locator('.match-series-rail')).toBeVisible();
 
   const gameMark = hero.locator('.series-hero-game-mark');
-  await expect(gameMark).toContainText('LoL');
   await expect(gameMark.locator('img')).toHaveCount(1);
   await expect(gameMark.locator('img')).toHaveAttribute(
     'src',
@@ -164,7 +163,9 @@ test('renders the broadcast match shell with team logos, score, game canvas, and
     const scoreValue = scorePanel?.querySelector<HTMLElement>('strong');
     const footerCell = element.querySelector<HTMLElement>('.series-hero-footer > *');
     const footerGrid = element.querySelector<HTMLElement>('.series-hero-footer');
-    if (!top || !matchup || !team || !scorePanel || !scoreValue || !footerCell || !footerGrid) return null;
+    const gameButton = document.querySelector<HTMLElement>('#game-selector .game-button');
+    const primary = document.querySelector<HTMLElement>('.match-primary-column');
+    if (!top || !matchup || !team || !scorePanel || !scoreValue || !footerCell || !footerGrid || !gameButton || !primary) return null;
     const topStyle = getComputedStyle(top);
     const matchupStyle = getComputedStyle(matchup);
     const teamStyle = getComputedStyle(team);
@@ -172,32 +173,44 @@ test('renders the broadcast match shell with team logos, score, game canvas, and
     const scoreValueStyle = getComputedStyle(scoreValue);
     const footerStyle = getComputedStyle(footerCell);
     const footerGridStyle = getComputedStyle(footerGrid);
+    const gameButtonStyle = getComputedStyle(gameButton);
+    const primaryStyle = getComputedStyle(primary);
     return {
       topBackground: topStyle.backgroundColor,
+      topBackgroundImage: topStyle.backgroundImage,
       topBorderLeftWidth: topStyle.borderLeftWidth,
       matchupBackgroundImage: matchupStyle.backgroundImage,
       teamBackground: teamStyle.backgroundColor,
       teamBorderTopWidth: teamStyle.borderTopWidth,
+      teamBorderRadius: teamStyle.borderTopLeftRadius,
       scoreBackground: scoreStyle.backgroundColor,
+      scoreBackgroundImage: scoreStyle.backgroundImage,
       scoreBorderTopWidth: scoreStyle.borderTopWidth,
       scoreTextShadow: scoreValueStyle.textShadow,
       footerBackground: footerStyle.backgroundColor,
       footerBorderTopWidth: footerStyle.borderTopWidth,
-      footerDisplay: footerGridStyle.display
+      footerDisplay: footerGridStyle.display,
+      gameButtonRadius: gameButtonStyle.borderTopLeftRadius,
+      primaryRadius: primaryStyle.borderTopLeftRadius
     };
   });
   expect(surfaces).not.toBeNull();
   expect(surfaces?.topBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.topBackgroundImage).toBe('none');
   expect(surfaces?.topBorderLeftWidth).toBe('0px');
-  expect(surfaces?.matchupBackgroundImage).not.toBe('none');
+  expect(surfaces?.matchupBackgroundImage).toBe('none');
   expect(surfaces?.teamBackground).toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.teamBorderTopWidth).toBe('0px');
+  expect(surfaces?.teamBorderRadius).toBe('0px');
   expect(surfaces?.scoreBackground).toBe('rgba(0, 0, 0, 0)');
+  expect(surfaces?.scoreBackgroundImage).toBe('none');
   expect(surfaces?.scoreBorderTopWidth).toBe('0px');
-  expect(surfaces?.scoreTextShadow).not.toBe('none');
+  expect(surfaces?.scoreTextShadow).toBe('none');
   expect(surfaces?.footerBackground).toBe('rgba(0, 0, 0, 0)');
   expect(surfaces?.footerBorderTopWidth).toBe('0px');
   expect(surfaces?.footerDisplay).toBe('flex');
+  expect(surfaces?.gameButtonRadius).toBe('0px');
+  expect(surfaces?.primaryRadius).toBe('0px');
 
   const geometry = await page.evaluate(() => {
     const header = document.querySelector<HTMLElement>('.analysis-header');

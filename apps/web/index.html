@@ -4,9 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Live and upcoming esports match listings." />
-    <meta name="theme-color" content="#050812" />
+    <meta name="theme-color" content="#0b0e13" />
     <title>Matches · Esports Live</title>
-    <link rel="stylesheet" href="/src/visual-polish.css" />
   </head>
   <body>
     <div class="app-frame match-index-frame">
@@ -16,7 +15,7 @@
             <span class="brand-mark" aria-hidden="true">EL</span>
             <div>
               <strong>Esports Live</strong>
-              <small>Match center</small>
+              <small>Scores &amp; schedules</small>
             </div>
           </a>
 
@@ -38,9 +37,9 @@
       <main class="match-index-main">
         <section class="match-index-hero" aria-labelledby="match-index-heading">
           <div>
-            <p class="eyebrow">MATCH CENTER</p>
-            <h1 id="match-index-heading">League of Legends matches</h1>
-            <p>Open any match for the full series view, live telemetry, objectives, player boards, and match history.</p>
+            <p class="eyebrow">Match schedule</p>
+            <h1 id="match-index-heading">League of Legends</h1>
+            <p>Live and upcoming series. Open a match for game scores, player builds, objectives and history.</p>
           </div>
 
           <div class="match-index-actions">
@@ -50,16 +49,16 @@
         </section>
 
         <div class="match-index-sportbar" aria-label="Esports">
-          <button class="sport-tab active" type="button">LoL <span>LIVE</span></button>
-          <button class="sport-tab" type="button" disabled>CS2 <span>PLANNED</span></button>
-          <button class="sport-tab" type="button" disabled>Dota 2 <span>PLANNED</span></button>
+          <button class="sport-tab active" type="button">League of Legends</button>
+          <button class="sport-tab" type="button" disabled>Counter-Strike 2 <span>planned</span></button>
+          <button class="sport-tab" type="button" disabled>Dota 2 <span>planned</span></button>
         </div>
 
         <div id="schedule-list" class="match-index-lists" aria-live="polite">
           <section class="match-index-section" aria-labelledby="live-matches-heading">
             <div class="match-index-section-heading">
               <div>
-                <p class="eyebrow live-eyebrow">LIVE NOW</p>
+                <p class="eyebrow live-eyebrow">Live</p>
                 <h2 id="live-matches-heading">Live matches</h2>
               </div>
               <span id="live-match-count" class="match-count">0</span>
@@ -72,7 +71,7 @@
           <section class="match-index-section" aria-labelledby="upcoming-matches-heading">
             <div class="match-index-section-heading">
               <div>
-                <p class="eyebrow">UP NEXT</p>
+                <p class="eyebrow">Upcoming</p>
                 <h2 id="upcoming-matches-heading">Upcoming matches</h2>
               </div>
               <span id="upcoming-match-count" class="match-count">0</span>
@@ -85,12 +84,13 @@
       </main>
 
       <footer class="match-index-footer">
-        <span>Esports Live · clean-room community project</span>
-        <span>Match detail pages separate provider status from telemetry quality.</span>
+        <span>Esports Live · community match tracker</span>
+        <span>League of Legends data is provider-backed and quality-gated.</span>
       </footer>
     </div>
 
     <script type="module" src="/src/startup-data-prefetch.ts"></script>
     <script type="module" src="/src/index-page.ts"></script>
+    <script type="module" src="/src/editorial-reset.ts"></script>
   </body>
 </html>

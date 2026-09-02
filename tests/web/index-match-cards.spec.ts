@@ -26,7 +26,7 @@ function series(id: string, state: 'live' | 'scheduled', teams: readonly [typeof
   };
 }
 
-test('renders editorial match rows with team logos and series scores', async ({ page }) => {
+test('renders Nexus Live League-only match rows with team logos and series scores', async ({ page }) => {
   const live = series('series-live-card', 'live', [left, right]);
   const upcoming = series('series-upcoming-card', 'scheduled', [upcomingLeft, upcomingRight] as unknown as readonly [typeof left, typeof right]);
 
@@ -68,6 +68,9 @@ test('renders editorial match rows with team logos and series scores', async ({ 
 
   await page.goto('/');
   await expect(page.getByText('API connected')).toBeVisible();
+  await expect(page.locator('.nexus-brand')).toContainText('NEXUS LIVE');
+  await expect(page.getByText('Counter-Strike 2')).toHaveCount(0);
+  await expect(page.getByText('Dota 2')).toHaveCount(0);
 
   const liveCard = page.locator('[data-series-id="series-live-card"]');
   const upcomingCard = page.locator('[data-series-id="series-upcoming-card"]');

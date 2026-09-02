@@ -1,4 +1,5 @@
 import './editorial-reset.css';
 import './editorial-compat.css';
 import './editorial-depth.css';
-import './signal-theme.css';
+import './nexus-reference.css';
+import './nexus-compat.css';

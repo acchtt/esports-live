@@ -1,7 +1,7 @@
-ArenaSignal
-Signal Red: #FF1744
+Nexus Live
+Signal Red: #FF0033
 Electric Cyan: #00E5FF
 Acid Lime: #C6FF00
-Ink: #090B0F
+Deep Charcoal: #080F12
 
-Direction: color-block sports editorial. No gradients. No glow.
+Direction: high-contrast League of Legends live-score product with hard color blocks, dense match rows, and broadcast-style data hierarchy.

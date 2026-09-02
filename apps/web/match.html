@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ArenaSignal live League of Legends series scores, game telemetry, player builds, and match history." />
-    <meta name="theme-color" content="#090b0f" />
-    <link rel="icon" href="/arenasignal-mark.svg" type="image/svg+xml" />
-    <title>Match · ArenaSignal</title>
+    <meta name="description" content="Nexus Live League of Legends series scores, game telemetry, player builds, and match history." />
+    <meta name="theme-color" content="#080f12" />
+    <link rel="icon" href="/nexus-live-mark.svg" type="image/svg+xml" />
+    <title>Match · Nexus Live</title>
     <style>
       #completed-match-list[hidden],
       .analysis-header[hidden],
@@ -23,14 +23,14 @@
     <link rel="stylesheet" href="/src/match-page.css" />
   </head>
   <body>
-    <div class="app-frame match-detail-frame match-flat-frame match-broadcast-frame">
-      <header class="topbar match-topbar">
+    <div class="app-frame match-detail-frame match-flat-frame match-broadcast-frame nexus-app nexus-match-app">
+      <header class="topbar match-topbar nexus-topbar">
         <div class="topbar-inner match-topbar-inner">
-          <a class="brand" href="/" aria-label="Back to ArenaSignal matches">
-            <span class="brand-mark" aria-hidden="true"><img src="/arenasignal-mark.svg" alt="" /></span>
+          <a class="brand nexus-brand" href="/" aria-label="Back to Nexus Live matches">
+            <span class="brand-mark" aria-hidden="true"><img src="/nexus-live-mark.svg" alt="" /></span>
             <div>
-              <strong>ArenaSignal</strong>
-              <small>Live esports signal</small>
+              <strong>NEXUS <em>LIVE</em></strong>
+              <small>Games · stats · moments</small>
             </div>
           </a>
 
@@ -108,9 +108,9 @@
         <aside id="platform-panel" class="panel platform-panel match-data-panel" aria-labelledby="platform-heading" data-collapsed="true">
           <div class="panel-heading compact platform-panel-heading">
             <div class="platform-panel-title">
-              <p class="eyebrow">Data</p>
-              <h2 id="platform-heading">Data sources</h2>
-              <p class="match-data-panel-copy">Provider availability and telemetry freshness.</p>
+              <p class="eyebrow">League data</p>
+              <h2 id="platform-heading">Feed status</h2>
+              <p class="match-data-panel-copy">League of Legends provider availability and telemetry freshness.</p>
             </div>
             <button
               id="platform-panel-toggle"
@@ -121,13 +121,13 @@
               aria-label="Expand platform status"
             >
               <span class="platform-panel-toggle-icon" aria-hidden="true">⌄</span>
-              <span class="platform-panel-toggle-label" aria-hidden="true">Data sources</span>
+              <span class="platform-panel-toggle-label" aria-hidden="true">Feed status</span>
             </button>
           </div>
 
           <div id="platform-panel-content" class="platform-panel-content" aria-hidden="true">
             <div class="match-data-source-block">
-              <span class="match-data-block-label">Adapters</span>
+              <span class="match-data-block-label">Provider</span>
               <div id="adapter-list" class="adapter-list"></div>
             </div>
 
@@ -146,7 +146,7 @@
 
       <footer class="match-footer">
         <span><a class="match-footer-link" href="/">← Back to matches</a></span>
-        <span>ArenaSignal · live values remain quality-gated.</span>
+        <span>Nexus Live · live values remain quality-gated.</span>
       </footer>
     </div>
 

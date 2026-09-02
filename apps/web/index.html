@@ -3,24 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ArenaSignal live and upcoming esports match listings." />
-    <meta name="theme-color" content="#090b0f" />
-    <link rel="icon" href="/arenasignal-mark.svg" type="image/svg+xml" />
-    <title>Matches · ArenaSignal</title>
+    <meta name="description" content="Nexus Live League of Legends live scores, schedules and match data." />
+    <meta name="theme-color" content="#080f12" />
+    <link rel="icon" href="/nexus-live-mark.svg" type="image/svg+xml" />
+    <title>Matches · Nexus Live</title>
   </head>
   <body>
-    <div class="app-frame match-index-frame">
-      <header class="topbar match-index-topbar">
+    <div class="app-frame match-index-frame nexus-app">
+      <header class="topbar match-index-topbar nexus-topbar">
         <div class="match-index-topbar-inner">
-          <a class="brand" href="/" aria-label="ArenaSignal matches">
-            <span class="brand-mark" aria-hidden="true"><img src="/arenasignal-mark.svg" alt="" /></span>
+          <a class="brand nexus-brand" href="/" aria-label="Nexus Live matches">
+            <span class="brand-mark" aria-hidden="true"><img src="/nexus-live-mark.svg" alt="" /></span>
             <div>
-              <strong>ArenaSignal</strong>
-              <small>Live esports signal</small>
+              <strong>NEXUS <em>LIVE</em></strong>
+              <small>Games · stats · moments</small>
             </div>
           </a>
 
-          <nav class="match-index-nav" aria-label="Primary navigation">
+          <nav class="match-index-nav nexus-nav" aria-label="Primary navigation">
             <a href="/" aria-current="page">Matches</a>
           </nav>
 
@@ -35,58 +35,76 @@
         </div>
       </header>
 
-      <main class="match-index-main">
-        <section class="match-index-hero" aria-labelledby="match-index-heading">
-          <div>
-            <p class="eyebrow">Live match signal</p>
-            <h1 id="match-index-heading">League of Legends</h1>
-            <p>Live and upcoming series. Open a match for game scores, player builds, objectives and history.</p>
+      <main class="nexus-home-shell">
+        <aside class="nexus-sidebar" aria-label="Match navigation">
+          <div class="nexus-sidebar-group">
+            <span class="nexus-sidebar-label">Filters</span>
+            <a class="nexus-sidebar-link active" href="#schedule-list"><span>▦</span>All matches</a>
+            <a class="nexus-sidebar-link" href="#live-matches-heading"><span>▷</span>Live</a>
+            <a class="nexus-sidebar-link" href="#upcoming-matches-heading"><span>◷</span>Upcoming</a>
           </div>
+          <div class="nexus-sidebar-group">
+            <span class="nexus-sidebar-label">Game</span>
+            <div class="nexus-game-chip"><span class="nexus-game-dot"></span><div><strong>League of Legends</strong><small>Primary feed</small></div></div>
+          </div>
+          <div class="nexus-sidebar-group nexus-sidebar-note">
+            <span class="nexus-sidebar-label">Coverage</span>
+            <p>Provider-backed schedules, live telemetry, series results and player builds.</p>
+          </div>
+        </aside>
 
-          <div class="match-index-actions">
-            <span id="polling-countdown" aria-live="polite">Starting…</span>
-            <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
+        <section class="match-index-main nexus-home-content">
+          <section class="match-index-hero nexus-lol-hero" aria-labelledby="match-index-heading">
+            <div class="nexus-lol-copy">
+              <p class="eyebrow">League of Legends</p>
+              <h1 id="match-index-heading">Live matches.<br />Real game data.</h1>
+              <p>Follow series scores, objectives, player builds and match history as games unfold.</p>
+            </div>
+            <div class="nexus-hero-art" aria-hidden="true">
+              <span class="nexus-block red"></span>
+              <span class="nexus-block cyan"></span>
+              <span class="nexus-block lime"></span>
+              <img src="/nexus-live-mark.svg" alt="" />
+            </div>
+            <div class="match-index-actions">
+              <span id="polling-countdown" aria-live="polite">Starting…</span>
+              <button id="refresh-schedule" class="icon-button" type="button">Refresh</button>
+            </div>
+          </section>
+
+          <div id="schedule-list" class="match-index-lists nexus-match-board" aria-live="polite">
+            <section class="match-index-section" aria-labelledby="live-matches-heading">
+              <div class="match-index-section-heading">
+                <div>
+                  <p class="eyebrow live-eyebrow">Now</p>
+                  <h2 id="live-matches-heading">Live matches</h2>
+                </div>
+                <span id="live-match-count" class="match-count">0</span>
+              </div>
+              <div id="live-match-list" class="match-grid">
+                <div class="match-index-empty">Loading live matches…</div>
+              </div>
+            </section>
+
+            <section class="match-index-section" aria-labelledby="upcoming-matches-heading">
+              <div class="match-index-section-heading">
+                <div>
+                  <p class="eyebrow">Schedule</p>
+                  <h2 id="upcoming-matches-heading">Upcoming matches</h2>
+                </div>
+                <span id="upcoming-match-count" class="match-count">0</span>
+              </div>
+              <div id="upcoming-match-list" class="match-grid">
+                <div class="match-index-empty">Loading upcoming matches…</div>
+              </div>
+            </section>
           </div>
         </section>
-
-        <div class="match-index-sportbar" aria-label="Esports">
-          <button class="sport-tab active" type="button">League of Legends</button>
-          <button class="sport-tab" type="button" disabled>Counter-Strike 2 <span>planned</span></button>
-          <button class="sport-tab" type="button" disabled>Dota 2 <span>planned</span></button>
-        </div>
-
-        <div id="schedule-list" class="match-index-lists" aria-live="polite">
-          <section class="match-index-section" aria-labelledby="live-matches-heading">
-            <div class="match-index-section-heading">
-              <div>
-                <p class="eyebrow live-eyebrow">Live</p>
-                <h2 id="live-matches-heading">Live matches</h2>
-              </div>
-              <span id="live-match-count" class="match-count">0</span>
-            </div>
-            <div id="live-match-list" class="match-grid">
-              <div class="match-index-empty">Loading live matches…</div>
-            </div>
-          </section>
-
-          <section class="match-index-section" aria-labelledby="upcoming-matches-heading">
-            <div class="match-index-section-heading">
-              <div>
-                <p class="eyebrow">Upcoming</p>
-                <h2 id="upcoming-matches-heading">Upcoming matches</h2>
-              </div>
-              <span id="upcoming-match-count" class="match-count">0</span>
-            </div>
-            <div id="upcoming-match-list" class="match-grid">
-              <div class="match-index-empty">Loading upcoming matches…</div>
-            </div>
-          </section>
-        </div>
       </main>
 
       <footer class="match-index-footer">
-        <span>ArenaSignal · live esports match tracker</span>
-        <span>League of Legends data is provider-backed and quality-gated.</span>
+        <span>Nexus Live · League of Legends match tracker</span>
+        <span>Live values are provider-backed and quality-gated.</span>
       </footer>
     </div>
 

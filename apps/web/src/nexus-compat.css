@@ -1,0 +1,4 @@
+/* Preserve the stable flat-series geometry while the Nexus parent stage carries the surface. */
+body .nexus-match-app .series-hero-topline {
+  background: transparent !important;
+}

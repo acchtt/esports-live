@@ -1,0 +1,7 @@
+ArenaSignal
+Signal Red: #FF1744
+Electric Cyan: #00E5FF
+Acid Lime: #C6FF00
+Ink: #090B0F
+
+Direction: color-block sports editorial. No gradients. No glow.

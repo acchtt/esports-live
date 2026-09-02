@@ -1,0 +1,933 @@
+/* Nexus Live — reference-driven League-only shell.
+ * Signal red / electric cyan / acid lime, hard color blocks, dense sports UI.
+ */
+:root {
+  --nexus-red: #ff0033;
+  --nexus-cyan: #00e5ff;
+  --nexus-lime: #c6ff00;
+  --nexus-ink: #080f12;
+  --nexus-bg: #090d11;
+  --nexus-panel: #0c1217;
+  --nexus-panel-2: #101820;
+  --nexus-panel-3: #131d25;
+  --nexus-rule: #26323b;
+  --nexus-rule-soft: #19242c;
+  --nexus-text: #f4f7f8;
+  --nexus-muted: #82909b;
+}
+
+html,
+body {
+  background: var(--nexus-bg) !important;
+  color: var(--nexus-text) !important;
+}
+
+body::before,
+body::after,
+.match-index-frame::before,
+.match-index-frame::after,
+.match-broadcast-frame::before,
+.match-broadcast-frame::after {
+  display: none !important;
+  content: none !important;
+}
+
+.nexus-app {
+  min-height: 100vh;
+  background: var(--nexus-bg) !important;
+}
+
+.nexus-topbar {
+  min-height: 58px !important;
+  border-bottom: 1px solid var(--nexus-rule) !important;
+  background: #080d11 !important;
+}
+
+.match-index-topbar-inner,
+.match-topbar-inner {
+  width: min(1480px, calc(100% - 32px)) !important;
+  min-height: 58px !important;
+  padding: 0 !important;
+}
+
+.nexus-brand {
+  gap: 10px !important;
+  text-decoration: none !important;
+}
+
+.nexus-brand .brand-mark {
+  width: 34px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+.nexus-brand .brand-mark img {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+}
+
+.nexus-brand strong {
+  color: #fff !important;
+  font-size: .9rem !important;
+  font-weight: 900 !important;
+  letter-spacing: .035em !important;
+  line-height: 1 !important;
+}
+
+.nexus-brand strong em {
+  color: var(--nexus-red) !important;
+  font-style: italic !important;
+}
+
+.nexus-brand small {
+  margin-top: 4px !important;
+  color: #6f7b84 !important;
+  font-size: .58rem !important;
+  letter-spacing: .18em !important;
+  text-transform: uppercase !important;
+}
+
+.nexus-nav {
+  align-self: stretch !important;
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+.nexus-nav a {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 22px !important;
+  color: #aeb9c1 !important;
+  font-size: .78rem !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid transparent !important;
+  text-decoration: none !important;
+}
+
+.nexus-nav a[aria-current='page'] {
+  color: #fff !important;
+  border-bottom-color: var(--nexus-red) !important;
+}
+
+.connection {
+  gap: 8px !important;
+}
+
+.status-dot.connected {
+  background: var(--nexus-lime) !important;
+}
+
+.badge {
+  border-radius: 2px !important;
+  border-color: #29414a !important;
+  background: #0c171c !important;
+  color: var(--nexus-cyan) !important;
+}
+
+/* Homepage shell */
+.nexus-home-shell {
+  width: min(1480px, calc(100% - 32px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 22px;
+  padding: 22px 0 42px;
+}
+
+.nexus-sidebar {
+  position: sticky;
+  top: 76px;
+  align-self: start;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.nexus-sidebar-group {
+  padding: 13px 0 18px;
+  border-bottom: 1px solid var(--nexus-rule-soft);
+}
+
+.nexus-sidebar-label {
+  display: block;
+  margin: 0 10px 8px;
+  color: #66737e;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.nexus-sidebar-link {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-left: 3px solid transparent;
+  color: #aeb8bf;
+  text-decoration: none;
+  font-size: .78rem;
+  font-weight: 650;
+}
+
+.nexus-sidebar-link:hover,
+.nexus-sidebar-link.active {
+  color: #fff;
+  border-left-color: var(--nexus-red);
+  background: #101820;
+}
+
+.nexus-sidebar-link span {
+  width: 16px;
+  color: var(--nexus-cyan);
+  text-align: center;
+}
+
+.nexus-game-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  color: #e9eef0;
+}
+
+.nexus-game-dot {
+  width: 9px;
+  height: 9px;
+  background: var(--nexus-lime);
+  transform: rotate(45deg);
+}
+
+.nexus-game-chip strong,
+.nexus-game-chip small {
+  display: block;
+}
+
+.nexus-game-chip strong {
+  font-size: .75rem;
+}
+
+.nexus-game-chip small,
+.nexus-sidebar-note p {
+  margin-top: 3px;
+  color: #6f7c86;
+  font-size: .66rem;
+  line-height: 1.5;
+}
+
+.nexus-sidebar-note p {
+  margin: 0 10px;
+}
+
+.nexus-home-content.match-index-main,
+.match-index-frame .nexus-home-content.match-index-main {
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.nexus-lol-hero,
+.match-index-frame .match-index-main .nexus-lol-hero {
+  position: relative !important;
+  min-height: 205px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 330px auto !important;
+  align-items: center !important;
+  gap: 28px !important;
+  overflow: hidden !important;
+  padding: 26px 26px 26px 30px !important;
+  border: 1px solid var(--nexus-rule) !important;
+  border-left: 5px solid var(--nexus-red) !important;
+  border-top: 1px solid var(--nexus-rule) !important;
+  border-radius: 6px !important;
+  background: #0d141a !important;
+  box-shadow: none !important;
+}
+
+.nexus-lol-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.nexus-lol-copy .eyebrow {
+  color: var(--nexus-lime) !important;
+  font-size: .65rem !important;
+  font-weight: 900 !important;
+  letter-spacing: .16em !important;
+}
+
+.nexus-lol-hero h1,
+.match-index-frame .match-index-main .nexus-lol-hero h1 {
+  max-width: 720px !important;
+  margin: 8px 0 10px !important;
+  color: #fff !important;
+  font-size: clamp(2.3rem, 4vw, 4.1rem) !important;
+  font-weight: 900 !important;
+  font-style: italic !important;
+  letter-spacing: -.055em !important;
+  line-height: .92 !important;
+}
+
+.nexus-lol-hero p:not(.eyebrow) {
+  max-width: 650px !important;
+  color: #94a0a9 !important;
+  line-height: 1.55 !important;
+}
+
+.nexus-hero-art {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  border-left: 1px solid #25313a;
+}
+
+.nexus-hero-art img {
+  position: absolute;
+  z-index: 3;
+  width: 104px;
+  height: 104px;
+  right: 58px;
+  top: 22px;
+}
+
+.nexus-block {
+  position: absolute;
+  display: block;
+  transform: skewX(-19deg);
+}
+
+.nexus-block.red {
+  width: 120px;
+  height: 180px;
+  left: 12px;
+  top: -14px;
+  background: var(--nexus-red);
+}
+
+.nexus-block.cyan {
+  width: 84px;
+  height: 180px;
+  left: 128px;
+  top: -14px;
+  background: var(--nexus-cyan);
+}
+
+.nexus-block.lime {
+  width: 116px;
+  height: 180px;
+  right: -50px;
+  top: -14px;
+  background: var(--nexus-lime);
+}
+
+.match-index-actions {
+  position: relative !important;
+  z-index: 4 !important;
+  align-items: flex-end !important;
+}
+
+.match-index-actions #polling-countdown {
+  color: #6f7c86 !important;
+  font-size: .66rem !important;
+}
+
+.match-index-actions .icon-button,
+.match-refresh-button {
+  min-height: 34px !important;
+  border: 1px solid var(--nexus-cyan) !important;
+  border-radius: 3px !important;
+  background: transparent !important;
+  color: var(--nexus-cyan) !important;
+  font-weight: 800 !important;
+}
+
+.match-index-actions .icon-button:hover,
+.match-refresh-button:hover:not(:disabled) {
+  background: var(--nexus-cyan) !important;
+  color: #041014 !important;
+}
+
+.nexus-match-board.match-index-lists,
+.match-index-frame .match-index-main .nexus-match-board.match-index-lists {
+  gap: 22px !important;
+  margin-top: 18px !important;
+}
+
+.match-index-section,
+.match-index-frame .match-index-main .match-index-section {
+  overflow: hidden !important;
+  border: 1px solid var(--nexus-rule) !important;
+  border-radius: 5px !important;
+  background: var(--nexus-panel) !important;
+}
+
+.match-index-section:first-child {
+  border-top: 3px solid var(--nexus-lime) !important;
+}
+
+.match-index-section:nth-child(2) {
+  border-top: 3px solid var(--nexus-red) !important;
+}
+
+.match-index-section-heading,
+.match-index-frame .match-index-main .match-index-section-heading {
+  min-height: 50px !important;
+  padding: 0 16px !important;
+  border-bottom: 1px solid var(--nexus-rule) !important;
+  background: #0f171d !important;
+}
+
+.match-index-section-heading h2 {
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+}
+
+.match-index-section-heading .eyebrow {
+  margin-bottom: 2px !important;
+  color: #64717a !important;
+  font-size: .55rem !important;
+  letter-spacing: .12em !important;
+}
+
+.match-index-section:first-child .match-index-section-heading .eyebrow {
+  color: var(--nexus-lime) !important;
+}
+
+.match-count {
+  min-width: 31px !important;
+  padding: 4px 7px !important;
+  border-radius: 2px !important;
+  border: 1px solid #34404a !important;
+  background: #0a1015 !important;
+  color: #d4dce1 !important;
+  text-align: center !important;
+}
+
+.match-grid {
+  display: block !important;
+}
+
+.index-match-card,
+.match-index-frame .match-index-main .index-match-card {
+  min-height: 74px !important;
+  display: grid !important;
+  grid-template-columns: 170px minmax(0, 1fr) 150px !important;
+  gap: 16px !important;
+  align-items: center !important;
+  padding: 9px 15px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--nexus-rule-soft) !important;
+  border-radius: 0 !important;
+  background: #0c1217 !important;
+  box-shadow: none !important;
+}
+
+.index-match-card:nth-child(even) {
+  background: #0e151b !important;
+}
+
+.index-match-card:last-child {
+  border-bottom: 0 !important;
+}
+
+.index-match-card:hover {
+  background: #131d24 !important;
+  border-left: 3px solid var(--nexus-cyan) !important;
+  padding-left: 12px !important;
+}
+
+.index-match-card.is-live,
+.match-index-frame .match-index-main .index-match-card.is-live {
+  border-left: 3px solid var(--nexus-lime) !important;
+  background: #0d1815 !important;
+  padding-left: 12px !important;
+}
+
+.index-match-card-top {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
+}
+
+.index-match-competition {
+  color: #d5dde1 !important;
+  font-size: .68rem !important;
+  font-weight: 800 !important;
+}
+
+.match-state {
+  color: #71808a !important;
+  font-size: .58rem !important;
+}
+
+.index-match-card.is-live .match-state,
+.match-state.live,
+.match-state.paused {
+  color: var(--nexus-lime) !important;
+  font-weight: 900 !important;
+}
+
+.index-match-matchup {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr) !important;
+  gap: 14px !important;
+  align-items: center !important;
+}
+
+.index-match-team {
+  gap: 9px !important;
+}
+
+.index-match-team strong {
+  color: #f2f5f6 !important;
+  font-size: .85rem !important;
+  font-weight: 800 !important;
+}
+
+.index-team-logo {
+  width: 35px !important;
+  height: 35px !important;
+  flex: 0 0 35px !important;
+  border: 1px solid #28343d !important;
+  border-radius: 4px !important;
+  background: #081015 !important;
+}
+
+.index-team-logo img {
+  width: 29px !important;
+  height: 29px !important;
+}
+
+.index-series-score,
+.match-index-frame .match-index-main .index-series-score {
+  min-width: 68px !important;
+  min-height: 35px !important;
+  border: 1px solid #34414a !important;
+  border-radius: 3px !important;
+  background: #080d11 !important;
+}
+
+.index-series-score strong {
+  color: #fff !important;
+  font-size: .95rem !important;
+  font-weight: 900 !important;
+}
+
+.index-series-score span {
+  color: #5d6b75 !important;
+}
+
+.index-match-card.is-live .index-series-score {
+  border-color: var(--nexus-lime) !important;
+}
+
+.index-match-card-bottom {
+  justify-content: flex-end !important;
+  color: #73808a !important;
+  font-size: .62rem !important;
+}
+
+.open-match-label {
+  color: var(--nexus-cyan) !important;
+  font-weight: 800 !important;
+}
+
+.match-index-empty {
+  min-height: 92px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #0c1217 !important;
+}
+
+.match-index-footer {
+  width: min(1480px, calc(100% - 32px)) !important;
+  padding: 18px 0 26px !important;
+  border-top: 1px solid var(--nexus-rule) !important;
+  color: #66727b !important;
+}
+
+/* Match page — keep live data system, use reference-style scoreboard hierarchy. */
+.nexus-match-app .match-topbar-back {
+  border-left: 2px solid var(--nexus-red) !important;
+  color: #d6dde1 !important;
+}
+
+.nexus-match-app .match-workspace {
+  width: min(1480px, calc(100% - 32px)) !important;
+  max-width: none !important;
+  padding-top: 18px !important;
+}
+
+.nexus-match-app .match-info-panel {
+  border: 1px solid var(--nexus-rule) !important;
+  border-radius: 6px !important;
+  background: #0b1116 !important;
+}
+
+body .nexus-match-app .analysis-header.match-series-header,
+body .nexus-match-app .analysis-header.series-hero-active {
+  border: 0 !important;
+  border-top: 3px solid var(--nexus-cyan) !important;
+  border-radius: 0 !important;
+  background: #0c1319 !important;
+}
+
+body .nexus-match-app .series-hero-topline {
+  min-height: 52px !important;
+  border-bottom: 1px solid var(--nexus-rule) !important;
+  background: #0d141a !important;
+}
+
+body .nexus-match-app .series-hero-status.live,
+body .nexus-match-app .series-hero-status.in-progress {
+  border: 0 !important;
+  border-radius: 2px !important;
+  background: var(--nexus-lime) !important;
+  color: #081005 !important;
+  font-weight: 900 !important;
+}
+
+body .nexus-match-app .series-hero-matchup {
+  min-height: 150px !important;
+  border-bottom: 1px solid var(--nexus-rule) !important;
+  background: #091016 !important;
+}
+
+body .nexus-match-app .series-hero-team {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body .nexus-match-app .series-hero-team.left {
+  border-left: 5px solid var(--nexus-cyan) !important;
+  padding-left: 20px !important;
+}
+
+body .nexus-match-app .series-hero-team.right {
+  border-right: 5px solid var(--nexus-red) !important;
+  padding-right: 20px !important;
+}
+
+body .nexus-match-app .series-hero-team strong {
+  color: #fff !important;
+  font-size: clamp(1.35rem, 2.1vw, 2.15rem) !important;
+  font-weight: 900 !important;
+}
+
+body .nexus-match-app .series-hero-logo {
+  border-radius: 5px !important;
+  background: #0f171d !important;
+}
+
+body .nexus-match-app .series-hero-score {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body .nexus-match-app .series-hero-score::after {
+  content: '' !important;
+  display: block !important;
+  width: 64px !important;
+  height: 3px !important;
+  margin: 8px auto 0 !important;
+  background: var(--nexus-lime) !important;
+}
+
+body .nexus-match-app .series-hero-score strong {
+  color: #fff !important;
+  font-size: clamp(3.2rem, 5.8vw, 5.8rem) !important;
+  font-weight: 900 !important;
+  letter-spacing: -.07em !important;
+  text-shadow: none !important;
+}
+
+body .nexus-match-app .series-hero-meta {
+  min-height: 46px !important;
+  background: #0c1217 !important;
+}
+
+body .nexus-match-app .game-selector {
+  padding: 0 18px !important;
+  border-bottom: 1px solid var(--nexus-rule) !important;
+  background: #0a1015 !important;
+}
+
+body .nexus-match-app .game-selector button {
+  min-height: 43px !important;
+  border: 0 !important;
+  border-bottom: 3px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #7d8b95 !important;
+}
+
+body .nexus-match-app .game-selector button[aria-pressed='true'],
+body .nexus-match-app .game-selector button.active {
+  border-bottom-color: var(--nexus-red) !important;
+  color: #fff !important;
+}
+
+.nexus-match-app .match-content-shell {
+  gap: 0 !important;
+  background: #091015 !important;
+}
+
+.nexus-match-app .match-primary-column {
+  min-width: 0 !important;
+  border-right: 1px solid var(--nexus-rule) !important;
+}
+
+.nexus-match-app .match-series-rail {
+  background: #0b1217 !important;
+}
+
+.nexus-match-app .match-current-game-heading {
+  border-left: 4px solid var(--nexus-red) !important;
+}
+
+.nexus-match-app .match-series-rail > .match-section-heading {
+  border-left: 4px solid var(--nexus-lime) !important;
+}
+
+.nexus-match-app .match-section-heading {
+  min-height: 48px !important;
+  padding: 0 14px !important;
+  border-bottom: 1px solid var(--nexus-rule) !important;
+  background: #0e161c !important;
+}
+
+.nexus-match-app .match-section-kicker {
+  color: #6d7b85 !important;
+  font-size: .56rem !important;
+  letter-spacing: .13em !important;
+}
+
+.nexus-match-app .match-game-content {
+  background: #091015 !important;
+}
+
+body .nexus-match-app .game-summary,
+body .nexus-match-app .live-game-summary,
+body .nexus-match-app .completed-game-summary {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #0d151b !important;
+}
+
+body .nexus-match-app .objective-grid {
+  border-top: 1px solid var(--nexus-rule) !important;
+  border-bottom: 1px solid var(--nexus-rule) !important;
+  background: #0a1116 !important;
+}
+
+body .nexus-match-app .objective-stat {
+  border-right: 1px solid var(--nexus-rule-soft) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body .nexus-match-app .role-scoreboard-board {
+  border: 1px solid var(--nexus-rule) !important;
+  border-top: 3px solid var(--nexus-red) !important;
+  border-radius: 4px !important;
+  background: #090f14 !important;
+}
+
+body .nexus-match-app .role-matchup-row {
+  border-bottom: 1px solid var(--nexus-rule-soft) !important;
+}
+
+body .nexus-match-app .role-matchup-row:nth-child(odd) {
+  background: #0b1217 !important;
+}
+
+body .nexus-match-app .role-matchup-row:nth-child(even) {
+  background: #0e161c !important;
+}
+
+body .nexus-match-app .role-player-delta.positive,
+body .nexus-match-app .gold-diff.positive {
+  color: var(--nexus-lime) !important;
+}
+
+body .nexus-match-app .role-player-delta.negative,
+body .nexus-match-app .gold-diff.negative {
+  color: #ff5274 !important;
+}
+
+body .nexus-match-app #series-history .completed-game {
+  border: 0 !important;
+  border-bottom: 1px solid var(--nexus-rule-soft) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body .nexus-match-app #series-history .completed-game.live,
+body .nexus-match-app #series-history .completed-game.paused,
+body .nexus-match-app #series-history .completed-game.draft {
+  border-left: 3px solid var(--nexus-lime) !important;
+  background: #0e1714 !important;
+}
+
+/* League-only: remove the old planned CS2 / Dota rows from legacy adapter rendering. */
+.nexus-match-app #adapter-list .adapter-row:not(.enabled) {
+  display: none !important;
+}
+
+.nexus-match-app .match-data-panel {
+  border-top: 1px solid var(--nexus-rule) !important;
+  background: #090f14 !important;
+}
+
+.nexus-match-app .platform-panel-toggle[aria-expanded='true'] {
+  color: var(--nexus-cyan) !important;
+  border-color: var(--nexus-cyan) !important;
+}
+
+.nexus-match-app .match-footer {
+  width: min(1480px, calc(100% - 32px)) !important;
+  border-top-color: var(--nexus-rule) !important;
+}
+
+@media (max-width: 1040px) {
+  .nexus-home-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .nexus-sidebar {
+    position: static;
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 0;
+  }
+
+  .nexus-sidebar-group {
+    min-width: max-content;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .nexus-sidebar-label,
+  .nexus-sidebar-note {
+    display: none;
+  }
+
+  .nexus-sidebar-link {
+    min-height: 34px;
+    border: 1px solid var(--nexus-rule);
+    border-left-width: 1px;
+    padding: 0 10px;
+  }
+
+  .nexus-game-chip {
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--nexus-rule);
+  }
+
+  .nexus-lol-hero,
+  .match-index-frame .match-index-main .nexus-lol-hero {
+    grid-template-columns: 1fr 220px !important;
+  }
+
+  .match-index-actions {
+    grid-column: 1 / -1;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .match-index-topbar-inner,
+  .match-topbar-inner,
+  .nexus-home-shell,
+  .match-index-footer,
+  .nexus-match-app .match-workspace,
+  .nexus-match-app .match-footer {
+    width: min(100% - 20px, 1480px) !important;
+  }
+
+  .nexus-nav {
+    display: none !important;
+  }
+
+  .connection-copy small,
+  .badge {
+    display: none !important;
+  }
+
+  .nexus-lol-hero,
+  .match-index-frame .match-index-main .nexus-lol-hero {
+    min-height: 0 !important;
+    grid-template-columns: 1fr !important;
+    gap: 18px !important;
+    padding: 22px !important;
+  }
+
+  .nexus-hero-art {
+    height: 86px;
+    border-left: 0;
+  }
+
+  .nexus-hero-art img {
+    width: 70px;
+    height: 70px;
+    right: 28px;
+    top: 8px;
+  }
+
+  .index-match-card,
+  .match-index-frame .match-index-main .index-match-card {
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+    min-height: 0 !important;
+    padding: 12px !important;
+  }
+
+  .index-match-card-top,
+  .index-match-card-bottom {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+  }
+
+  .index-match-matchup {
+    grid-template-columns: minmax(0, 1fr) 58px minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .index-team-logo {
+    width: 30px !important;
+    height: 30px !important;
+    flex-basis: 30px !important;
+  }
+
+  .index-team-logo img {
+    width: 25px !important;
+    height: 25px !important;
+  }
+
+  body .nexus-match-app .series-hero-team.left,
+  body .nexus-match-app .series-hero-team.right {
+    border-left: 0 !important;
+    border-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .nexus-match-app .match-primary-column {
+    border-right: 0 !important;
+  }
+}

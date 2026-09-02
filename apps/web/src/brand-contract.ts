@@ -1,6 +1,6 @@
-export const ARENASIGNAL_COLORS = {
-  signalRed: '#ff1744',
+export const NEXUS_LIVE_COLORS = {
+  signalRed: '#ff0033',
   electricCyan: '#00e5ff',
   acidLime: '#c6ff00',
-  ink: '#090b0f'
+  ink: '#080f12'
 } as const;

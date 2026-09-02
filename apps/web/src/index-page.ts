@@ -1,7 +1,6 @@
 import type { ScheduleEvent, SeriesContext, TeamRef } from '@esports-live/core';
 import { apiJson } from './api-client.ts';
 import './styles.css';
-import './index-page.css';
 
 interface HealthResponse {
   ok: boolean;
